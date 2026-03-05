@@ -12,12 +12,13 @@ import {
   AlertCircle,
   Shield,
   Lock,
+  Loader2,
 } from 'lucide-react';
 import Link from 'next/link';
 
 import { adminApi } from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { LanguageSwitcher, SprinterLoading } from '@/components/shared';
+import { LanguageSwitcher } from '@/components/shared';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -242,7 +243,7 @@ export default function AdminLoginPage() {
                   >
                     {isSubmitting ? (
                       <span className="flex items-center">
-                        <SprinterLoading size="xs" className="mr-2" />
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                         {t.auth.verifying}
                       </span>
                     ) : (
@@ -308,7 +309,7 @@ export default function AdminLoginPage() {
                   >
                     {isSubmitting ? (
                       <span className="flex items-center">
-                        <SprinterLoading size="xs" className="mr-2" />
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                         {t.auth.sending}
                       </span>
                     ) : (

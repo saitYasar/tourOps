@@ -16,6 +16,7 @@ import {
   CheckCircle2,
   AlertCircle,
   UserPlus,
+  Loader2,
 } from 'lucide-react';
 
 import { useAuth } from '@/contexts/AuthContext';
@@ -365,7 +366,7 @@ function LoginPageContent() {
                   >
                     {isSubmitting ? (
                       <span className="flex items-center">
-                        <SprinterLoading size="xs" className="mr-2" />
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                         {t.auth.verifying}
                       </span>
                     ) : (
@@ -455,7 +456,7 @@ function LoginPageContent() {
                   >
                     {isSubmitting ? (
                       <span className="flex items-center">
-                        <SprinterLoading size="xs" className="mr-2" />
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                         {t.auth.sending}
                       </span>
                     ) : (
