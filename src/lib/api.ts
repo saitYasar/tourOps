@@ -1952,8 +1952,8 @@ class ApiClient {
   // Service Categories
   // ============================================
 
-  async getServiceCategories(page = 1, limit = 100, lang: 'tr' | 'en' | 'de' | 'ar' = 'tr') {
-    return this.request<PaginatedResponse<ServiceCategoryDto>>(`/service-categories?page=${page}&limit=${limit}`, {
+  async getServiceCategories(lang: 'tr' | 'en' | 'de' | 'ar' = 'tr') {
+    return this.request<ServiceCategoryDto[]>(`/service-categories/tree?lang=${lang}`, {
       method: 'GET',
     }, lang as 'tr' | 'en', true);
   }
@@ -3398,10 +3398,11 @@ export const adminApi = {
 // ============================================
 
 export const serviceCategoryApi = {
-  async getAll(page = 1, limit = 100): Promise<{ success: boolean; data?: ServiceCategoryDto[]; error?: string }> {
+  async getAll(): Promise<{ success: boolean; data?: ServiceCategoryDto[]; error?: string }> {
     try {
-      const response = await apiClient.getServiceCategories(page, limit);
-      return { success: true, data: response.data };
+      const response = await apiClient.getServiceCategories();
+      const data = Array.isArray(response) ? response : (response as any).data ?? [];
+      return { success: true, data };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
