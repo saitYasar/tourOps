@@ -7,6 +7,7 @@ import { CheckCircle, XCircle, UserPlus } from 'lucide-react';
 import { invitationApi, type LoginResponseDto } from '@/lib/api';
 import { SprinterLoading } from '@/components/shared';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,7 @@ export default function AcceptInvitationPage() {
   const params = useParams();
   const router = useRouter();
   const { updateSessionFromRegistration } = useAuth();
+  const { t } = useLanguage();
   const [status, setStatus] = useState<AcceptStatus>('loading');
   const [error, setError] = useState<string>('');
   const [userData, setUserData] = useState<LoginResponseDto['user'] | null>(null);
@@ -30,7 +32,7 @@ export default function AcceptInvitationPage() {
   useEffect(() => {
     if (!token) {
       setStatus('error');
-      setError('Davet linki geçersiz');
+      setError(t.invitations.invalidLink);
       return;
     }
 
@@ -74,19 +76,19 @@ export default function AcceptInvitationPage() {
           // Redirect to dashboard after a short delay
           setTimeout(() => {
             if (userType === 'agency') {
-              router.push('/agency/regions');
+              router.push('/agency');
             } else {
               router.push('/restaurant');
             }
           }, 2000);
         } else {
           setStatus('error');
-          setError(result.error || 'Davet kabul edilemedi');
+          setError(result.error || t.invitations.acceptFailed);
         }
       } catch (err) {
         console.error('Invitation accept error:', err);
         setStatus('error');
-        setError((err as Error).message || 'Bir hata oluştu');
+        setError((err as Error).message || t.common.error);
       } finally {
         isProcessing.current = false;
       }
@@ -117,14 +119,14 @@ export default function AcceptInvitationPage() {
             )}
           </div>
           <CardTitle>
-            {status === 'loading' && 'Davet Kabul Ediliyor...'}
-            {status === 'success' && 'Hoş Geldiniz!'}
-            {status === 'error' && 'Hata Oluştu'}
+            {status === 'loading' && t.invitations.accepting}
+            {status === 'success' && t.invitations.welcome}
+            {status === 'error' && t.invitations.errorOccurred}
           </CardTitle>
           <CardDescription>
-            {status === 'loading' && 'Lütfen bekleyin, davetiniz işleniyor.'}
+            {status === 'loading' && t.invitations.pleaseWait}
             {status === 'success' && userData && (
-              <>Merhaba {userData.firstName}, sisteme başarıyla giriş yaptınız.</>
+              <>{t.invitations.helloSuccess} {userData.firstName}, {t.invitations.loginSuccess}</>
             )}
             {status === 'error' && error}
           </CardDescription>
@@ -132,7 +134,7 @@ export default function AcceptInvitationPage() {
         <CardContent>
           {status === 'loading' && (
             <div className="text-center text-sm text-slate-500">
-              Bu işlem birkaç saniye sürebilir...
+              {t.invitations.mayTakeMoment}
             </div>
           )}
 
@@ -141,7 +143,7 @@ export default function AcceptInvitationPage() {
               <div className="p-4 bg-green-50 rounded-lg text-center">
                 <UserPlus className="h-6 w-6 text-green-600 mx-auto mb-2" />
                 <p className="text-sm text-green-700">
-                  Ekibe başarıyla katıldınız. Yönlendiriliyorsunuz...
+                  {t.invitations.joinedTeam}
                 </p>
               </div>
             </div>
@@ -158,13 +160,13 @@ export default function AcceptInvitationPage() {
                   className="flex-1"
                   onClick={() => router.push('/login')}
                 >
-                  Giriş Yap
+                  {t.auth.login}
                 </Button>
                 <Button
                   className="flex-1"
                   onClick={() => window.location.reload()}
                 >
-                  Tekrar Dene
+                  {t.common.retry}
                 </Button>
               </div>
             </div>

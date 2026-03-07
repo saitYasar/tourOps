@@ -37,7 +37,7 @@ const initialFormData: ClientFormData = {
 };
 
 export default function AgencyClientsPage() {
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -45,6 +45,13 @@ export default function AgencyClientsPage() {
   const [formData, setFormData] = useState<ClientFormData>(initialFormData);
   const [errors, setErrors] = useState<Partial<Record<keyof ClientFormData, string>>>({});
   const [showPassword, setShowPassword] = useState(false);
+
+  // Fetch agency data for status badge
+  const { data: agencyResult } = useQuery({
+    queryKey: ['my-agency'],
+    queryFn: () => agencyApi.getMyAgency(),
+  });
+  const agencyStatus = agencyResult?.success ? agencyResult.data?.status : undefined;
 
   const {
     data: clientsData,
@@ -62,15 +69,15 @@ export default function AgencyClientsPage() {
     mutationFn: (data: CreateAgencyClientDto) => agencyApi.createClient(data),
     onSuccess: (result) => {
       if (result.success) {
-        toast.success('Müşteri başarıyla oluşturuldu');
+        toast.success(t.invitations.clientCreated);
         queryClient.invalidateQueries({ queryKey: ['agency-clients'] });
         closeForm();
       } else {
-        toast.error(result.error || 'Müşteri oluşturulamadı');
+        toast.error(result.error || t.invitations.clientCreateFailed);
       }
     },
     onError: () => {
-      toast.error('Müşteri oluşturulamadı');
+      toast.error(t.invitations.clientCreateFailed);
     },
   });
 
@@ -78,15 +85,15 @@ export default function AgencyClientsPage() {
     mutationFn: (clientId: number) => agencyApi.deleteClient(clientId),
     onSuccess: (result) => {
       if (result.success) {
-        toast.success('Müşteri silindi');
+        toast.success(t.invitations.clientDeleted);
         queryClient.invalidateQueries({ queryKey: ['agency-clients'] });
         setDeleteTarget(null);
       } else {
-        toast.error(result.error || 'Müşteri silinemedi');
+        toast.error(result.error || t.invitations.clientDeleteFailed);
       }
     },
     onError: () => {
-      toast.error('Müşteri silinemedi');
+      toast.error(t.invitations.clientDeleteFailed);
     },
   });
 
@@ -100,17 +107,17 @@ export default function AgencyClientsPage() {
   const validateForm = (): boolean => {
     const newErrors: Partial<Record<keyof ClientFormData, string>> = {};
 
-    if (!formData.firstName.trim()) newErrors.firstName = 'Ad zorunludur';
-    if (!formData.lastName.trim()) newErrors.lastName = 'Soyad zorunludur';
+    if (!formData.firstName.trim()) newErrors.firstName = t.invitations.firstNameRequired;
+    if (!formData.lastName.trim()) newErrors.lastName = t.invitations.lastNameRequired;
     if (!formData.username.trim()) {
-      newErrors.username = 'Kullanıcı adı zorunludur';
+      newErrors.username = t.invitations.usernameRequired;
     } else if (formData.username.length < 3) {
-      newErrors.username = 'En az 3 karakter olmalıdır';
+      newErrors.username = t.invitations.usernameMinLength;
     }
     if (!formData.password.trim()) {
-      newErrors.password = 'Şifre zorunludur';
+      newErrors.password = t.invitations.passwordRequired;
     } else if (formData.password.length < 6) {
-      newErrors.password = 'En az 6 karakter olmalıdır';
+      newErrors.password = t.invitations.passwordMinLength;
     }
 
     setErrors(newErrors);
@@ -150,9 +157,9 @@ export default function AgencyClientsPage() {
   if (isLoading) {
     return (
       <div className="flex flex-col h-full">
-        <Header title="Müşteriler" description="Acente müşterilerini yönetin" />
+        <Header title={t.agency.clients} description={t.agency.clientsDesc} organizationStatus={agencyStatus} lang={locale} />
         <div className="flex-1 p-6">
-          <LoadingState message="Müşteriler yükleniyor..." />
+          <LoadingState message={t.agency.agencyLoading} />
         </div>
       </div>
     );
@@ -161,9 +168,9 @@ export default function AgencyClientsPage() {
   if (error) {
     return (
       <div className="flex flex-col h-full">
-        <Header title="Müşteriler" description="Acente müşterilerini yönetin" />
+        <Header title={t.agency.clients} description={t.agency.clientsDesc} organizationStatus={agencyStatus} lang={locale} />
         <div className="flex-1 p-6">
-          <ErrorState message="Müşteriler yüklenemedi" onRetry={refetch} />
+          <ErrorState message={t.agency.agencyLoadError} onRetry={refetch} />
         </div>
       </div>
     );
@@ -171,7 +178,7 @@ export default function AgencyClientsPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <Header title="Müşteriler" description="Acente müşterilerini yönetin" />
+      <Header title={t.agency.clients} description={t.agency.clientsDesc} organizationStatus={agencyStatus} lang={locale} />
 
       <div className="flex-1 p-6 overflow-auto">
         <div className="max-w-6xl mx-auto space-y-6">
@@ -257,12 +264,12 @@ export default function AgencyClientsPage() {
                             {client.active ? (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
                                 <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-                                Aktif
+                                {t.agency.clientActive}
                               </span>
                             ) : (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
                                 <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-                                Pasif
+                                {t.agency.clientInactive}
                               </span>
                             )}
                           </td>
@@ -388,7 +395,7 @@ export default function AgencyClientsPage() {
       <ConfirmDialog
         open={!!deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
-        title="Müşteriyi Sil"
+        title={t.agency.deleteClient}
         description={
           deleteTarget
             ? `"${deleteTarget.client?.firstName || ''} ${deleteTarget.client?.lastName || ''}" müşterisini silmek istediğinize emin misiniz?`

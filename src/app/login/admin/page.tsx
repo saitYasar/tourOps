@@ -231,6 +231,7 @@ export default function AdminLoginPage() {
                       maxLength={6}
                       value={otp}
                       onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                      onKeyDown={(e) => { if (e.key === 'Enter' && otp.length === 6 && !isSubmitting) onVerifyOtp(); }}
                       className="h-14 text-center text-2xl tracking-[0.5em] font-mono rounded-xl"
                       autoFocus
                     />

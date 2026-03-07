@@ -303,6 +303,7 @@ export function useLayoutSync(
       const dirtyObjects = objects.filter((o) => o.dirty);
 
       if (dirtyRooms.length === 0 && dirtyTables.length === 0 && dirtyObjects.length === 0) {
+        dispatch({ type: 'MARK_CLEAN' });
         toast.info('Değişiklik yok');
         return;
       }

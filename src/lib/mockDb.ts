@@ -176,7 +176,7 @@ function generateSeedData(): Database {
       startDate: startDate.toISOString().split('T')[0],
       endDate: endDate.toISOString().split('T')[0],
       capacity: 20 + Math.floor(Math.random() * 30),
-      status: i < 7 ? 'Published' : 'Draft',
+      status: i < 7 ? 'published' : 'draft',
       route: routePoints,
       stops: [],
       photoUrl: tourPhotos[i],

@@ -66,6 +66,15 @@ const parseError = (errorMessage: string, t: Translations): ErrorState => {
     };
   }
 
+  if (lowerError.includes('not associated with any agency') ||
+      lowerError.includes('herhangi bir acentede mevcut değil') ||
+      lowerError.includes('not associated')) {
+    return {
+      type: 'already_exists',
+      message: t.auth.notAssociatedWithAgencyMsg || 'Bu e-posta adresi kayıtlı ancak herhangi bir acenteye bağlı değil. Lütfen giriş yapın.',
+    };
+  }
+
   if (lowerError.includes('invalid otp') ||
       lowerError.includes('geçersiz kod') ||
       lowerError.includes('otp')) {
@@ -142,8 +151,9 @@ function RegisterPageContent() {
   const { t } = useLanguage();
   const searchParams = useSearchParams();
 
-  // Get type from URL params first
+  // Get type and email from URL params
   const typeFromUrl = searchParams.get('type') as RegisterableRole | null;
+  const emailFromUrl = searchParams.get('email') || '';
   const initialRole: RegisterableRole = (typeFromUrl && ['agency', 'organization'].includes(typeFromUrl)) ? typeFromUrl : 'agency';
 
   const [error, setError] = useState<ErrorState | null>(null);
@@ -175,6 +185,9 @@ function RegisterPageContent() {
     organization: t.roles.restaurantDesc,
   };
 
+  const [phoneCountryCode, setPhoneCountryCode] = useState('+90');
+  const [phoneDisplay, setPhoneDisplay] = useState('');
+
   const {
     register,
     handleSubmit,
@@ -183,6 +196,7 @@ function RegisterPageContent() {
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
+      email: emailFromUrl,
       phoneCountryCode: '+90',
     },
   });
@@ -370,6 +384,7 @@ function RegisterPageContent() {
                       maxLength={6}
                       value={otp}
                       onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                      onKeyDown={(e) => { if (e.key === 'Enter' && otp.length === 6 && !isSubmitting) onVerifyOtp(); }}
                       className="h-14 text-center text-2xl tracking-[0.5em] font-mono rounded-xl border-slate-200 focus:border-blue-400 focus:ring-blue-400"
                       autoFocus
                     />
@@ -498,11 +513,14 @@ function RegisterPageContent() {
                     <Label htmlFor="phone" className="text-slate-700 text-sm">{t.auth.phoneLabel}</Label>
                     <div className="flex gap-2">
                       <Select
-                        defaultValue="+90"
-                        onValueChange={(value) => setValue('phoneCountryCode', value)}
+                        value={phoneCountryCode}
+                        onValueChange={(value) => {
+                          setPhoneCountryCode(value);
+                          setValue('phoneCountryCode', value);
+                        }}
                       >
                         <SelectTrigger className="w-[100px] h-11 rounded-xl border-slate-200">
-                          <SelectValue />
+                          <SelectValue placeholder="+90" />
                         </SelectTrigger>
                         <SelectContent>
                           {countryCodes.map((cc) => (
@@ -521,11 +539,12 @@ function RegisterPageContent() {
                         inputMode="numeric"
                         placeholder="5XX XXX XX XX"
                         className="flex-1 h-11 rounded-xl border-slate-200"
-                        {...register('phone', {
-                          onChange: (e) => {
-                            e.target.value = formatPhoneNumber(e.target.value);
-                          },
-                        })}
+                        value={phoneDisplay}
+                        onChange={(e) => {
+                          const formatted = formatPhoneNumber(e.target.value);
+                          setPhoneDisplay(formatted);
+                          setValue('phone', formatted, { shouldValidate: false });
+                        }}
                       />
                     </div>
                     {errors.phone && (

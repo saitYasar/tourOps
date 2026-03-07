@@ -64,11 +64,12 @@ export function LayoutInspector({
               })
             }
             className="h-8"
+            placeholder="Örn: Ana Salon, VIP Bölüm"
           />
         </div>
 
         <div className="space-y-2">
-          <Label className="text-xs">{t.venue.capacity}</Label>
+          <Label className="text-xs">Salon Kapasitesi</Label>
           <Input
             type="number"
             value={selectedRoom.capacity || ''}
@@ -155,6 +156,7 @@ export function LayoutInspector({
           <Label className="text-xs">{le?.name ?? 'Ad'}</Label>
           <Input
             value={selectedTable.name}
+            placeholder="Örn: Masa 1, Pencere Kenarı"
             onChange={(e) =>
               dispatch({
                 type: 'UPDATE_TABLE_PROPERTY',
@@ -277,6 +279,7 @@ export function LayoutInspector({
             <Label className="text-xs">{le?.name ?? 'Ad'}</Label>
             <Input
               value={selectedObject.displayName}
+              placeholder="Örn: Ağaç, Kapı, Saksı"
               onChange={(e) =>
                 dispatch({
                   type: 'UPDATE_OBJECT_PROPERTY',

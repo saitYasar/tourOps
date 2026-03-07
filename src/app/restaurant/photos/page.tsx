@@ -14,7 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { LoadingState, EmptyState, ConfirmDialog, ImageCropper, SprinterLoading } from '@/components/shared';
 
 export default function PhotosPage() {
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
   const queryClient = useQueryClient();
   const [deletePhotoId, setDeletePhotoId] = useState<number | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -22,6 +22,12 @@ export default function PhotosPage() {
   // Cropper state
   const [cropperOpen, setCropperOpen] = useState(false);
   const [cropperImageSrc, setCropperImageSrc] = useState('');
+
+  const { data: orgResult } = useQuery({
+    queryKey: ['my-organization'],
+    queryFn: () => organizationApi.getMyOrganization(),
+  });
+  const orgStatus = orgResult?.success ? orgResult.data?.status : undefined;
 
   // Fetch photos - sadece /organizations/my/photos endpoint'i
   const { data: photosResult, isLoading: photosLoading } = useQuery({
@@ -36,15 +42,15 @@ export default function PhotosPage() {
     mutationFn: (file: File) => organizationApi.addPhoto(file),
     onSuccess: (result) => {
       if (result.success) {
-        toast.success('Fotoğraf başarıyla eklendi');
+        toast.success(t.common.success);
         queryClient.invalidateQueries({ queryKey: ['organization-photos'] });
       } else {
-        toast.error(result.error || 'Fotoğraf eklenemedi');
+        toast.error(result.error || t.common.error);
       }
       setUploading(false);
     },
     onError: () => {
-      toast.error('Fotoğraf yüklenirken bir hata oluştu');
+      toast.error(t.common.error);
       setUploading(false);
     },
   });
@@ -54,15 +60,15 @@ export default function PhotosPage() {
     mutationFn: (photoId: number) => organizationApi.deletePhoto(photoId),
     onSuccess: (result) => {
       if (result.success) {
-        toast.success('Fotoğraf silindi');
+        toast.success(t.common.success);
         queryClient.invalidateQueries({ queryKey: ['organization-photos'] });
       } else {
-        toast.error(result.error || 'Fotoğraf silinemedi');
+        toast.error(result.error || t.common.error);
       }
       setDeletePhotoId(null);
     },
     onError: () => {
-      toast.error('Fotoğraf silinirken bir hata oluştu');
+      toast.error(t.common.error);
       setDeletePhotoId(null);
     },
   });
@@ -72,17 +78,17 @@ export default function PhotosPage() {
     if (!file) return;
 
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      toast.error('Sadece JPG, PNG veya WEBP dosyaları yükleyebilirsiniz');
+      toast.error(t.common.error);
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      toast.error('Dosya boyutu 5MB\'dan küçük olmalı');
+      toast.error(t.common.error);
       return;
     }
 
     if (photos.length >= 5) {
-      toast.error('En fazla 5 fotoğraf yükleyebilirsiniz');
+      toast.error(t.common.error);
       return;
     }
 
@@ -110,7 +116,7 @@ export default function PhotosPage() {
   if (photosLoading) {
     return (
       <div className="flex flex-col h-full">
-        <Header title="Fotoğraflar" />
+        <Header title={t.restaurant.photosTitle} organizationStatus={orgStatus} lang={locale} />
         <div className="flex-1 p-6">
           <LoadingState message={t.common.loading} />
         </div>
@@ -120,7 +126,7 @@ export default function PhotosPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <Header title="Fotoğraflar" description="İşletme fotoğraflarını yönetin" />
+      <Header title={t.restaurant.photosTitle} description={t.restaurant.photosDesc} organizationStatus={orgStatus} lang={locale} />
 
       <div className="flex-1 p-6 overflow-auto">
         <div className="max-w-4xl mx-auto">
@@ -130,10 +136,10 @@ export default function PhotosPage() {
               <div>
                 <CardTitle className="flex items-center gap-2">
                   <Image className="h-5 w-5" />
-                  Galeri Fotoğrafları
+                  {t.tours.gallery}
                 </CardTitle>
                 <CardDescription>
-                  {photos.length}/5 fotoğraf yüklendi
+                  {photos.length}/5
                 </CardDescription>
               </div>
               {photos.length < 5 && (
@@ -142,12 +148,12 @@ export default function PhotosPage() {
                     {uploading ? (
                       <>
                         <SprinterLoading size="xs" className="mr-2" />
-                        Yükleniyor...
+                        {t.common.loading}
                       </>
                     ) : (
                       <>
                         <Upload className="h-4 w-4 mr-2" />
-                        Fotoğraf Ekle
+                        {t.menu.uploadImage}
                       </>
                     )}
                   </Button>
@@ -165,9 +171,9 @@ export default function PhotosPage() {
               {photos.length === 0 ? (
                 <EmptyState
                   icon={Image}
-                  title="Henüz fotoğraf yok"
-                  description="İşletmenizin fotoğraflarını ekleyin"
-                  actionLabel="Fotoğraf Ekle"
+                  title={t.common.noData}
+                  description={t.restaurant.addPhotosDesc}
+                  actionLabel={t.menu.uploadImage}
                   onAction={() => document.querySelector<HTMLInputElement>('input[type="file"]')?.click()}
                 />
               ) : (
@@ -204,16 +210,16 @@ export default function PhotosPage() {
         imageSrc={cropperImageSrc}
         onCropComplete={handleCropComplete}
         aspectRatio={1}
-        title="Fotoğrafı Kırp"
+        title={t.restaurant.photosTitle}
       />
 
       {/* Delete Confirmation */}
       <ConfirmDialog
         open={!!deletePhotoId}
         onOpenChange={(open) => !open && setDeletePhotoId(null)}
-        title="Fotoğrafı Sil"
-        description="Bu fotoğrafı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz."
-        confirmLabel="Sil"
+        title={t.restaurant.deletePhoto}
+        description={t.restaurant.deletePhoto}
+        confirmLabel={t.common.delete}
         onConfirm={handleDelete}
         variant="destructive"
       />

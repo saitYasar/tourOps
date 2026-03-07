@@ -123,60 +123,42 @@ function TableShape({
         });
       }
     } else {
-      // Rectangular arrangement
-      const longSide = width > height;
-      const longLength = Math.max(width, height);
-      const shortLength = Math.min(width, height);
+      // Rectangular: chairs on 2 opposite sides only (matching layout editor)
+      const sideA = Math.ceil(capacity / 2);
+      const sideB = capacity - sideA;
 
-      // Calculate chairs per side based on table proportions
-      const ratio = longLength / shortLength;
-      const chairsLong = Math.ceil(capacity * ratio / (2 * ratio + 2));
-      let chairsShort = Math.ceil((capacity - chairsLong * 2) / 2);
-
-      // Ensure we don't exceed capacity
-      const totalChairs = chairsLong * 2 + chairsShort * 2;
-      if (totalChairs > capacity) {
-        if (chairsShort > 0) chairsShort = Math.max(0, chairsShort - 1);
-      }
-
-      // Top side (long if landscape)
-      const topChairs = longSide ? chairsLong : chairsShort;
-      for (let i = 0; i < Math.min(topChairs, capacity - positions.length); i++) {
-        const spacing = width / (topChairs + 1);
-        positions.push({
-          x: spacing * (i + 1) - chairSize / 2,
-          y: -chairOffset,
-        });
-      }
-
-      // Bottom side
-      const bottomChairs = longSide ? chairsLong : chairsShort;
-      for (let i = 0; i < Math.min(bottomChairs, capacity - positions.length); i++) {
-        const spacing = width / (bottomChairs + 1);
-        positions.push({
-          x: spacing * (i + 1) - chairSize / 2,
-          y: height + chairOffset - chairSize,
-        });
-      }
-
-      // Left side
-      const leftChairs = longSide ? chairsShort : chairsLong;
-      for (let i = 0; i < Math.min(leftChairs, capacity - positions.length); i++) {
-        const spacing = height / (leftChairs + 1);
-        positions.push({
-          x: -chairOffset,
-          y: spacing * (i + 1) - chairSize / 2,
-        });
-      }
-
-      // Right side
-      const rightChairs = longSide ? chairsShort : chairsLong;
-      for (let i = 0; i < Math.min(rightChairs, capacity - positions.length); i++) {
-        const spacing = height / (rightChairs + 1);
-        positions.push({
-          x: width + chairOffset - chairSize,
-          y: spacing * (i + 1) - chairSize / 2,
-        });
+      if (width > height) {
+        // Wide table — chairs on top and bottom only
+        for (let i = 0; i < sideA; i++) {
+          const spacing = width / (sideA + 1);
+          positions.push({
+            x: spacing * (i + 1) - chairSize / 2,
+            y: -chairOffset,
+          });
+        }
+        for (let i = 0; i < sideB; i++) {
+          const spacing = width / (sideB + 1);
+          positions.push({
+            x: spacing * (i + 1) - chairSize / 2,
+            y: height + chairOffset - chairSize,
+          });
+        }
+      } else {
+        // Tall or square table — chairs on left and right only
+        for (let i = 0; i < sideA; i++) {
+          const spacing = height / (sideA + 1);
+          positions.push({
+            x: -chairOffset,
+            y: spacing * (i + 1) - chairSize / 2,
+          });
+        }
+        for (let i = 0; i < sideB; i++) {
+          const spacing = height / (sideB + 1);
+          positions.push({
+            x: width + chairOffset - chairSize,
+            y: spacing * (i + 1) - chairSize / 2,
+          });
+        }
       }
     }
 
@@ -362,6 +344,44 @@ export function VenueModel3D({
               <Armchair className="h-12 w-12 mb-2" />
               <p>{t.venue.noTables}</p>
             </div>
+          ) : room?.width && room?.height && room.width > 0 && room.height > 0 && roomTables.some(tbl => tbl.x !== undefined && tbl.y !== undefined && (tbl.x !== 0 || tbl.y !== 0)) ? (
+            /* Coordinate-based layout: position tables at their saved positions */
+            (() => {
+              const roomW = room.width!;
+              const roomH = room.height!;
+              const roomX = room.x ?? 0;
+              const roomY = room.y ?? 0;
+              // Scale to fit the view container (max ~700x450)
+              const scl = Math.min(700 / roomW, 450 / roomH, 2);
+              const viewW = roomW * scl;
+              const viewH = roomH * scl;
+
+              return (
+                <div className="flex justify-center">
+                  <div className="relative" style={{ width: viewW, height: viewH }}>
+                    {roomTables.map((table) => {
+                      const tx = ((table.x ?? 0) - roomX) * scl;
+                      const ty = ((table.y ?? 0) - roomY) * scl;
+                      return (
+                        <div
+                          key={table.id}
+                          className="absolute"
+                          style={{ left: tx, top: ty }}
+                        >
+                          <TableShape
+                            table={table}
+                            color={color}
+                            isSelected={selectedTableId === table.id}
+                            onClick={() => onTableClick?.(table)}
+                            size="large"
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()
           ) : (
             <div className="flex flex-wrap gap-6 justify-center items-center">
               {roomTables.map((table) => (

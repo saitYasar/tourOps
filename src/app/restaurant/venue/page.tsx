@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, ChevronRight, ChevronDown, Box, Layers, Square, Circle, User, Power, PowerOff, MapPin, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { resourceApi, type ResourceDto, type ResourceTypeDto, type CreateResourceDto, type UpdateResourceDto } from '@/lib/api';
+import { resourceApi, organizationApi, type ResourceDto, type ResourceTypeDto, type CreateResourceDto, type UpdateResourceDto } from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 import { Header } from '@/components/layout/Header';
@@ -57,8 +57,6 @@ interface FormState {
   siblingTables: ResourceDto[];
 }
 
-// Grid size for coordinate system
-const GRID_SIZE = 15;
 
 const initialForm: FormState = {
   isOpen: false,
@@ -95,6 +93,7 @@ function TableWithSeats({
   onClick: () => void;
   parseCoordinates: (coords: string | string[] | number[] | undefined | null) => { x: number; y: number };
 }) {
+  const { t } = useLanguage();
   const coords = parseCoordinates(table.coordinates);
   const capacity = table.capacity || 4;
 
@@ -124,7 +123,7 @@ function TableWithSeats({
         transform: 'translate(-50%, -50%)',
       }}
       onClick={onClick}
-      title={`${table.name} - ${capacity} kişi`}
+      title={`${table.name} - ${capacity} ${t.venue.people}`}
     >
       {/* Seat dots */}
       {seats.map((pos, idx) => (
@@ -150,7 +149,13 @@ function TableWithSeats({
 
 export default function VenuePage() {
   const queryClient = useQueryClient();
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
+
+  const { data: orgResult } = useQuery({
+    queryKey: ['my-organization'],
+    queryFn: () => organizationApi.getMyOrganization(),
+  });
+  const orgStatus = orgResult?.success ? orgResult.data?.status : undefined;
 
   const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set());
   const [childrenCache, setChildrenCache] = useState<Record<number, ResourceDto[]>>({});
@@ -203,10 +208,10 @@ export default function VenuePage() {
         queryClient.invalidateQueries({ queryKey: ['resource-layout'] });
         // Keep existing cache visible, trigger background refresh
         setChildrenLoaded(false);
-        toast.success('Kaynak oluşturuldu');
+        toast.success(t.venue.resourceCreated);
         closeForm();
       } else {
-        toast.error(result.error || 'Oluşturulamadı');
+        toast.error(result.error || t.venue.createError);
       }
     },
   });
@@ -219,10 +224,10 @@ export default function VenuePage() {
         queryClient.invalidateQueries({ queryKey: ['resource-layout'] });
         // Keep existing cache visible, trigger background refresh
         setChildrenLoaded(false);
-        toast.success('Kaynak güncellendi');
+        toast.success(t.venue.resourceUpdated);
         closeForm();
       } else {
-        toast.error(result.error || 'Güncellenemedi');
+        toast.error(result.error || t.venue.updateError);
       }
     },
   });
@@ -234,10 +239,10 @@ export default function VenuePage() {
         queryClient.invalidateQueries({ queryKey: ['resource-layout'] });
         // Keep existing cache visible, trigger background refresh
         setChildrenLoaded(false);
-        toast.success('Kaynak silindi');
+        toast.success(t.venue.resourceDeleted);
         setDeleteTarget(null);
       } else {
-        toast.error(result.error || 'Silinemedi');
+        toast.error(result.error || t.venue.deleteError);
       }
     },
   });
@@ -247,7 +252,7 @@ export default function VenuePage() {
     onSuccess: (result) => {
       if (result.success) {
         queryClient.invalidateQueries({ queryKey: ['resource-layout'] });
-        toast.success('Kaynak aktifleştirildi');
+        toast.success(t.venue.resourceActivated);
       }
     },
   });
@@ -257,7 +262,7 @@ export default function VenuePage() {
     onSuccess: (result) => {
       if (result.success) {
         queryClient.invalidateQueries({ queryKey: ['resource-layout'] });
-        toast.success('Kaynak pasifleştirildi');
+        toast.success(t.venue.resourceDeactivated);
       }
     },
   });
@@ -358,6 +363,7 @@ export default function VenuePage() {
 
   // Load all children AFTER LayoutEditor finishes its initial API calls (avoids concurrent requests)
   const [editorReady, setEditorReady] = useState(false);
+  const [activeTab, setActiveTab] = useState('summary');
   const handleEditorReady = useCallback(() => {
     setEditorReady(true);
   }, []);
@@ -535,11 +541,11 @@ export default function VenuePage() {
 
     // For chairs/seats with count > 1, name is optional (will be auto-generated)
     if (!isChair && !form.name.trim()) {
-      toast.error('Lütfen ad alanını doldurun');
+      toast.error(t.venue.nameRequired);
       return;
     }
     if (!form.resourceTypeId) {
-      toast.error('Lütfen kaynak tipini seçin');
+      toast.error(t.venue.selectResourceType);
       return;
     }
 
@@ -563,7 +569,7 @@ export default function VenuePage() {
       updateMutation.mutate({ id: form.editId, data: baseData });
     } else if (isChair && form.count > 1) {
       // Multiple chair creation
-      const baseName = form.name.trim() || 'Sandalye';
+      const baseName = form.name.trim() || t.venue.chair;
       setMultipleCreating(true);
       try {
         for (let i = 1; i <= form.count; i++) {
@@ -577,10 +583,10 @@ export default function VenuePage() {
         queryClient.invalidateQueries({ queryKey: ['resource-layout'] });
         clearChildrenCache(form.parentId);
         setChildrenLoaded(false);
-        toast.success(`${form.count} sandalye oluşturuldu`);
+        toast.success(`${form.count} ${t.venue.chair.toLowerCase()} ${t.venue.resourceCreated.toLowerCase()}`);
         closeForm();
       } catch (error) {
-        toast.error('Sandalye oluşturulurken hata oluştu');
+        toast.error(t.venue.chairCreateError);
       } finally {
         setMultipleCreating(false);
       }
@@ -610,20 +616,20 @@ export default function VenuePage() {
                 console.error(`Chair ${tableName}-${i} creation failed:`, chairErr);
               }
             }
-            toast.success(`Masa ve ${chairsCreated} sandalye oluşturuldu`);
+            toast.success(`${t.venue.table} + ${chairsCreated} ${t.venue.chair.toLowerCase()} ${t.venue.resourceCreated.toLowerCase()}`);
           } else {
             console.warn('[Venue] Chair/seat resource type not found. Available types:', resourceTypes.map(t => t.code));
-            toast.success('Masa oluşturuldu (sandalye tipi bulunamadı)');
+            toast.success(t.venue.resourceCreated);
           }
           queryClient.invalidateQueries({ queryKey: ['resource-layout'] });
           clearChildrenCache(form.parentId);
           setChildrenLoaded(false);
           closeForm();
         } else {
-          toast.error(tableResult.error || 'Masa oluşturulamadı');
+          toast.error(tableResult.error || t.venue.tableCreateError);
         }
       } catch (error) {
-        toast.error('Masa oluşturulurken hata oluştu');
+        toast.error(t.venue.tableCreateErrorGeneral);
       } finally {
         setMultipleCreating(false);
       }
@@ -673,20 +679,20 @@ export default function VenuePage() {
                   <Icon className="h-5 w-5 text-indigo-500" />
                   <span className="font-medium">{resource.name}</span>
                   <Badge variant="outline" className="text-xs">
-                    {type?.name || 'Bilinmiyor'}
+                    {type?.name || t.venue.unknown}
                   </Badge>
                   {type?.code === 'floor' && (
                     <span className="text-sm text-slate-400">
-                      (Kat {resource.order >= 0 ? resource.order : resource.order})
+                      ({t.venue.floorLabel} {resource.order >= 0 ? resource.order : resource.order})
                     </span>
                   )}
                   {resource.capacity > 1 && (
                     <span className="text-sm text-slate-400">
-                      ({resource.capacity} kişi)
+                      ({resource.capacity} {t.venue.people})
                     </span>
                   )}
                   {!resource.active && (
-                    <Badge variant="secondary" className="text-xs">Pasif</Badge>
+                    <Badge variant="secondary" className="text-xs">{t.team.inactive}</Badge>
                   )}
                 </div>
                 <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
@@ -707,7 +713,7 @@ export default function VenuePage() {
                       ? deactivateMutation.mutate(resource.id)
                       : activateMutation.mutate(resource.id)
                     }
-                    title={resource.active ? 'Pasif Yap' : 'Aktif Yap'}
+                    title={resource.active ? t.venue.deactivate : t.venue.activate}
                   >
                     {resource.active ? (
                       <PowerOff className="h-4 w-4 text-orange-500" />
@@ -745,7 +751,7 @@ export default function VenuePage() {
                   {isLoadingChildren ? (
                     <div className="flex items-center justify-center py-4">
                       <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-slate-600"></div>
-                      <span className="ml-2 text-sm text-slate-500">Yükleniyor...</span>
+                      <span className="ml-2 text-sm text-slate-500">{t.common.loading}</span>
                     </div>
                   ) : hasChildren ? (
                     children.map((child) => (
@@ -753,7 +759,7 @@ export default function VenuePage() {
                     ))
                   ) : (
                     <p className="text-sm text-slate-500 text-center py-4">
-                      Henüz {childType?.name?.toLowerCase() || 'alt kaynak'} eklenmemiş
+                      {t.venue.noChildResources} {childType?.name?.toLowerCase() || ''} {t.venue.noChildResourcesSuffix}
                     </p>
                   )}
                 </div>
@@ -769,8 +775,8 @@ export default function VenuePage() {
   const convertToLegacyFormat = () => {
     const now = new Date().toISOString();
     const floors: Array<{ id: string; name: string; order: number; restaurantId: string; createdAt: string; updatedAt: string }> = [];
-    const rooms: Array<{ id: string; name: string; floorId: string; order: number; restaurantId: string; createdAt: string; updatedAt: string }> = [];
-    const tables: Array<{ id: string; name: string; roomId: string; capacity: number; order: number; restaurantId: string; createdAt: string; updatedAt: string }> = [];
+    const rooms: Array<{ id: string; name: string; floorId: string; order: number; restaurantId: string; createdAt: string; updatedAt: string; x?: number; y?: number; width?: number; height?: number }> = [];
+    const tables: Array<{ id: string; name: string; roomId: string; capacity: number; order: number; restaurantId: string; createdAt: string; updatedAt: string; x?: number; y?: number; w?: number; h?: number; rotation?: number }> = [];
 
     const processResource = (resource: ResourceDto, parentFloorId?: string, parentRoomId?: string) => {
       const type = resource.resourceType || getTypeById(resource.resourceTypeId);
@@ -787,6 +793,7 @@ export default function VenuePage() {
         });
         children.forEach(child => processResource(child, String(resource.id)));
       } else if (type?.code === 'room' && parentFloorId) {
+        const roomCoords = parseCoordinates(resource.coordinates);
         rooms.push({
           id: String(resource.id),
           name: resource.name,
@@ -795,9 +802,14 @@ export default function VenuePage() {
           restaurantId: '1',
           createdAt: resource.createdAt || now,
           updatedAt: resource.updatedAt || now,
+          x: roomCoords.x,
+          y: roomCoords.y,
+          width: resource.width,
+          height: resource.height,
         });
         children.forEach(child => processResource(child, parentFloorId, String(resource.id)));
       } else if (type?.code === 'table' && parentRoomId) {
+        const tableCoords = parseCoordinates(resource.coordinates);
         tables.push({
           id: String(resource.id),
           name: resource.name,
@@ -807,6 +819,11 @@ export default function VenuePage() {
           restaurantId: '1',
           createdAt: resource.createdAt || now,
           updatedAt: resource.updatedAt || now,
+          x: tableCoords.x,
+          y: tableCoords.y,
+          w: resource.width,
+          h: resource.height,
+          rotation: resource.rotation,
         });
       }
     };
@@ -820,20 +837,21 @@ export default function VenuePage() {
 
   return (
     <div className="flex flex-col h-full">
-      <Header title={t.venue.title} description={t.venue.description} />
+      <Header title={t.venue.title} description={t.venue.description} organizationStatus={orgStatus} lang={locale} />
 
       <div className="flex-1 p-6">
-        <Tabs defaultValue="summary" className="space-y-4" onValueChange={(tab) => {
+        <Tabs value={activeTab} onValueChange={(tab) => {
+          setActiveTab(tab);
           // 3D model tabına geçişte: editor hazırsa cache'i yenile, değilse editorReady sonrası otomatik yüklenecek
           if (tab === 'model' && editorReady && !childrenLoadingInProgress) {
             setChildrenLoaded(false);
           }
-        }}>
+        }} className="space-y-4">
           <div className="flex items-center justify-between">
             <TabsList>
               <TabsTrigger value="summary" className="gap-2">
                 <MapPin className="h-4 w-4" />
-                Kat Planı
+                {t.venue.floorPlan}
               </TabsTrigger>
               <TabsTrigger value="model" className="gap-2">
                 <Box className="h-4 w-4" />
@@ -843,17 +861,17 @@ export default function VenuePage() {
             {typesLoading ? (
               <Button disabled>
                 <Plus className="h-4 w-4 mr-2" />
-                Yükleniyor...
+                {t.common.loading}
               </Button>
             ) : rootType ? (
               <Button onClick={() => openCreateForm(null, rootType.id)}>
                 <Plus className="h-4 w-4 mr-2" />
-                Yeni {rootType.name}
+                {t.venue.addNew} {rootType.name}
               </Button>
             ) : (
               <Button variant="outline" disabled>
                 <Plus className="h-4 w-4 mr-2" />
-                Kaynak tipi bulunamadı
+                {t.venue.selectResourceType}
               </Button>
             )}
           </div>
@@ -871,39 +889,38 @@ export default function VenuePage() {
                       <Building2 className="h-10 w-10 text-indigo-600" />
                     </div>
                     <h2 className="text-2xl font-bold text-slate-900 mb-3">
-                      İşletmenizin Oturma Düzenini Oluşturun
+                      {t.venue.createSeatingTitle}
                     </h2>
                     <p className="text-slate-500 mb-6 leading-relaxed">
-                      Restoranınızın kat, salon ve masa yapısını tanımlayarak rezervasyon yönetimini kolaylaştırın.
-                      Bu bilgiler müşterilerinize sunulacak ve kapasite yönetiminde kullanılacaktır.
+                      {t.venue.createSeatingDesc}
                     </p>
 
                     <div className="grid grid-cols-3 gap-4 mb-8 w-full">
                       <div className="flex flex-col items-center p-4 bg-slate-50 rounded-lg">
                         <Layers className="h-6 w-6 text-indigo-500 mb-2" />
-                        <span className="text-sm font-medium text-slate-700">1. Kat Ekle</span>
-                        <span className="text-xs text-slate-400 mt-1">Zemin, 1. kat vb.</span>
+                        <span className="text-sm font-medium text-slate-700">{t.venue.addFloorStep}</span>
+                        <span className="text-xs text-slate-400 mt-1">{t.venue.addFloorStepDesc}</span>
                       </div>
                       <div className="flex flex-col items-center p-4 bg-slate-50 rounded-lg">
                         <Square className="h-6 w-6 text-blue-500 mb-2" />
-                        <span className="text-sm font-medium text-slate-700">2. Salon Ekle</span>
-                        <span className="text-xs text-slate-400 mt-1">Teras, iç mekan vb.</span>
+                        <span className="text-sm font-medium text-slate-700">{t.venue.addRoomStep}</span>
+                        <span className="text-xs text-slate-400 mt-1">{t.venue.addRoomStepDesc}</span>
                       </div>
                       <div className="flex flex-col items-center p-4 bg-slate-50 rounded-lg">
                         <Circle className="h-6 w-6 text-amber-500 mb-2" />
-                        <span className="text-sm font-medium text-slate-700">3. Masa Ekle</span>
-                        <span className="text-xs text-slate-400 mt-1">Kapasiteli masalar</span>
+                        <span className="text-sm font-medium text-slate-700">{t.venue.addTableStep}</span>
+                        <span className="text-xs text-slate-400 mt-1">{t.venue.addTableStepDesc}</span>
                       </div>
                     </div>
 
                     {rootType ? (
                       <Button size="lg" onClick={() => openCreateForm(null, rootType.id)} className="gap-2">
                         <Plus className="h-5 w-5" />
-                        İlk Katınızı Ekleyerek Başlayın
+                        {t.venue.startByAddingFloor}
                       </Button>
                     ) : (
                       <p className="text-sm text-red-500">
-                        Kaynak tipleri yüklenemedi. Sayfayı yenileyin.
+                        {t.venue.typesLoadError}
                       </p>
                     )}
                   </div>
@@ -915,7 +932,7 @@ export default function VenuePage() {
                   {/* Stats Cards */}
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Toplam Kat</CardTitle>
+                      <CardTitle className="text-sm font-medium">{t.venue.totalFloors}</CardTitle>
                       <Layers className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
@@ -924,7 +941,7 @@ export default function VenuePage() {
                   </Card>
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Toplam Salon</CardTitle>
+                      <CardTitle className="text-sm font-medium">{t.venue.totalRooms}</CardTitle>
                       <Square className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
@@ -938,7 +955,7 @@ export default function VenuePage() {
                   </Card>
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Toplam Masa</CardTitle>
+                      <CardTitle className="text-sm font-medium">{t.venue.totalTables}</CardTitle>
                       <Circle className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
@@ -955,12 +972,12 @@ export default function VenuePage() {
                   </Card>
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Toplam Kapasite</CardTitle>
+                      <CardTitle className="text-sm font-medium">{t.venue.totalCapacity}</CardTitle>
                       <User className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">
-                        {resources.reduce((acc, floor) => acc + floor.capacity, 0)} kişi
+                        {resources.reduce((acc, floor) => acc + floor.capacity, 0)} {t.venue.people}
                       </div>
                     </CardContent>
                   </Card>
@@ -984,6 +1001,16 @@ export default function VenuePage() {
 
           {/* 3D Model View */}
           <TabsContent value="model">
+            {resources.length > 0 && (
+              <div className="mb-4 flex items-center gap-3 rounded-lg border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-100">
+                  <Pencil className="h-4 w-4 text-blue-600" />
+                </div>
+                <p className="text-sm text-blue-800">
+                  Düzenleme yapmak için Mekan Planı sekmesine geçin.
+                </p>
+              </div>
+            )}
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">{t.venue.buildingModel}</CardTitle>
@@ -991,12 +1018,12 @@ export default function VenuePage() {
               </CardHeader>
               <CardContent>
                 {layoutLoading || childrenLoadingInProgress ? (
-                  <LoadingState message="Katlar ve salonlar yükleniyor..." />
+                  <LoadingState message={t.venue.loadingFloorsAndRooms} />
                 ) : !resources.length ? (
                   <EmptyState
                     icon={Box}
-                    title="3D model için veri yok"
-                    description="Önce kat planından kat ve salon ekleyin"
+                    title={t.venue.noDataFor3D}
+                    description={t.venue.noDataFor3DDesc}
                   />
                 ) : (
                   <VenueModel3D
@@ -1042,30 +1069,35 @@ export default function VenuePage() {
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {form.editId ? 'Düzenle' : 'Yeni Ekle'}: {form.resourceTypeId && getTypeById(form.resourceTypeId)?.name}
+              {form.editId ? t.venue.editResource : t.venue.addNew}: {form.resourceTypeId && getTypeById(form.resourceTypeId)?.name}
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit}>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label htmlFor="name">
-                  Ad {form.resourceTypeId && getTypeById(form.resourceTypeId)?.code === 'chair' && !form.editId ? '(opsiyonel)' : '*'}
+                  {t.venue.nameLabel} {form.resourceTypeId && getTypeById(form.resourceTypeId)?.code === 'chair' && !form.editId ? t.venue.optional : '*'}
                 </Label>
                 <Input
                   id="name"
                   value={form.name}
                   onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-                  placeholder={
-                    form.resourceTypeId && getTypeById(form.resourceTypeId)?.code === 'chair'
-                      ? 'Örn: Sandalye (boş bırakılırsa otomatik numaralanır)'
-                      : 'Örn: Ana Salon, Masa 1'
-                  }
+                  placeholder={(() => {
+                    const code = form.resourceTypeId ? getTypeById(form.resourceTypeId)?.code : '';
+                    switch (code) {
+                      case 'floor': return t.venue.floorNameExample;
+                      case 'room': return t.venue.roomNameExample;
+                      case 'table': return t.venue.tableNameExample;
+                      case 'chair': case 'seat': return t.venue.chairNameExample;
+                      default: return t.venue.resourceNamePlaceholder;
+                    }
+                  })()}
                 />
               </div>
 
               {form.resourceTypeId && getTypeById(form.resourceTypeId)?.code === 'floor' && (
                 <div className="space-y-2">
-                  <Label htmlFor="order">Kat Numarası</Label>
+                  <Label htmlFor="order">{t.venue.floorNumber}</Label>
                   <Select
                     value={String(form.order)}
                     onValueChange={(v) => setForm((prev) => ({ ...prev, order: parseInt(v) }))}
@@ -1074,27 +1106,46 @@ export default function VenuePage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="-2">-2. Kat (Bodrum)</SelectItem>
-                      <SelectItem value="-1">-1. Kat (Bodrum)</SelectItem>
-                      <SelectItem value="0">Zemin Kat</SelectItem>
-                      <SelectItem value="1">1. Kat</SelectItem>
-                      <SelectItem value="2">2. Kat</SelectItem>
-                      <SelectItem value="3">3. Kat</SelectItem>
-                      <SelectItem value="4">4. Kat</SelectItem>
-                      <SelectItem value="5">5. Kat</SelectItem>
+                      <SelectItem value="-2">-2. {t.venue.floorLabel} ({t.venue.basement})</SelectItem>
+                      <SelectItem value="-1">-1. {t.venue.floorLabel} ({t.venue.basement})</SelectItem>
+                      <SelectItem value="0">{t.venue.groundFloor}</SelectItem>
+                      <SelectItem value="1">1. {t.venue.floorLabel}</SelectItem>
+                      <SelectItem value="2">2. {t.venue.floorLabel}</SelectItem>
+                      <SelectItem value="3">3. {t.venue.floorLabel}</SelectItem>
+                      <SelectItem value="4">4. {t.venue.floorLabel}</SelectItem>
+                      <SelectItem value="5">5. {t.venue.floorLabel}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="capacity">Kapasite (Kişi)</Label>
+                <Label htmlFor="capacity">
+                  {(() => {
+                    const code = form.resourceTypeId ? getTypeById(form.resourceTypeId)?.code : '';
+                    switch (code) {
+                      case 'floor': return t.venue.floorCapacity;
+                      case 'room': return t.venue.roomCapacity;
+                      case 'table': return t.venue.personCount;
+                      default: return t.venue.capacityLabel;
+                    }
+                  })()}
+                </Label>
                 <Input
                   id="capacity"
                   type="number"
                   min={1}
                   value={form.capacity || ''}
                   onFocus={(e) => e.target.select()}
+                  placeholder={(() => {
+                    const code = form.resourceTypeId ? getTypeById(form.resourceTypeId)?.code : '';
+                    switch (code) {
+                      case 'floor': return `${t.venue.examplePrefix} 100`;
+                      case 'room': return `${t.venue.examplePrefix} 30`;
+                      case 'table': return `${t.venue.examplePrefix} 4`;
+                      default: return `${t.venue.examplePrefix} 1`;
+                    }
+                  })()}
                   onChange={(e) =>
                     setForm((prev) => ({
                       ...prev,
@@ -1106,7 +1157,7 @@ export default function VenuePage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="serviceStartAt">Servis Başlangıç</Label>
+                  <Label htmlFor="serviceStartAt">{t.venue.serviceStart}</Label>
                   <Input
                     id="serviceStartAt"
                     type="time"
@@ -1117,7 +1168,7 @@ export default function VenuePage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="serviceEndAt">Servis Bitiş</Label>
+                  <Label htmlFor="serviceEndAt">{t.venue.serviceEnd}</Label>
                   <Input
                     id="serviceEndAt"
                     type="time"
@@ -1132,7 +1183,7 @@ export default function VenuePage() {
               {/* Chair/Seat count for multiple creation */}
               {form.resourceTypeId && (getTypeById(form.resourceTypeId)?.code === 'chair' || getTypeById(form.resourceTypeId)?.code === 'seat') && !form.editId && (
                 <div className="space-y-2">
-                  <Label htmlFor="count">Sandalye Sayısı</Label>
+                  <Label htmlFor="count">{t.venue.chairCountLabel}</Label>
                   <div className="flex items-center gap-2">
                     <Input
                       id="count"
@@ -1150,141 +1201,12 @@ export default function VenuePage() {
                       className="w-24"
                     />
                     <span className="text-sm text-slate-500">
-                      {form.count > 1 ? `"${form.name || 'Sandalye'} 1" ... "${form.name || 'Sandalye'} ${form.count}" olarak oluşturulacak` : ''}
+                      {form.count > 1 ? `"${form.name || t.venue.chair} 1" ... "${form.name || t.venue.chair} ${form.count}" ${t.venue.willBeCreatedAs}` : ''}
                     </span>
                   </div>
                 </div>
               )}
 
-              {/* Coordinates - Visual picker with 20x20 grid (for types that support coordinates) */}
-              {form.resourceTypeId && getTypeById(form.resourceTypeId)?.supportsCoordinates && (
-                <div className="space-y-2">
-                  <Label>Konum</Label>
-                  <p className="text-xs text-slate-500 mb-2">
-                    {getTypeById(form.resourceTypeId)?.name} konumunu seçmek için tıklayın
-                    {form.siblingTables.length > 0 && ` (${form.siblingTables.length} mevcut öğe gösteriliyor)`}
-                  </p>
-                  <div
-                    className="relative bg-slate-100 border-2 border-dashed border-slate-300 rounded-lg cursor-crosshair"
-                    style={{ height: '300px' }}
-                    onClick={(e) => {
-                      const rect = e.currentTarget.getBoundingClientRect();
-                      // Snap to grid (20x20 = 5% increments)
-                      const gridStep = 100 / GRID_SIZE;
-                      const rawX = ((e.clientX - rect.left) / rect.width) * 100;
-                      const rawY = ((e.clientY - rect.top) / rect.height) * 100;
-                      const x = Math.round(rawX / gridStep) * gridStep;
-                      const y = Math.round(rawY / gridStep) * gridStep;
-
-                      // Check if position is occupied by another table
-                      const isOccupied = form.siblingTables.some(table => {
-                        const coords = parseCoordinates(table.coordinates);
-                        return Math.abs(coords.x - x) < gridStep && Math.abs(coords.y - y) < gridStep;
-                      });
-
-                      if (isOccupied) {
-                        toast.error('Bu konumda zaten bir masa var!');
-                        return;
-                      }
-
-                      setForm((prev) => ({
-                        ...prev,
-                        coordinateX: Math.max(0, Math.min(100, x)),
-                        coordinateY: Math.max(0, Math.min(100, y)),
-                      }));
-                    }}
-                  >
-                    {/* Grid lines - 20x20 */}
-                    <div
-                      className="absolute inset-0 pointer-events-none opacity-30"
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: `repeat(${GRID_SIZE}, 1fr)`,
-                        gridTemplateRows: `repeat(${GRID_SIZE}, 1fr)`,
-                      }}
-                    >
-                      {[...Array(GRID_SIZE * GRID_SIZE)].map((_, i) => (
-                        <div key={i} className="border border-slate-300" />
-                      ))}
-                    </div>
-
-                    {/* Existing tables (siblings) - shown in gray with seat dots */}
-                    {form.siblingTables.map((table) => {
-                      const coords = parseCoordinates(table.coordinates);
-                      const capacity = table.capacity || 4;
-                      // Calculate seat positions
-                      const seatPositions = [];
-                      const radius = 18;
-                      for (let i = 0; i < capacity; i++) {
-                        const angle = (i / capacity) * 2 * Math.PI - Math.PI / 2;
-                        seatPositions.push({
-                          x: Math.cos(angle) * radius,
-                          y: Math.sin(angle) * radius,
-                        });
-                      }
-                      return (
-                        <div
-                          key={table.id}
-                          className="absolute flex flex-col items-center pointer-events-none"
-                          style={{
-                            left: `${coords.x}%`,
-                            top: `${coords.y}%`,
-                            transform: 'translate(-50%, -50%)',
-                          }}
-                          title={`${table.name} - ${capacity} kişi`}
-                        >
-                          {/* Seat dots */}
-                          {seatPositions.map((pos, idx) => (
-                            <div
-                              key={idx}
-                              className="absolute w-2.5 h-2.5 rounded-full bg-slate-300 border border-slate-400"
-                              style={{
-                                left: `calc(50% + ${pos.x}px - 5px)`,
-                                top: `calc(50% + ${pos.y}px - 5px)`,
-                              }}
-                            />
-                          ))}
-                          <div className="w-8 h-8 rounded-full bg-slate-400 shadow flex items-center justify-center text-white text-xs font-bold z-10 relative">
-                            {capacity}
-                          </div>
-                          <span className="text-[10px] mt-0.5 bg-slate-600 text-white px-1 rounded whitespace-nowrap z-10 relative">
-                            {table.name}
-                          </span>
-                        </div>
-                      );
-                    })}
-
-                    {/* Current table marker - shown in amber */}
-                    <div
-                      className="absolute w-10 h-10 rounded-full bg-amber-500 shadow-lg flex items-center justify-center text-white font-bold text-sm transition-all duration-150 z-10"
-                      style={{
-                        left: `${form.coordinateX}%`,
-                        top: `${form.coordinateY}%`,
-                        transform: 'translate(-50%, -50%)',
-                      }}
-                    >
-                      <Circle className="h-4 w-4" />
-                    </div>
-
-                    {/* Corner labels */}
-                    <span className="absolute top-1 left-1 text-[10px] text-slate-400">Sol Üst</span>
-                    <span className="absolute top-1 right-1 text-[10px] text-slate-400">Sağ Üst</span>
-                    <span className="absolute bottom-1 left-1 text-[10px] text-slate-400">Sol Alt</span>
-                    <span className="absolute bottom-1 right-1 text-[10px] text-slate-400">Sağ Alt</span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs text-slate-500">
-                    <span>Konum: X={form.coordinateX}%, Y={form.coordinateY}% (Grid: {GRID_SIZE}x{GRID_SIZE})</span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setForm((prev) => ({ ...prev, coordinateX: 50, coordinateY: 50 }))}
-                    >
-                      Ortala
-                    </Button>
-                  </div>
-                </div>
-              )}
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={closeForm}>
@@ -1302,8 +1224,8 @@ export default function VenuePage() {
       <ConfirmDialog
         open={!!deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
-        title="Kaynağı Sil"
-        description={`"${deleteTarget?.name}" silinecek. Alt kaynakları varsa önce onları silmelisiniz.`}
+        title={t.venue.deleteResource}
+        description={`"${deleteTarget?.name}" ${t.venue.deleteResourceDesc}`}
         confirmLabel={t.common.delete}
         onConfirm={handleDelete}
         variant="destructive"

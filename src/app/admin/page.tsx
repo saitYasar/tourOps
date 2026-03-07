@@ -44,12 +44,6 @@ export default function AdminDashboardPage() {
     return <LoadingState />;
   }
 
-  // Debug: Log API responses to console
-  console.log('Admin Dashboard API Results:', {
-    orgsResult,
-    agenciesResult,
-  });
-
   // Check for errors
   const hasError = orgsError || agenciesError ||
     (orgsResult && !orgsResult.success) ||
@@ -70,14 +64,12 @@ export default function AdminDashboardPage() {
   const totalAgencies = agenciesResult?.success ? agenciesResult.data?.meta?.total || agencies.length : 0;
   const pendingAgencies = agencies.filter(agency => agency.status === 'pending').length;
 
-  const totalPending = pendingOrgs + pendingAgencies;
-
   // Calculate inactive (pasif) - organizations that are suspended
   const inactiveOrgs = suspendedOrgs;
 
   const statsCards = [
     {
-      title: 'Toplam İşletme',
+      title: t.admin.totalOrgLabel,
       value: totalOrgs,
       icon: Building2,
       color: 'bg-orange-500',
@@ -85,7 +77,7 @@ export default function AdminDashboardPage() {
       hasError: !orgsResult?.success,
     },
     {
-      title: 'Aktif İşletme',
+      title: t.admin.activeOrgLabel,
       value: activeOrgs,
       icon: CheckCircle2,
       color: 'bg-green-500',
@@ -93,7 +85,7 @@ export default function AdminDashboardPage() {
       hasError: !orgsResult?.success,
     },
     {
-      title: 'Pasif İşletme',
+      title: t.admin.inactiveOrgLabel,
       value: inactiveOrgs,
       icon: Ban,
       color: 'bg-red-500',
@@ -101,12 +93,12 @@ export default function AdminDashboardPage() {
       hasError: !orgsResult?.success,
     },
     {
-      title: 'Onay Bekleyen',
-      value: totalPending,
+      title: t.admin.pendingApproval,
+      value: pendingOrgs,
       icon: Clock,
       color: 'bg-amber-500',
       href: '/admin/restaurants?status=pending',
-      hasError: !orgsResult?.success || !agenciesResult?.success,
+      hasError: !orgsResult?.success,
     },
   ];
 
@@ -135,9 +127,9 @@ export default function AdminDashboardPage() {
         <div className="p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3">
           <AlertTriangle className="h-5 w-5 text-red-500 flex-shrink-0" />
           <div>
-            <p className="text-sm font-medium text-red-800">API bağlantı hatası</p>
+            <p className="text-sm font-medium text-red-800">{t.admin.apiConnectionError}</p>
             <p className="text-xs text-red-600">
-              {errorMessage || 'Bazı veriler yüklenemedi. Lütfen sayfayı yenileyin veya API durumunu kontrol edin.'}
+              {errorMessage || t.admin.someDataLoadError}
             </p>
           </div>
         </div>
@@ -177,37 +169,37 @@ export default function AdminDashboardPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Building2 className="h-5 w-5 text-orange-600" />
-              İşletme Durumları
+              {t.admin.orgStatuses}
             </CardTitle>
-            <CardDescription>İşletmelerin onay durumlarına göre dağılımı</CardDescription>
+            <CardDescription>{t.admin.orgStatusDistribution}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               <div className="flex items-center justify-between p-4 bg-amber-50 rounded-xl">
                 <div className="flex items-center gap-3">
                   <Clock className="h-5 w-5 text-amber-600" />
-                  <span className="text-sm font-medium text-amber-800">Onay Bekleyen</span>
+                  <span className="text-sm font-medium text-amber-800">{t.admin.pendingApproval}</span>
                 </div>
                 <Badge className="bg-amber-500">{pendingOrgs}</Badge>
               </div>
               <div className="flex items-center justify-between p-4 bg-green-50 rounded-xl">
                 <div className="flex items-center gap-3">
                   <CheckCircle2 className="h-5 w-5 text-green-600" />
-                  <span className="text-sm font-medium text-green-800">Aktif</span>
+                  <span className="text-sm font-medium text-green-800">{t.admin.statusActive}</span>
                 </div>
                 <Badge className="bg-green-500">{activeOrgs}</Badge>
               </div>
               <div className="flex items-center justify-between p-4 bg-red-50 rounded-xl">
                 <div className="flex items-center gap-3">
                   <Ban className="h-5 w-5 text-red-600" />
-                  <span className="text-sm font-medium text-red-800">Askıya Alınmış</span>
+                  <span className="text-sm font-medium text-red-800">{t.admin.statusSuspended}</span>
                 </div>
                 <Badge className="bg-red-500">{suspendedOrgs}</Badge>
               </div>
             </div>
             <Link href="/admin/restaurants">
               <Button className="w-full mt-4" variant="outline">
-                İşletmeleri Yönet
+                {t.admin.manageOrgs}
               </Button>
             </Link>
           </CardContent>
@@ -218,37 +210,39 @@ export default function AdminDashboardPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Briefcase className="h-5 w-5 text-blue-600" />
-              Acente Durumları
+              {t.admin.agencyStatuses}
             </CardTitle>
-            <CardDescription>Acentelerin durumlarına göre dağılımı</CardDescription>
+            <CardDescription>{t.admin.agencyStatusDistribution}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               <div className="flex items-center justify-between p-4 bg-blue-50 rounded-xl">
                 <div className="flex items-center gap-3">
                   <Briefcase className="h-5 w-5 text-blue-600" />
-                  <span className="text-sm font-medium text-blue-800">Toplam Acente</span>
+                  <span className="text-sm font-medium text-blue-800">{t.admin.totalAgencyLabel}</span>
                 </div>
                 <Badge className="bg-blue-500">{totalAgencies}</Badge>
               </div>
               <div className="flex items-center justify-between p-4 bg-amber-50 rounded-xl">
                 <div className="flex items-center gap-3">
                   <Clock className="h-5 w-5 text-amber-600" />
-                  <span className="text-sm font-medium text-amber-800">Onay Bekleyen</span>
+                  <span className="text-sm font-medium text-amber-800">{t.admin.pendingApproval}</span>
                 </div>
                 <Badge className="bg-amber-500">{pendingAgencies}</Badge>
               </div>
               <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
                 <div className="flex items-center gap-3">
                   <Activity className="h-5 w-5 text-slate-600" />
-                  <span className="text-sm font-medium text-slate-800">Sistem Durumu</span>
+                  <span className="text-sm font-medium text-slate-800">{t.admin.systemStatus}</span>
                 </div>
-                <Badge className="bg-green-500">Aktif</Badge>
+                <Badge className="bg-green-500">{t.admin.statusActive}</Badge>
               </div>
             </div>
-            <Button className="w-full mt-4" variant="outline" disabled>
-              Acenteleri Yönet (Yakında)
-            </Button>
+            <Link href="/admin/agencies">
+              <Button className="w-full mt-4" variant="outline">
+                {t.admin.manageAgencies}
+              </Button>
+            </Link>
           </CardContent>
         </Card>
       </div>
@@ -257,34 +251,37 @@ export default function AdminDashboardPage() {
       <Card className="border-0 shadow-sm">
         <CardHeader>
           <CardTitle>{t.admin.quickActions}</CardTitle>
-          <CardDescription>Hızlı erişim menüsü</CardDescription>
+          <CardDescription>{t.admin.quickAccessMenu}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Link href="/admin/restaurants">
               <Button variant="outline" className="w-full h-24 flex flex-col gap-2">
                 <Building2 className="h-8 w-8 text-orange-500" />
-                <span className="text-sm font-medium">İşletmeler</span>
-                <span className="text-xs text-slate-400">{totalOrgs} kayıt</span>
+                <span className="text-sm font-medium">{t.admin.orgsLabel}</span>
+                <span className="text-xs text-slate-400">{totalOrgs} {t.admin.record}</span>
               </Button>
             </Link>
             <Link href="/admin/restaurants?status=pending">
               <Button variant="outline" className="w-full h-24 flex flex-col gap-2 border-amber-200 bg-amber-50 hover:bg-amber-100">
                 <Clock className="h-8 w-8 text-amber-500" />
-                <span className="text-sm font-medium">Onay Bekleyenler</span>
-                <span className="text-xs text-amber-600">{totalPending} bekliyor</span>
+                <span className="text-sm font-medium">{t.admin.pendingApprovals}</span>
+                <span className="text-xs text-amber-600">{pendingOrgs + pendingAgencies} {t.admin.waiting}</span>
               </Button>
             </Link>
-            <Button variant="outline" className="w-full h-24 flex flex-col gap-2" disabled>
-              <Briefcase className="h-8 w-8 text-blue-500" />
-              <span className="text-sm font-medium">Acenteler</span>
-              <span className="text-xs text-slate-400">Yakında</span>
-            </Button>
-            <Button variant="outline" className="w-full h-24 flex flex-col gap-2" disabled>
-              <Users className="h-8 w-8 text-violet-500" />
-              <span className="text-sm font-medium">Kullanıcılar</span>
-              <span className="text-xs text-slate-400">Yakında</span>
-            </Button>
+            <Link href="/admin/agencies">
+              <Button variant="outline" className="w-full h-24 flex flex-col gap-2">
+                <Briefcase className="h-8 w-8 text-blue-500" />
+                <span className="text-sm font-medium">{t.admin.agenciesLabel}</span>
+                <span className="text-xs text-slate-400">{totalAgencies} {t.admin.record}</span>
+              </Button>
+            </Link>
+            <Link href="/admin/users">
+              <Button variant="outline" className="w-full h-24 flex flex-col gap-2">
+                <Users className="h-8 w-8 text-violet-500" />
+                <span className="text-sm font-medium">{t.admin.usersLabel}</span>
+              </Button>
+            </Link>
           </div>
         </CardContent>
       </Card>
@@ -294,31 +291,31 @@ export default function AdminDashboardPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <TrendingUp className="h-5 w-5 text-slate-600" />
-            Sistem Bilgisi
+            {t.admin.systemInfo}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div className="p-4 bg-white rounded-xl">
-              <p className="text-xs text-slate-500">API Durumu</p>
+              <p className="text-xs text-slate-500">{t.admin.apiStatus}</p>
               <p className={`text-lg font-semibold ${hasError ? 'text-red-600' : 'text-green-600'}`}>
-                {hasError ? 'Hata Var' : 'Çalışıyor'}
+                {hasError ? t.admin.hasErrorLabel : t.admin.running}
               </p>
             </div>
             <div className="p-4 bg-white rounded-xl">
-              <p className="text-xs text-slate-500">Toplam Firma</p>
-              <p className="text-lg font-semibold text-slate-900">{totalOrgs + totalAgencies}</p>
+              <p className="text-xs text-slate-500">{t.admin.totalOrgLabel}</p>
+              <p className="text-lg font-semibold text-slate-900">{totalOrgs}</p>
             </div>
             <div className="p-4 bg-white rounded-xl">
-              <p className="text-xs text-slate-500">Bekleyen Onay</p>
-              <p className="text-lg font-semibold text-amber-600">{totalPending}</p>
+              <p className="text-xs text-slate-500">{t.admin.totalAgencyLabel}</p>
+              <p className="text-lg font-semibold text-slate-900">{totalAgencies}</p>
             </div>
             <div className="p-4 bg-white rounded-xl">
-              <p className="text-xs text-slate-500">Pasif İşletme</p>
+              <p className="text-xs text-slate-500">{t.admin.inactiveOrgInfoLabel}</p>
               <p className="text-lg font-semibold text-red-600">{inactiveOrgs}</p>
             </div>
             <div className="p-4 bg-white rounded-xl">
-              <p className="text-xs text-slate-500">Versiyon</p>
+              <p className="text-xs text-slate-500">{t.admin.version}</p>
               <p className="text-lg font-semibold text-slate-900">v1.0.0</p>
             </div>
           </div>

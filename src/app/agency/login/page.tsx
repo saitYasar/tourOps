@@ -55,7 +55,8 @@ export default function AgencyClientLoginPage() {
 function AgencyClientLoginContent() {
   const { t } = useLanguage();
   const searchParams = useSearchParams();
-  const uuid = searchParams.get('uuid');
+  const uuid = searchParams.get('uuid') || searchParams.get('agencyUuid');
+  const tourUuid = searchParams.get('tourUuid');
 
   // Shared state
   const [mode, setMode] = useState<PageMode>('login');
@@ -146,8 +147,14 @@ function AgencyClientLoginContent() {
 
     setIsLoading(true);
     try {
-      // Login mode: only email, no name fields
-      const result = await realAuthApi.clientLoginRegister(email.trim());
+      // Login mode: only email, no name fields — still pass agencyUuid/tourUuid if present
+      const result = await realAuthApi.clientLoginRegister(
+        email.trim(),
+        undefined,
+        undefined,
+        uuid || undefined,
+        tourUuid || undefined,
+      );
       if (result.success) {
         setOtpStep('otp');
       } else {
@@ -173,6 +180,7 @@ function AgencyClientLoginContent() {
         firstName.trim(),
         lastName.trim(),
         uuid || undefined,
+        tourUuid || undefined,
       );
       if (result.success) {
         setOtpStep('otp');
@@ -211,9 +219,11 @@ function AgencyClientLoginContent() {
     setError('');
     setIsLoading(true);
     try {
-      const args: [string, string?, string?, string?] = [email.trim()];
+      const args: [string, string?, string?, string?, string?] = [email.trim()];
       if (mode === 'register') {
-        args.push(firstName.trim(), lastName.trim(), uuid || undefined);
+        args.push(firstName.trim(), lastName.trim(), uuid || undefined, tourUuid || undefined);
+      } else {
+        args.push(undefined, undefined, uuid || undefined, tourUuid || undefined);
       }
       const result = await realAuthApi.clientLoginRegister(...args);
       if (!result.success) {
@@ -675,24 +685,6 @@ function AgencyClientLoginContent() {
         </div>
       </div>
 
-      {/* CSS Animations */}
-      <style jsx global>{`
-        @keyframes float {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-10px); }
-        }
-        @keyframes float-delayed {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-15px); }
-        }
-        .animate-float {
-          animation: float 3s ease-in-out infinite;
-        }
-        .animate-float-delayed {
-          animation: float-delayed 4s ease-in-out infinite;
-          animation-delay: 1s;
-        }
-      `}</style>
     </div>
   );
 }
@@ -758,6 +750,7 @@ function OtpVerifySection({
             maxLength={6}
             value={otp}
             onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+            onKeyDown={(e) => { if (e.key === 'Enter' && otp.length === 6 && !isLoading) onVerify(); }}
             className="h-14 text-center text-2xl tracking-[0.5em] font-mono rounded-xl border-slate-200 focus:border-red-400 focus:ring-red-400"
             autoFocus
           />

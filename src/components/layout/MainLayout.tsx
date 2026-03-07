@@ -13,7 +13,7 @@ interface MainLayoutProps {
 }
 
 // Sidebar gosterilmeyecek sayfalar
-const noSidebarPaths = ['/login', '/register', '/agency/login', '/customer'];
+const noSidebarPaths = ['/', '/login', '/register', '/agency/login', '/agency/setup', '/restaurant/setup', '/customer'];
 
 export function MainLayout({ children }: MainLayoutProps) {
   const { isLoading, isAuthenticated } = useAuth();

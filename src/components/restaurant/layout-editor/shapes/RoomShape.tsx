@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useEffect } from 'react';
 import { Group, Rect, Text, Line } from 'react-konva';
 import type Konva from 'konva';
 import type { EditorRoom } from '../types';
@@ -28,6 +28,19 @@ interface RoomShapeProps {
 }
 
 export function RoomShape({ room, isSelected, onSelect, onDragStart, onDragMove, onDragEnd, onResize }: RoomShapeProps) {
+  const groupRef = useRef<Konva.Group>(null);
+  const isDraggingRef = useRef(false);
+
+  // Sync Konva node position from React props (needed for undo/restore)
+  useEffect(() => {
+    const node = groupRef.current;
+    if (node && !isDraggingRef.current) {
+      node.x(room.x);
+      node.y(room.y);
+      node.getLayer()?.batchDraw();
+    }
+  }, [room.x, room.y]);
+
   // Ref to track initial state at resize drag start
   const resizeRef = useRef<{
     px: number; py: number; // canvas pointer at start
@@ -47,6 +60,7 @@ export function RoomShape({ room, isSelected, onSelect, onDragStart, onDragMove,
 
   // --- Room drag (move) handlers ---
   const handleDragStart = () => {
+    isDraggingRef.current = true;
     onDragStart(room.id, room.x, room.y);
   };
 
@@ -62,6 +76,7 @@ export function RoomShape({ room, isSelected, onSelect, onDragStart, onDragMove,
   };
 
   const handleDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
+    isDraggingRef.current = false;
     const node = e.target;
     onDragEnd(room.id, node.x(), node.y());
   };
@@ -136,6 +151,7 @@ export function RoomShape({ room, isSelected, onSelect, onDragStart, onDragMove,
 
   return (
     <Group
+      ref={groupRef}
       x={room.x}
       y={room.y}
       draggable

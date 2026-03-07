@@ -5,7 +5,8 @@ import { useQuery } from '@tanstack/react-query';
 import { Copy, Check, Code2, Globe, Shield, Key, Send, BookOpen, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { apiClient } from '@/lib/api';
+import { apiClient, agencyApi } from '@/lib/api';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Header } from '@/components/layout/Header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -45,7 +46,15 @@ function CodeBlock({ children, copyText }: { children: string; copyText?: string
 }
 
 export default function ExternalApiPage() {
+  const { t, locale } = useLanguage();
   const [showUuid, setShowUuid] = useState(false);
+
+  // Fetch agency data for status badge
+  const { data: agencyResult } = useQuery({
+    queryKey: ['my-agency'],
+    queryFn: () => agencyApi.getMyAgency(),
+  });
+  const agencyStatus = agencyResult?.success ? agencyResult.data?.status : undefined;
 
   const {
     data: agency,
@@ -60,9 +69,9 @@ export default function ExternalApiPage() {
   if (isLoading) {
     return (
       <div className="flex flex-col h-full">
-        <Header title="External API" description="Dış kaynak entegrasyon API'si" />
+        <Header title="External API" description="Dış kaynak entegrasyon API'si" organizationStatus={agencyStatus} lang={locale} />
         <div className="flex-1 p-6">
-          <LoadingState message="Acente bilgileri yükleniyor..." />
+          <LoadingState message={t.agency.agencyLoading} />
         </div>
       </div>
     );
@@ -71,9 +80,9 @@ export default function ExternalApiPage() {
   if (error || !agency) {
     return (
       <div className="flex flex-col h-full">
-        <Header title="External API" description="Dış kaynak entegrasyon API'si" />
+        <Header title="External API" description="Dış kaynak entegrasyon API'si" organizationStatus={agencyStatus} lang={locale} />
         <div className="flex-1 p-6">
-          <ErrorState message="Acente bilgileri yüklenemedi" onRetry={refetch} />
+          <ErrorState message={t.agency.agencyLoadError} onRetry={refetch} />
         </div>
       </div>
     );
@@ -129,17 +138,17 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
   });
 
   if (response.ok) {
-    alert('Kayıt başarılı!');
+    alert('Success!');
   } else {
     const error = await response.json();
-    alert('Hata: ' + error.message);
+    alert(t.agency.errorMsg + ': ' + error.message);
   }
 });
 </script>`;
 
   return (
     <div className="flex flex-col h-full">
-      <Header title="External API" description="Dış kaynak entegrasyon API'si" />
+      <Header title="External API" description="Dış kaynak entegrasyon API'si" organizationStatus={agencyStatus} lang={locale} />
 
       <div className="flex-1 p-6 overflow-y-auto">
         <div className="max-w-4xl mx-auto space-y-6">
@@ -153,7 +162,7 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-1">
-                    <h3 className="text-sm font-medium text-blue-900">Acente UUID&apos;niz</h3>
+                    <h3 className="text-sm font-medium text-blue-900">{t.agency.agencyUuid}</h3>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -290,7 +299,7 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
                       <tr>
                         <td className="px-4 py-2.5"><code className="text-sm bg-slate-100 px-1.5 py-0.5 rounded">lang</code></td>
                         <td className="px-4 py-2.5 text-slate-600"><code>tr</code> | <code>en</code></td>
-                        <td className="px-4 py-2.5 text-slate-600">Hata mesajları için dil (varsayılan: tr)</td>
+                        <td className="px-4 py-2.5 text-slate-600">{t.agency.langParamDesc}</td>
                       </tr>
                     </tbody>
                   </table>
@@ -311,7 +320,7 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
                   </div>
                   <div className="flex items-center gap-3 p-3 bg-red-50 border border-red-200 rounded-lg">
                     <Badge className="bg-red-600 shrink-0">404</Badge>
-                    <span className="text-sm text-red-700">Acente bulunamadı</span>
+                    <span className="text-sm text-red-700">{t.agency.agencyNotFoundApi}</span>
                   </div>
                 </div>
               </div>
@@ -367,7 +376,7 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
                   <h3 className="font-medium text-amber-900">Dikkat Edilmesi Gerekenler</h3>
                   <ul className="text-sm text-amber-800 space-y-1.5 list-disc list-inside">
                     <li>UUID&apos;nizi gizli tutun; yalnızca kendi web sitenizde kullanın.</li>
-                    <li>Acenteniz <strong>aktif</strong> durumda değilse API 400 hatası döndürür.</li>
+                    <li>{t.agency.agencyNotActiveWarning}</li>
                     <li>Aynı e-posta ile tekrar kayıt denendiğinde mevcut müşteri döndürülür.</li>
                     <li>Tüm alanlar (<code>firstName</code>, <code>lastName</code>, <code>email</code>) zorunludur.</li>
                   </ul>

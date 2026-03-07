@@ -9,8 +9,7 @@ import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { toast } from 'sonner';
 
-import { organizationApi, locationApi } from '@/lib/api';
-import { preReservationApi, venueApi, menuApi } from '@/lib/mockApi';
+import { organizationApi, locationApi, resourceApi, serviceCategoryApi, preReservationOrgApi } from '@/lib/api';
 import { formatPhoneNumber, cleanPhoneNumber } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -53,11 +52,9 @@ const RestaurantMap = dynamic(
 
 export default function RestaurantDashboard() {
   const { user } = useAuth();
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const restaurantId = user?.restaurantId;
-
   // Dialog states
   const [isLocationDialogOpen, setIsLocationDialogOpen] = useState(false);
   const [isInfoDialogOpen, setIsInfoDialogOpen] = useState(false);
@@ -140,15 +137,15 @@ export default function RestaurantDashboard() {
     }),
     onSuccess: (result) => {
       if (result.success) {
-        toast.success('Konum bilgileri güncellendi');
+        toast.success(t.restaurant.orgUpdated);
         queryClient.invalidateQueries({ queryKey: ['my-organization'] });
         setIsLocationDialogOpen(false);
       } else {
-        toast.error(result.error || 'Güncelleme başarısız');
+        toast.error(result.error || t.restaurant.orgCreateFailed);
       }
     },
     onError: () => {
-      toast.error('Bir hata oluştu');
+      toast.error(t.restaurant.orgCreateError);
     },
   });
 
@@ -165,7 +162,7 @@ export default function RestaurantDashboard() {
 
   const handleSaveLocation = () => {
     if (!selectedCountryId || !selectedCityId || !selectedDistrictId) {
-      toast.error('Lütfen tüm alanları doldurun');
+      toast.error(t.common.required);
       return;
     }
     updateLocationMutation.mutate();
@@ -182,15 +179,15 @@ export default function RestaurantDashboard() {
     }, editCoverImage || undefined),
     onSuccess: (result) => {
       if (result.success) {
-        toast.success('İşletme bilgileri güncellendi');
+        toast.success(t.restaurant.orgUpdated);
         queryClient.invalidateQueries({ queryKey: ['my-organization'] });
         setIsInfoDialogOpen(false);
       } else {
-        toast.error(result.error || 'Güncelleme başarısız');
+        toast.error(result.error || t.restaurant.orgCreateFailed);
       }
     },
     onError: () => {
-      toast.error('Bir hata oluştu');
+      toast.error(t.restaurant.orgCreateError);
     },
   });
 
@@ -213,11 +210,11 @@ export default function RestaurantDashboard() {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      toast.error('Sadece JPG, PNG veya WEBP formatları desteklenir');
+      toast.error(t.common.error);
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      toast.error('Dosya boyutu en fazla 5MB olabilir');
+      toast.error(t.common.error);
       return;
     }
     const reader = new FileReader();
@@ -237,7 +234,7 @@ export default function RestaurantDashboard() {
 
   const handleSaveInfo = () => {
     if (!editName.trim()) {
-      toast.error('İşletme adı zorunludur');
+      toast.error(t.restaurant.orgNameRequired);
       return;
     }
     updateInfoMutation.mutate();
@@ -250,26 +247,32 @@ export default function RestaurantDashboard() {
     }
   }, [shouldRedirectToSetup, router]);
 
-  // Query: Gelen istekler
-  const { data: requests, isLoading: requestsLoading } = useQuery({
-    queryKey: ['restaurantRequests', restaurantId],
-    queryFn: () => preReservationApi.listByRestaurant(restaurantId || ''),
-    enabled: !!restaurantId,
+  // Query: Pre-reservation requests (real API)
+  const { data: requestsResult, isLoading: requestsLoading } = useQuery({
+    queryKey: ['org-pre-reservations'],
+    queryFn: () => preReservationOrgApi.getAll(),
+    enabled: !!organization,
   });
 
-  // Query: Katlar
-  const { data: floors, isLoading: floorsLoading } = useQuery({
-    queryKey: ['floors', restaurantId],
-    queryFn: () => venueApi.listFloors(restaurantId || ''),
-    enabled: !!restaurantId,
+  const requests = requestsResult?.success ? requestsResult.data || [] : [];
+
+  // Query: Resource layout (floors) from real API
+  const { data: layoutResult, isLoading: floorsLoading } = useQuery({
+    queryKey: ['resource-layout'],
+    queryFn: () => resourceApi.getLayout(),
+    enabled: !!organization,
   });
 
-  // Query: Kategoriler
-  const { data: categories, isLoading: categoriesLoading } = useQuery({
-    queryKey: ['menuCategories', restaurantId],
-    queryFn: () => menuApi.listCategories(restaurantId || ''),
-    enabled: !!restaurantId,
+  const floors = layoutResult?.success ? layoutResult.data || [] : [];
+
+  // Query: Service categories from real API
+  const { data: categoriesResult, isLoading: categoriesLoading } = useQuery({
+    queryKey: ['service-categories'],
+    queryFn: () => serviceCategoryApi.getAll(),
+    enabled: !!organization,
   });
+
+  const categories = categoriesResult?.success ? categoriesResult.data || [] : [];
 
   const isLoading = requestsLoading || floorsLoading || categoriesLoading || organizationLoading;
 
@@ -295,9 +298,9 @@ export default function RestaurantDashboard() {
     return organization?.id ? String(organization.id) : undefined;
   }, [organization?.id]);
 
-  const pendingRequests = requests?.filter((r) => r.status === 'Pending').length || 0;
-  const approvedRequests = requests?.filter((r) => r.status === 'Approved').length || 0;
-  const rejectedRequests = requests?.filter((r) => r.status === 'Rejected').length || 0;
+  const pendingRequests = requests.filter((r) => r.status === 'pending').length;
+  const approvedRequests = requests.filter((r) => r.status === 'approved').length;
+  const rejectedRequests = requests.filter((r) => r.status === 'rejected').length;
 
   // Show loading while redirecting or loading data
   if (isLoading || shouldRedirectToSetup) {
@@ -305,7 +308,7 @@ export default function RestaurantDashboard() {
       <div className="flex flex-col h-full">
         <Header title={t.restaurant.title} />
         <div className="flex-1 p-6">
-          <LoadingState message={shouldRedirectToSetup ? 'Yönlendiriliyor...' : t.common.loading} />
+          <LoadingState message={t.common.loading} />
         </div>
       </div>
     );
@@ -313,7 +316,7 @@ export default function RestaurantDashboard() {
 
   return (
     <div className="flex flex-col h-full">
-      <Header title={organization?.name || t.restaurant.title} description={t.restaurant.description} />
+      <Header title={organization?.name || t.restaurant.title} description={t.restaurant.description} organizationStatus={organization?.status} lang={locale} />
 
       <div className="flex-1 p-6 overflow-auto">
         {/* Ozet Kartlari */}
@@ -357,7 +360,7 @@ export default function RestaurantDashboard() {
               <ClipboardList className="h-4 w-4 text-slate-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{requests?.length || 0}</div>
+              <div className="text-2xl font-bold">{requests.length}</div>
               <p className="text-xs text-muted-foreground">{t.restaurant.allTime}</p>
             </CardContent>
           </Card>
@@ -369,7 +372,7 @@ export default function RestaurantDashboard() {
             <div className="flex items-center justify-between">
               <CardTitle className="text-xl flex items-center gap-2">
                 <Building2 className="h-6 w-6 text-blue-600" />
-                İşletme Bilgileri
+                {t.restaurant.orgInfo}
               </CardTitle>
               <Button
                 variant="outline"
@@ -378,7 +381,7 @@ export default function RestaurantDashboard() {
                 className="gap-2"
               >
                 <Pencil className="h-4 w-4" />
-                Düzenle
+                {t.common.edit}
               </Button>
             </div>
           </CardHeader>
@@ -388,7 +391,7 @@ export default function RestaurantDashboard() {
               <div className="mb-6 rounded-lg overflow-hidden">
                 <img
                   src={organization.coverImageUrl}
-                  alt="Kapak Fotoğrafı"
+                  alt={t.tours.coverImage}
                   className="w-full h-48 md:h-56 object-cover"
                 />
               </div>
@@ -397,13 +400,13 @@ export default function RestaurantDashboard() {
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {/* İşletme Adı */}
               <div className="space-y-1">
-                <p className="text-sm text-slate-500 font-medium">İşletme Adı</p>
+                <p className="text-sm text-slate-500 font-medium">{t.restaurant.orgName}</p>
                 <p className="text-lg font-semibold text-slate-900">{organization?.name || '-'}</p>
               </div>
 
               {/* Kategori */}
               <div className="space-y-1">
-                <p className="text-sm text-slate-500 font-medium">Kategori</p>
+                <p className="text-sm text-slate-500 font-medium">{t.admin.categoryLabel}</p>
                 <div className="flex items-center gap-2">
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
                     {organization?.category?.name || '-'}
@@ -413,7 +416,7 @@ export default function RestaurantDashboard() {
 
               {/* Telefon */}
               <div className="space-y-1">
-                <p className="text-sm text-slate-500 font-medium">Telefon</p>
+                <p className="text-sm text-slate-500 font-medium">{t.common.phone}</p>
                 <p className="text-lg font-semibold text-slate-900 flex items-center gap-2">
                   <Phone className="h-4 w-4 text-slate-400" />
                   {organization?.phone ? `+${organization.phoneCountryCode} ${organization.phone}` : '-'}
@@ -422,7 +425,7 @@ export default function RestaurantDashboard() {
 
               {/* E-posta */}
               <div className="space-y-1">
-                <p className="text-sm text-slate-500 font-medium">E-posta</p>
+                <p className="text-sm text-slate-500 font-medium">{t.admin.emailLabel}</p>
                 <p className="text-base font-medium text-slate-900 flex items-center gap-2">
                   <Mail className="h-4 w-4 text-slate-400" />
                   {organization?.email || '-'}
@@ -431,25 +434,25 @@ export default function RestaurantDashboard() {
 
               {/* Resmi Ünvan */}
               <div className="space-y-1">
-                <p className="text-sm text-slate-500 font-medium">Resmi Ünvan</p>
+                <p className="text-sm text-slate-500 font-medium">{t.admin.legalName}</p>
                 <p className="text-base font-medium text-slate-900">{organization?.legalName || '-'}</p>
               </div>
 
               {/* Vergi Dairesi */}
               <div className="space-y-1">
-                <p className="text-sm text-slate-500 font-medium">Vergi Dairesi</p>
+                <p className="text-sm text-slate-500 font-medium">{t.admin.taxOffice}</p>
                 <p className="text-base font-medium text-slate-900">{organization?.taxOffice || '-'}</p>
               </div>
 
               {/* Vergi No */}
               <div className="space-y-1">
-                <p className="text-sm text-slate-500 font-medium">Vergi Numarası</p>
+                <p className="text-sm text-slate-500 font-medium">{t.admin.taxNumber}</p>
                 <p className="text-base font-medium text-slate-900 font-mono">{organization?.taxNumber || '-'}</p>
               </div>
 
               {/* Adres - Tam Genişlik */}
               <div className="space-y-1 md:col-span-2">
-                <p className="text-sm text-slate-500 font-medium">Adres</p>
+                <p className="text-sm text-slate-500 font-medium">{t.admin.addressLabel}</p>
                 <p className="text-base text-slate-900 flex items-start gap-2">
                   <MapPin className="h-4 w-4 text-slate-400 mt-1 shrink-0" />
                   {organization?.address || '-'}
@@ -459,7 +462,7 @@ export default function RestaurantDashboard() {
               {/* Açıklama - Tam Genişlik */}
               {organization?.description && (
                 <div className="space-y-1 lg:col-span-3 md:col-span-2">
-                  <p className="text-sm text-slate-500 font-medium">Açıklama</p>
+                  <p className="text-sm text-slate-500 font-medium">{t.admin.descriptionLabel}</p>
                   <p className="text-base text-slate-700 bg-slate-50 p-3 rounded-lg">{organization.description}</p>
                 </div>
               )}
@@ -475,7 +478,7 @@ export default function RestaurantDashboard() {
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <MapPin className="h-5 w-5 text-emerald-600" />
-                  Konum
+                  {t.restaurant.locationStep}
                 </CardTitle>
                 <Button
                   variant="outline"
@@ -484,7 +487,7 @@ export default function RestaurantDashboard() {
                   className="gap-2"
                 >
                   <Pencil className="h-4 w-4" />
-                  Düzenle
+                  {t.common.edit}
                 </Button>
               </div>
             </CardHeader>
@@ -507,7 +510,7 @@ export default function RestaurantDashboard() {
                   </span>
                 )}
                 {!organization?.city && !organization?.district && (
-                  <span className="text-sm text-slate-400">İl/İlçe belirtilmemiş</span>
+                  <span className="text-sm text-slate-400">{t.admin.noLocation}</span>
                 )}
               </div>
               {mapRestaurants && mapCenter ? (
@@ -520,7 +523,7 @@ export default function RestaurantDashboard() {
                 />
               ) : (
                 <div className="h-[250px] bg-slate-100 rounded-lg flex items-center justify-center">
-                  <p className="text-slate-500">Konum bilgisi mevcut değil</p>
+                  <p className="text-slate-500">{t.admin.noLocation}</p>
                 </div>
               )}
             </CardContent>
@@ -529,16 +532,16 @@ export default function RestaurantDashboard() {
           {/* Hızlı Erişim */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-lg">Hızlı Erişim</CardTitle>
+              <CardTitle className="text-lg">{t.admin.quickActions}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               <Link href="/restaurant/team" className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors border">
                 <Users className="h-5 w-5 text-blue-500" />
-                <span className="text-sm font-medium">Ekip Yönetimi</span>
+                <span className="text-sm font-medium">{t.restaurant.teamManagement}</span>
               </Link>
               <Link href="/restaurant/photos" className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors border">
                 <Settings className="h-5 w-5 text-purple-500" />
-                <span className="text-sm font-medium">Galeri</span>
+                <span className="text-sm font-medium">{t.nav.photos}</span>
               </Link>
             </CardContent>
           </Card>
@@ -581,7 +584,7 @@ export default function RestaurantDashboard() {
                     <div>
                       <CardTitle className="text-lg">{t.venue.title}</CardTitle>
                       <p className="text-sm text-slate-500">
-                        {floors?.length || 0} {t.venue.floor.toLowerCase()}
+                        {floors.length} {t.venue.floor.toLowerCase()}
                       </p>
                     </div>
                   </div>
@@ -604,7 +607,7 @@ export default function RestaurantDashboard() {
                     <div>
                       <CardTitle className="text-lg">{t.menu.title}</CardTitle>
                       <p className="text-sm text-slate-500">
-                        {categories?.length || 0} {t.menu.categories.toLowerCase()}
+                        {categories.length} {t.menu.categories.toLowerCase()}
                       </p>
                     </div>
                   </div>
@@ -626,143 +629,146 @@ export default function RestaurantDashboard() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <MapPin className="h-5 w-5 text-emerald-600" />
-              Konum Bilgilerini Düzenle
+              {t.restaurant.editLocationInfo}
             </DialogTitle>
             <DialogDescription>
-              İşletmenizin konum ve adres bilgilerini güncelleyin.
+              {t.restaurant.editLocationDesc}
             </DialogDescription>
           </DialogHeader>
 
-          {countriesLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <SprinterLoading size="xs" />
-              <span className="ml-2 text-slate-500">Yükleniyor...</span>
-            </div>
-          ) : (
-            <div className="space-y-4 py-4">
-              {/* Country Select */}
-              <div className="space-y-2">
-                <Label>Ülke</Label>
-                <Select
-                  value={selectedCountryId?.toString() || ''}
-                  onValueChange={(v) => {
-                    setSelectedCountryId(parseInt(v));
-                    setSelectedCityId(null);
-                    setSelectedDistrictId(null);
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Ülke seçiniz" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {countries.map((country) => (
-                      <SelectItem key={country.id} value={country.id.toString()}>
-                        {country.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+          <form onSubmit={(e) => { e.preventDefault(); handleSaveLocation(); }}>
+            {countriesLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <SprinterLoading size="xs" />
+                <span className="ml-2 text-slate-500">{t.common.loading}</span>
               </div>
-
-              {/* City + District side by side */}
-              <div className="grid grid-cols-2 gap-3">
+            ) : (
+              <div className="space-y-4 py-4">
+                {/* Country Select */}
                 <div className="space-y-2">
-                  <Label>İl</Label>
+                  <Label>{t.admin.countryLabel}</Label>
                   <Select
-                    value={selectedCityId?.toString() || ''}
+                    value={selectedCountryId?.toString() || ''}
                     onValueChange={(v) => {
-                      setSelectedCityId(parseInt(v));
+                      setSelectedCountryId(parseInt(v));
+                      setSelectedCityId(null);
                       setSelectedDistrictId(null);
                     }}
-                    disabled={!selectedCountryId}
                   >
                     <SelectTrigger>
-                      {citiesLoading ? (
-                        <span className="flex items-center gap-2 text-slate-500">
-                          <SprinterLoading size="xs" />
-                          Yükleniyor...
-                        </span>
-                      ) : (
-                        <SelectValue placeholder="İl seçiniz" />
-                      )}
+                      <SelectValue placeholder={t.admin.countryLabel} />
                     </SelectTrigger>
                     <SelectContent>
-                      {cities.map((city) => (
-                        <SelectItem key={city.id} value={city.id.toString()}>
-                          {city.name}
+                      {countries.map((country) => (
+                        <SelectItem key={country.id} value={country.id.toString()}>
+                          {country.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
 
+                {/* City + District side by side */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>{t.admin.cityLabel}</Label>
+                    <Select
+                      value={selectedCityId?.toString() || ''}
+                      onValueChange={(v) => {
+                        setSelectedCityId(parseInt(v));
+                        setSelectedDistrictId(null);
+                      }}
+                      disabled={!selectedCountryId}
+                    >
+                      <SelectTrigger>
+                        {citiesLoading ? (
+                          <span className="flex items-center gap-2 text-slate-500">
+                            <SprinterLoading size="xs" />
+                            {t.common.loading}
+                          </span>
+                        ) : (
+                          <SelectValue placeholder={t.admin.cityLabel} />
+                        )}
+                      </SelectTrigger>
+                      <SelectContent>
+                        {cities.map((city) => (
+                          <SelectItem key={city.id} value={city.id.toString()}>
+                            {city.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>{t.admin.districtLabel}</Label>
+                    <Select
+                      value={selectedDistrictId?.toString() || ''}
+                      onValueChange={(v) => setSelectedDistrictId(parseInt(v))}
+                      disabled={!selectedCityId}
+                    >
+                      <SelectTrigger>
+                        {districtsLoading ? (
+                          <span className="flex items-center gap-2 text-slate-500">
+                            <SprinterLoading size="xs" />
+                            {t.common.loading}
+                          </span>
+                        ) : (
+                          <SelectValue placeholder={t.admin.districtLabel} />
+                        )}
+                      </SelectTrigger>
+                      <SelectContent>
+                        {districts.map((district) => (
+                          <SelectItem key={district.id} value={district.id.toString()}>
+                            {district.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Address */}
                 <div className="space-y-2">
-                  <Label>İlçe</Label>
-                  <Select
-                    value={selectedDistrictId?.toString() || ''}
-                    onValueChange={(v) => setSelectedDistrictId(parseInt(v))}
-                    disabled={!selectedCityId}
-                  >
-                    <SelectTrigger>
-                      {districtsLoading ? (
-                        <span className="flex items-center gap-2 text-slate-500">
-                          <SprinterLoading size="xs" />
-                          Yükleniyor...
-                        </span>
-                      ) : (
-                        <SelectValue placeholder="İlçe seçiniz" />
-                      )}
-                    </SelectTrigger>
-                    <SelectContent>
-                      {districts.map((district) => (
-                        <SelectItem key={district.id} value={district.id.toString()}>
-                          {district.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label htmlFor="locationAddress">{t.admin.addressLabel}</Label>
+                  <div className="relative">
+                    <MapPin className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                    <Textarea
+                      id="locationAddress"
+                      value={editLocationAddress}
+                      onChange={(e) => setEditLocationAddress(e.target.value)}
+                      placeholder={t.admin.addressLabel}
+                      rows={2}
+                      className="pl-10"
+                    />
+                  </div>
                 </div>
               </div>
+            )}
 
-              {/* Address */}
-              <div className="space-y-2">
-                <Label htmlFor="locationAddress">Adres</Label>
-                <div className="relative">
-                  <MapPin className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
-                  <Textarea
-                    id="locationAddress"
-                    value={editLocationAddress}
-                    onChange={(e) => setEditLocationAddress(e.target.value)}
-                    placeholder="Mahalle, sokak, bina no, kat..."
-                    rows={2}
-                    className="pl-10"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setIsLocationDialogOpen(false)}
-            >
-              İptal
-            </Button>
-            <Button
-              onClick={handleSaveLocation}
-              disabled={updateLocationMutation.isPending || !selectedDistrictId || countriesLoading}
-            >
-              {updateLocationMutation.isPending ? (
-                <>
-                  <SprinterLoading size="xs" className="mr-2" />
-                  Kaydediliyor...
-                </>
-              ) : (
-                'Kaydet'
-              )}
-            </Button>
-          </DialogFooter>
+            <DialogFooter className="gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsLocationDialogOpen(false)}
+              >
+                {t.common.cancel}
+              </Button>
+              <Button
+                type="submit"
+                disabled={updateLocationMutation.isPending || !selectedDistrictId || countriesLoading}
+              >
+                {updateLocationMutation.isPending ? (
+                  <>
+                    <SprinterLoading size="xs" className="mr-2" />
+                    {t.common.loading}
+                  </>
+                ) : (
+                  t.common.save
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 
@@ -772,17 +778,18 @@ export default function RestaurantDashboard() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Building2 className="h-5 w-5 text-blue-600" />
-              İşletme Bilgilerini Düzenle
+              {t.restaurant.editOrgInfo}
             </DialogTitle>
             <DialogDescription>
-              İşletmenizin temel bilgilerini güncelleyin.
+              {t.restaurant.editOrgInfoDesc}
             </DialogDescription>
           </DialogHeader>
 
+          <form onSubmit={(e) => { e.preventDefault(); handleSaveInfo(); }}>
           <div className="space-y-4 py-4">
             {/* Kapak Fotoğrafı */}
             <div className="space-y-2">
-              <Label>Kapak Fotoğrafı</Label>
+              <Label>{t.tours.coverImage}</Label>
               <div
                 className="relative w-full h-40 rounded-lg overflow-hidden border-2 border-dashed border-slate-300 hover:border-blue-400 transition-colors cursor-pointer group"
                 onClick={() => coverInputRef.current?.click()}
@@ -791,20 +798,20 @@ export default function RestaurantDashboard() {
                   <>
                     <img
                       src={editCoverPreview || organization!.coverImageUrl!}
-                      alt="Kapak Fotoğrafı"
+                      alt={t.tours.coverImage}
                       className="absolute inset-0 w-full h-full object-cover"
                     />
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                       <div className="text-white text-sm font-medium flex items-center gap-2">
                         <Upload className="h-4 w-4" />
-                        Değiştir
+                        {t.menu.changeImage}
                       </div>
                     </div>
                   </>
                 ) : (
                   <div className="flex flex-col items-center justify-center h-full text-slate-400">
                     <ImageIcon className="h-8 w-8 mb-2" />
-                    <span className="text-sm">Kapak fotoğrafı yükle (16:9)</span>
+                    <span className="text-sm">{t.menu.uploadImage} (16:9)</span>
                   </div>
                 )}
               </div>
@@ -819,18 +826,18 @@ export default function RestaurantDashboard() {
 
             {/* İşletme Adı */}
             <div className="space-y-2">
-              <Label htmlFor="editName">İşletme Adı *</Label>
+              <Label htmlFor="editName">{t.restaurant.orgNameLabel}</Label>
               <Input
                 id="editName"
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
-                placeholder="İşletme adı"
+                placeholder={t.restaurant.orgNamePlaceholder}
               />
             </div>
 
             {/* Telefon */}
             <div className="space-y-2">
-              <Label htmlFor="editPhone">Telefon</Label>
+              <Label htmlFor="editPhone">{t.common.phone}</Label>
               <div className="flex gap-2">
                 <Select
                   value={editPhoneCountryCode.toString()}
@@ -860,24 +867,24 @@ export default function RestaurantDashboard() {
 
             {/* Adres */}
             <div className="space-y-2">
-              <Label htmlFor="editAddress">Adres</Label>
+              <Label htmlFor="editAddress">{t.admin.addressLabel}</Label>
               <Textarea
                 id="editAddress"
                 value={editAddress}
                 onChange={(e) => setEditAddress(e.target.value)}
-                placeholder="Açık adres"
+                placeholder={t.admin.addressLabel}
                 rows={2}
               />
             </div>
 
             {/* Açıklama */}
             <div className="space-y-2">
-              <Label htmlFor="editDescription">Açıklama</Label>
+              <Label htmlFor="editDescription">{t.admin.descriptionLabel}</Label>
               <Textarea
                 id="editDescription"
                 value={editDescription}
                 onChange={(e) => setEditDescription(e.target.value)}
-                placeholder="İşletme hakkında kısa açıklama..."
+                placeholder={t.restaurant.orgDescPlaceholder}
                 rows={3}
               />
             </div>
@@ -885,25 +892,27 @@ export default function RestaurantDashboard() {
 
           <DialogFooter className="gap-2">
             <Button
+              type="button"
               variant="outline"
               onClick={() => setIsInfoDialogOpen(false)}
             >
-              İptal
+              {t.common.cancel}
             </Button>
             <Button
-              onClick={handleSaveInfo}
+              type="submit"
               disabled={updateInfoMutation.isPending}
             >
               {updateInfoMutation.isPending ? (
                 <>
                   <SprinterLoading size="xs" className="mr-2" />
-                  Kaydediliyor...
+                  {t.common.loading}
                 </>
               ) : (
-                'Kaydet'
+                t.common.save
               )}
             </Button>
           </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 
@@ -914,7 +923,7 @@ export default function RestaurantDashboard() {
         imageSrc={cropperImageSrc}
         onCropComplete={handleCoverCropComplete}
         aspectRatio={16 / 9}
-        title="Kapak Fotoğrafını Kırp"
+        title={t.tours.coverImage}
         cropShape="rect"
       />
     </div>

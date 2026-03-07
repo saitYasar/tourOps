@@ -29,7 +29,7 @@ export interface Region extends BaseEntity {
 // ============================================
 // Tour (Tur)
 // ============================================
-export type TourStatus = 'Draft' | 'Published';
+export type TourStatus = 'draft' | 'published' | 'cancelled' | 'completed';
 
 export interface TourStop {
   id: string;
@@ -96,6 +96,11 @@ export interface Room extends BaseEntity {
   restaurantId: string;
   name: string;
   order: number;
+  // Layout editor coordinates (pixels)
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
 }
 
 export interface Table extends BaseEntity {
@@ -105,6 +110,12 @@ export interface Table extends BaseEntity {
   capacity: number;
   order: number;
   isWindowSide?: boolean;
+  // Layout editor coordinates (pixels)
+  x?: number;
+  y?: number;
+  w?: number;
+  h?: number;
+  rotation?: number;
 }
 
 export interface Chair extends BaseEntity {

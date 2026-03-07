@@ -1,6 +1,6 @@
 'use client';
 
-import { Plus, ZoomIn, ZoomOut, Save, SquarePlus, Columns, PanelTop, Box } from 'lucide-react';
+import { Plus, ZoomIn, ZoomOut, Save, SquarePlus, Columns, PanelTop, Box, Undo2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -34,6 +34,8 @@ interface LayoutToolbarProps {
   onSave: () => void;
   saving: boolean;
   roomCount: number;
+  canUndo: boolean;
+  onUndo: () => void;
 }
 
 export function LayoutToolbar({
@@ -50,6 +52,8 @@ export function LayoutToolbar({
   onSave,
   saving,
   roomCount,
+  canUndo,
+  onUndo,
 }: LayoutToolbarProps) {
   const { t } = useLanguage();
 
@@ -123,6 +127,20 @@ export function LayoutToolbar({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <div className="h-6 w-px bg-slate-300" />
+
+      {/* Undo */}
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={onUndo}
+        disabled={!canUndo}
+        title="Ctrl+Z"
+      >
+        <Undo2 className="h-4 w-4 mr-1" />
+        {t.layoutEditor?.undo ?? 'Geri Al'}
+      </Button>
 
       <div className="h-6 w-px bg-slate-300" />
 

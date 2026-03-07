@@ -240,39 +240,6 @@ export function AnimatedMenu({
         );
       })}
 
-      {/* CSS Animations */}
-      <style jsx>{`
-        @keyframes fade-in {
-          0% { opacity: 0; transform: translateY(10px); }
-          100% { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes menu-item-in {
-          0% { opacity: 0; transform: translateX(-20px); }
-          100% { opacity: 1; transform: translateX(0); }
-        }
-        @keyframes pop-in {
-          0% { transform: scale(0); }
-          50% { transform: scale(1.3); }
-          100% { transform: scale(1); }
-        }
-        @keyframes bounce-in {
-          0% { transform: scale(0); }
-          50% { transform: scale(1.2); }
-          100% { transform: scale(1); }
-        }
-        .animate-fade-in {
-          animation: fade-in 0.4s ease-out both;
-        }
-        .animate-menu-item-in {
-          animation: menu-item-in 0.4s ease-out both;
-        }
-        .animate-pop-in {
-          animation: pop-in 0.3s ease-out;
-        }
-        .animate-bounce-in {
-          animation: bounce-in 0.4s ease-out;
-        }
-      `}</style>
     </div>
   );
 }

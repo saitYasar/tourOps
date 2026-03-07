@@ -83,7 +83,7 @@ export default function AdminCustomersPage() {
                 <TableHead>{t.auth.name}</TableHead>
                 <TableHead>{t.auth.email}</TableHead>
                 <TableHead>{t.common.phone}</TableHead>
-                <TableHead>{t.regions.createdAt}</TableHead>
+                <TableHead>{t.common.createdAt}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -91,8 +91,8 @@ export default function AdminCustomersPage() {
                 <TableRow key={customer.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-pink-100 flex items-center justify-center">
-                        <User className="h-5 w-5 text-pink-600" />
+                      <div className="h-10 w-10 rounded-full bg-pink-100 flex items-center justify-center font-semibold text-sm text-pink-600">
+                        {customer.name?.split(' ').map((n: string) => n.charAt(0).toUpperCase()).slice(0, 2).join('')}
                       </div>
                       <span className="font-medium">{customer.name}</span>
                     </div>

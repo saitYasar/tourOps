@@ -76,42 +76,21 @@ export function LayoutCanvas({ state, dispatch }: LayoutCanvasProps) {
     [dispatch],
   );
 
-  // Track room's previous position for computing delta during drag
-  const roomPrevPos = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-
   const handleRoomDragStart = useCallback(
-    (_roomId: number, x: number, y: number) => {
-      roomPrevPos.current = { x, y };
-    },
+    (_roomId: number, _x: number, _y: number) => {},
     [],
   );
 
   const handleRoomDragMove = useCallback(
     (roomId: number, newX: number, newY: number) => {
-      const dx = newX - roomPrevPos.current.x;
-      const dy = newY - roomPrevPos.current.y;
-      roomPrevPos.current = { x: newX, y: newY };
-
-      dispatch({ type: 'MOVE_ROOM', id: roomId, x: newX, y: newY });
-      // Move all tables inside this room by the same delta
-      for (const t of state.tables) {
-        if (t.roomId === roomId) {
-          dispatch({ type: 'MOVE_TABLE', id: t.id, x: t.x + dx, y: t.y + dy });
-        }
-      }
-      // Move all objects inside this room by the same delta
-      for (const o of state.objects) {
-        if (o.roomId === roomId) {
-          dispatch({ type: 'MOVE_OBJECT', id: o.id, x: o.x + dx, y: o.y + dy });
-        }
-      }
+      dispatch({ type: 'MOVE_ROOM_WITH_CHILDREN', id: roomId, x: newX, y: newY });
     },
-    [dispatch, state.tables, state.objects],
+    [dispatch],
   );
 
   const handleRoomDragEnd = useCallback(
     (roomId: number, x: number, y: number) => {
-      dispatch({ type: 'MOVE_ROOM', id: roomId, x, y });
+      dispatch({ type: 'MOVE_ROOM_WITH_CHILDREN', id: roomId, x, y });
     },
     [dispatch],
   );

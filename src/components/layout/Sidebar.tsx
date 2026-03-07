@@ -3,21 +3,16 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  MapPin,
   Route,
   Building2,
+  Briefcase,
   ClipboardList,
   UtensilsCrossed,
   LayoutGrid,
   LogOut,
   User,
-  Shield,
   Users,
-  Globe,
   Calendar,
-  FileText,
-  Database,
-  Settings,
   Compass,
   Plane,
   Image,
@@ -38,7 +33,7 @@ interface NavItem {
 }
 
 const agencyNavItems: NavItem[] = [
-  { labelKey: 'regions', href: '/agency/regions', icon: MapPin },
+  { labelKey: 'dashboard', href: '/agency', icon: LayoutGrid },
   { labelKey: 'tours', href: '/agency/tours', icon: Route },
   { labelKey: 'team', href: '/agency/team', icon: Users },
   { labelKey: 'clients', href: '/agency/clients', icon: User },
@@ -67,12 +62,11 @@ interface AdminNavItem {
 const adminNavItems: AdminNavItem[] = [
   { label: 'dashboard', href: '/admin', icon: LayoutGrid },
   { label: 'users', href: '/admin/users', icon: Users },
-  { label: 'regions', href: '/admin/regions', icon: Globe },
   { label: 'tours', href: '/admin/tours', icon: Calendar },
   { label: 'restaurants', href: '/admin/restaurants', icon: Building2 },
+  { label: 'agencies', href: '/admin/agencies', icon: Briefcase },
   { label: 'customers', href: '/admin/customers', icon: User },
   { label: 'requests', href: '/admin/requests', icon: ClipboardList },
-  { label: 'auditLogs', href: '/admin/audit-logs', icon: FileText },
 ];
 
 const roleBadgeColors: Record<UserRole, string> = {
@@ -118,12 +112,11 @@ export function Sidebar() {
   const adminLabels: Record<string, string> = {
     dashboard: t.admin.dashboard,
     users: t.admin.users,
-    regions: t.admin.regions,
     tours: t.admin.tours,
     restaurants: t.admin.restaurants,
+    agencies: t.admin.agencies,
     customers: t.admin.customers,
     requests: t.admin.requests,
-    auditLogs: t.admin.auditLogs,
   };
 
   return (
@@ -196,7 +189,8 @@ export function Sidebar() {
         ) : (
           // Other roles navigation
           navItems.map((item) => {
-            const isActive = pathname.startsWith(item.href);
+            const isDashboard = item.labelKey === 'dashboard';
+            const isActive = isDashboard ? pathname === item.href : pathname.startsWith(item.href);
             return (
               <Link
                 key={item.href}

@@ -53,6 +53,18 @@ export function ObjectShape({
 }: ObjectShapeProps) {
   const groupRef = useRef<Konva.Group>(null);
   const trRef = useRef<Konva.Transformer>(null);
+  const isDraggingRef = useRef(false);
+
+  // Sync Konva node position from React props (needed for undo/restore)
+  useEffect(() => {
+    const node = groupRef.current;
+    if (node && !isDraggingRef.current) {
+      node.x(object.x);
+      node.y(object.y);
+      node.rotation(object.r);
+      node.getLayer()?.batchDraw();
+    }
+  }, [object.x, object.y, object.r]);
 
   useEffect(() => {
     if (isSelected && trRef.current && groupRef.current) {
@@ -65,6 +77,7 @@ export function ObjectShape({
   const label = object.displayName;
 
   const handleDragMove = () => {
+    isDraggingRef.current = true;
     const node = groupRef.current;
     if (!node) return;
 
@@ -82,6 +95,7 @@ export function ObjectShape({
   };
 
   const handleDragEnd = () => {
+    isDraggingRef.current = false;
     const node = groupRef.current;
     if (!node) return;
     let x = snapToGrid(node.x());

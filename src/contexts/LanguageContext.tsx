@@ -1,20 +1,10 @@
 'use client';
 
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 import { locales, type Locale, type Translations } from '@/locales';
 
 const LANGUAGE_STORAGE_KEY = 'tourops_language';
 const DEFAULT_LOCALE: Locale = 'tr';
-
-function getInitialLocale(): Locale {
-  if (typeof window !== 'undefined') {
-    const savedLocale = localStorage.getItem(LANGUAGE_STORAGE_KEY) as Locale | null;
-    if (savedLocale && locales[savedLocale]) {
-      return savedLocale;
-    }
-  }
-  return DEFAULT_LOCALE;
-}
 
 interface LanguageContextType {
   locale: Locale;
@@ -25,7 +15,16 @@ interface LanguageContextType {
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>(getInitialLocale);
+  // Always start with default locale to match SSR — prevents hydration mismatch
+  const [locale, setLocaleState] = useState<Locale>(DEFAULT_LOCALE);
+
+  // Read saved locale AFTER hydration
+  useEffect(() => {
+    const savedLocale = localStorage.getItem(LANGUAGE_STORAGE_KEY) as Locale | null;
+    if (savedLocale && locales[savedLocale] && savedLocale !== DEFAULT_LOCALE) {
+      setLocaleState(savedLocale);
+    }
+  }, []);
 
   const setLocale = useCallback((newLocale: Locale) => {
     setLocaleState(newLocale);

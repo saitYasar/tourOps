@@ -5,10 +5,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Calendar, Clock, Users, CheckCircle, XCircle, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { preReservationApi, tourApi } from '@/lib/mockApi';
+import { preReservationOrgApi, organizationApi, type PreReservationDto } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import type { PreReservationRequest, RequestStatus } from '@/types';
 import { formatDate } from '@/lib/dateUtils';
 
 import { Header } from '@/components/layout/Header';
@@ -33,53 +32,43 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { LoadingState, EmptyState, ErrorState, RequestStatusBadge } from '@/components/shared';
 
+type PreReservationStatus = 'pending' | 'approved' | 'rejected';
+
 export default function RestaurantRequestsPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { t } = useLanguage();
-  const restaurantId = user?.restaurantId;
+  const { t, locale } = useLanguage();
 
-  const [statusFilter, setStatusFilter] = useState<RequestStatus | 'all'>('all');
-  const [selectedRequest, setSelectedRequest] = useState<PreReservationRequest | null>(null);
+  const { data: orgResult } = useQuery({
+    queryKey: ['my-organization'],
+    queryFn: () => organizationApi.getMyOrganization(),
+  });
+  const orgStatus = orgResult?.success ? orgResult.data?.status : undefined;
+
+  const [statusFilter, setStatusFilter] = useState<PreReservationStatus | 'all'>('all');
+  const [selectedRequest, setSelectedRequest] = useState<PreReservationDto | null>(null);
   const [responseNote, setResponseNote] = useState('');
   const [actionType, setActionType] = useState<'approve' | 'reject' | null>(null);
 
-  // Query: Gelen istekler
+  // Query: Pre-reservation requests from real API
   const {
-    data: requests,
+    data: requestsResult,
     isLoading,
     error,
     refetch,
   } = useQuery({
-    queryKey: ['restaurantRequests', restaurantId],
-    queryFn: () => preReservationApi.listByRestaurant(restaurantId || ''),
-    enabled: !!restaurantId,
+    queryKey: ['org-pre-reservations'],
+    queryFn: () => preReservationOrgApi.getAll(),
   });
 
-  // Query: Turlar (tur adini gostermek icin)
-  const { data: tours } = useQuery({
-    queryKey: ['tours'],
-    queryFn: tourApi.list,
-  });
+  const requests = requestsResult?.success ? requestsResult.data || [] : [];
 
-  // Mutation: Durum güncelle
-  const updateStatusMutation = useMutation({
-    mutationFn: ({
-      id,
-      status,
-      note,
-    }: {
-      id: string;
-      status: RequestStatus;
-      note?: string;
-    }) => preReservationApi.updateStatus(id, status, note),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['restaurantRequests', restaurantId] });
-      toast.success(
-        variables.status === 'Approved'
-          ? t.requests.approvedSuccess
-          : t.requests.rejectedSuccess
-      );
+  // Mutation: Approve
+  const approveMutation = useMutation({
+    mutationFn: (id: number) => preReservationOrgApi.approve(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['org-pre-reservations'] });
+      toast.success(t.requests.approvedSuccess);
       closeDialog();
     },
     onError: () => {
@@ -87,17 +76,26 @@ export default function RestaurantRequestsPage() {
     },
   });
 
-  const getTourName = (tourId: string) => {
-    return tours?.find((t) => t.id === tourId)?.name || '-';
-  };
+  // Mutation: Reject
+  const rejectMutation = useMutation({
+    mutationFn: (id: number) => preReservationOrgApi.reject(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['org-pre-reservations'] });
+      toast.success(t.requests.rejectedSuccess);
+      closeDialog();
+    },
+    onError: () => {
+      toast.error(t.common.error);
+    },
+  });
 
-  const openApproveDialog = (request: PreReservationRequest) => {
+  const openApproveDialog = (request: PreReservationDto) => {
     setSelectedRequest(request);
     setActionType('approve');
     setResponseNote('');
   };
 
-  const openRejectDialog = (request: PreReservationRequest) => {
+  const openRejectDialog = (request: PreReservationDto) => {
     setSelectedRequest(request);
     setActionType('reject');
     setResponseNote('');
@@ -112,23 +110,27 @@ export default function RestaurantRequestsPage() {
   const handleConfirmAction = () => {
     if (!selectedRequest || !actionType) return;
 
-    updateStatusMutation.mutate({
-      id: selectedRequest.id,
-      status: actionType === 'approve' ? 'Approved' : 'Rejected',
-      note: responseNote || undefined,
-    });
+    if (actionType === 'approve') {
+      approveMutation.mutate(selectedRequest.id);
+    } else {
+      rejectMutation.mutate(selectedRequest.id);
+    }
   };
 
-  const filteredRequests = requests?.filter((request) => {
+  const filteredRequests = requests.filter((request) => {
     if (statusFilter === 'all') return true;
     return request.status === statusFilter;
   });
+
+  const isPending = approveMutation.isPending || rejectMutation.isPending;
 
   return (
     <div className="flex flex-col h-full">
       <Header
         title={t.requests.title}
         description={t.requests.description}
+        organizationStatus={orgStatus}
+        lang={locale}
       />
 
       <div className="flex-1 p-6">
@@ -137,31 +139,31 @@ export default function RestaurantRequestsPage() {
             <CardTitle className="text-lg font-medium">{t.requests.list}</CardTitle>
             <Select
               value={statusFilter}
-              onValueChange={(v) => setStatusFilter(v as RequestStatus | 'all')}
+              onValueChange={(v) => setStatusFilter(v as PreReservationStatus | 'all')}
             >
               <SelectTrigger className="w-40">
                 <SelectValue placeholder={t.requests.status} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t.common.all}</SelectItem>
-                <SelectItem value="Pending">{t.requests.pending}</SelectItem>
-                <SelectItem value="Approved">{t.requests.approved}</SelectItem>
-                <SelectItem value="Rejected">{t.requests.rejected}</SelectItem>
+                <SelectItem value="pending">{t.requests.pending}</SelectItem>
+                <SelectItem value="approved">{t.requests.approved}</SelectItem>
+                <SelectItem value="rejected">{t.requests.rejected}</SelectItem>
               </SelectContent>
             </Select>
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <LoadingState message={t.common.loading} />
-            ) : error ? (
+            ) : error || (requestsResult && !requestsResult.success) ? (
               <ErrorState onRetry={() => refetch()} />
-            ) : !filteredRequests?.length ? (
+            ) : !filteredRequests.length ? (
               <EmptyState
                 icon={MessageSquare}
                 title={t.requests.notFound}
                 description={
                   statusFilter !== 'all'
-                    ? t.regions.notFoundDesc
+                    ? t.common.notFoundDesc
                     : t.requests.noRequests
                 }
               />
@@ -174,24 +176,24 @@ export default function RestaurantRequestsPage() {
                         <div className="space-y-2">
                           <div className="flex items-center gap-3">
                             <h3 className="font-semibold text-lg">
-                              {getTourName(request.tourId)}
+                              {request.tour?.title || `Tur #${request.tourId}`}
                             </h3>
-                            <RequestStatusBadge status={request.status} />
+                            <RequestStatusBadge status={request.status === 'pending' ? 'Pending' : request.status === 'approved' ? 'Approved' : 'Rejected'} />
                           </div>
 
                           <div className="flex flex-wrap items-center gap-4 text-sm text-slate-600">
-                            <span className="flex items-center gap-1">
-                              <Calendar className="h-4 w-4" />
-                              {formatDate(request.date)}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Clock className="h-4 w-4" />
-                              {request.timeStart} - {request.timeEnd}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Users className="h-4 w-4" />
-                              {request.headcount} {t.venue.persons}
-                            </span>
+                            {request.tour?.tourDate && (
+                              <span className="flex items-center gap-1">
+                                <Calendar className="h-4 w-4" />
+                                {formatDate(request.tour.tourDate)}
+                              </span>
+                            )}
+                            {request.headcount && (
+                              <span className="flex items-center gap-1">
+                                <Users className="h-4 w-4" />
+                                {request.headcount} {t.venue.persons}
+                              </span>
+                            )}
                           </div>
 
                           {request.note && (
@@ -208,7 +210,7 @@ export default function RestaurantRequestsPage() {
                           )}
                         </div>
 
-                        {request.status === 'Pending' && (
+                        {request.status === 'pending' && (
                           <div className="flex items-center gap-2">
                             <Button
                               variant="outline"
@@ -248,15 +250,19 @@ export default function RestaurantRequestsPage() {
             </DialogDescription>
           </DialogHeader>
 
+          <form onSubmit={(e) => { e.preventDefault(); handleConfirmAction(); }}>
           {selectedRequest && (
             <div className="space-y-4 py-4">
               <div className="bg-slate-50 p-3 rounded-lg space-y-1">
-                <p className="font-medium">{getTourName(selectedRequest.tourId)}</p>
-                <p className="text-sm text-slate-600">
-                  {formatDate(selectedRequest.date)} | {selectedRequest.timeStart} -{' '}
-                  {selectedRequest.timeEnd}
-                </p>
-                <p className="text-sm text-slate-600">{selectedRequest.headcount} {t.venue.persons}</p>
+                <p className="font-medium">{selectedRequest.tour?.title || `Tur #${selectedRequest.tourId}`}</p>
+                {selectedRequest.tour?.tourDate && (
+                  <p className="text-sm text-slate-600">
+                    {formatDate(selectedRequest.tour.tourDate)}
+                  </p>
+                )}
+                {selectedRequest.headcount && (
+                  <p className="text-sm text-slate-600">{selectedRequest.headcount} {t.venue.persons}</p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -275,21 +281,22 @@ export default function RestaurantRequestsPage() {
           )}
 
           <DialogFooter>
-            <Button variant="outline" onClick={closeDialog}>
+            <Button type="button" variant="outline" onClick={closeDialog}>
               {t.common.cancel}
             </Button>
             <Button
-              onClick={handleConfirmAction}
-              disabled={updateStatusMutation.isPending}
+              type="submit"
+              disabled={isPending}
               variant={actionType === 'reject' ? 'destructive' : 'default'}
             >
-              {updateStatusMutation.isPending
+              {isPending
                 ? t.common.loading
                 : actionType === 'approve'
                 ? t.requests.approve
                 : t.requests.reject}
             </Button>
           </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

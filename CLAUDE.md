@@ -1,5 +1,29 @@
 # TourOps - Project Guidelines
 
+## Türkçe Karakter Kuralı
+
+Tüm kullanıcıya görünen metinlerde (UI, metadata, SEO, placeholder, açıklama vb.) **Türkçe özel karakterler** doğru yazılmalıdır. ASCII karşılıkları kullanılmamalıdır:
+
+| Yanlış | Doğru |
+|--------|-------|
+| o | ö |
+| s | ş |
+| u | ü |
+| c | ç |
+| g | ğ |
+| i | ı (küçük noktalı i değil, noktasız ı) |
+| I | İ (büyük noktasız I değil, noktalı İ) |
+
+**Örnekler:**
+- `Yonetim` → `Yönetim`
+- `Isletme` → `İşletme`
+- `ucretsiz` → `ücretsiz`
+- `dijitallestirin` → `dijitalleştirin`
+- `giris` → `giriş`
+- `musteri` → `müşteri`
+
+Bu kural metadata, SEO title/description, hardcoded string ve locale dosyaları dahil tüm Türkçe metinler için geçerlidir.
+
 ## Auto-Select Rule for Dropdowns
 
 Dinamik veri ile dolan Select/dropdown bilesenlerinde, eger **tek bir secenek** varsa ve **henuz bir sey secilmemisse**, o secenek otomatik olarak secili gelmeli.

@@ -9,6 +9,17 @@ import { realAuthApi, type OrganizationLoginRegisterDto, type AgencyLoginRegiste
 const AUTH_TOKEN_KEY = 'tourops_access_token';
 const AUTH_USER_DATA_KEY = 'tourops_user_data';
 
+// Parse JWT to extract organizationId/agencyId
+function parseJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(atob(base64));
+  } catch {
+    return null;
+  }
+}
+
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
@@ -27,7 +38,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Public sayfalar (auth gerektirmeyen)
-const publicPaths = ['/login', '/login/customer', '/login/admin', '/register', '/agency/login'];
+const publicPaths = ['/', '/login', '/login/customer', '/login/admin', '/register', '/agency/login'];
 // Paths that start with these prefixes are also public
 const publicPathPrefixes = ['/invitations/accept'];
 
@@ -66,6 +77,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               role = 'agency';
             }
 
+            // Extract organizationId/agencyId from JWT token
+            const jwtPayload = parseJwtPayload(token);
+            const organizationId = jwtPayload?.organizationId as number | undefined;
+            const agencyId = jwtPayload?.agencyId as number | undefined;
+
             // Convert API user to local User type
             const loadedUser: User = {
               id: String(userData.id),
@@ -75,6 +91,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               role,
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
+              restaurantId: organizationId ? String(organizationId) : userData.organizationId ? String(userData.organizationId) : undefined,
+              customerId: userData.customerId ? String(userData.customerId) : undefined,
             };
             setUser(loadedUser);
           } catch {
@@ -114,6 +132,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } else if (user && isPublicPath && !pathname.startsWith('/invitations') && !pathname.startsWith('/agency/login')) {
       // Giris yapilmis ve public sayfa (login/register) - dashboard'a yonlendir
       // Invitation ve agency/login sayfalarinda kalmasina izin ver
+      // Agency kullanicilari icin: zaten giris yapmis, public sayfaya geri donmus (back button)
+      if (user.role === 'agency') {
+        router.replace('/agency');
+        return;
+      }
       redirectToDashboard(user.role);
     } else if (user && isAdminPath && user.role !== 'admin') {
       // Admin sayfasina erismeye calisan admin olmayan kullanici
@@ -130,7 +153,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         router.replace('/admin');
         break;
       case 'agency':
-        router.replace('/agency/regions');
+        if (isNewUser) {
+          router.replace('/agency/setup');
+        } else {
+          router.replace('/agency');
+        }
         break;
       case 'restaurant':
         // If new user (from registration), redirect to setup page
@@ -197,6 +224,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const userData = result.data.user;
         const role: UserRole = type === 'organization' ? 'restaurant' : 'agency';
 
+        // Extract organizationId/agencyId from JWT or response
+        const token = localStorage.getItem(AUTH_TOKEN_KEY);
+        const jwtPayload = token ? parseJwtPayload(token) : null;
+        const organizationId = (jwtPayload?.organizationId as number) || result.data.organization?.id;
+        const agencyId = (jwtPayload?.agencyId as number) || result.data.agency?.id;
+
         const loadedUser: User = {
           id: String(userData.id),
           name: `${userData.firstName} ${userData.lastName}`,
@@ -205,16 +238,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           role,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
+          restaurantId: organizationId ? String(organizationId) : undefined,
         };
 
         // Token is already stored by apiClient in verifyOtp
         setUser(loadedUser);
 
-        // Save user data with type for session restore
+        // Save user data with type for session restore (include organizationId/agencyId)
         localStorage.setItem(AUTH_USER_DATA_KEY, JSON.stringify({
           ...userData,
           userType: type,
           isNewUser: result.data.isNewUser,
+          organizationId: organizationId || undefined,
+          agencyId: agencyId || undefined,
         }));
 
         // Check organization/agency status - if new user, redirect to setup
@@ -239,6 +275,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   ) => {
     const role: UserRole = type === 'organization' ? 'restaurant' : 'agency';
 
+    // Extract organizationId/agencyId from current JWT
+    const token = typeof window !== 'undefined' ? localStorage.getItem(AUTH_TOKEN_KEY) : null;
+    const jwtPayload = token ? parseJwtPayload(token) : null;
+    const organizationId = jwtPayload?.organizationId as number | undefined;
+
     const loadedUser: User = {
       id: String(userData.id),
       name: `${userData.firstName} ${userData.lastName}`,
@@ -247,6 +288,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       role,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      restaurantId: organizationId ? String(organizationId) : undefined,
     };
 
     setUser(loadedUser);
@@ -255,7 +297,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(AUTH_USER_DATA_KEY, JSON.stringify({
       ...userData,
       userType: type,
-      isNewUser: false, // No longer new after business registration
+      isNewUser: false,
+      organizationId: organizationId || undefined,
+      agencyId: (jwtPayload?.agencyId as number) || undefined,
     }));
   }, []);
 

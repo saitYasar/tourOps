@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 import {
   serviceCategoryApi,
   serviceApi,
+  organizationApi,
 } from '@/lib/api';
 import type {
   ServiceCategoryDto,
@@ -173,7 +174,13 @@ function PreviewServiceList({
 // ============================================
 export default function MenuPage() {
   const queryClient = useQueryClient();
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
+
+  const { data: orgResult } = useQuery({
+    queryKey: ['my-organization'],
+    queryFn: () => organizationApi.getMyOrganization(),
+  });
+  const orgStatus = orgResult?.success ? orgResult.data?.status : undefined;
 
   // State
   const [selectedCategory, setSelectedCategory] = useState<ServiceCategoryDto | null>(null);
@@ -543,7 +550,7 @@ export default function MenuPage() {
 
       queryClient.invalidateQueries({ queryKey: ['serviceCategories'] });
     } catch {
-      toast.error('Sıralama güncellenemedi');
+      toast.error(t.common.error);
     }
   };
 
@@ -556,7 +563,7 @@ export default function MenuPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <Header title={t.menu.title} description={t.menu.description}>
+      <Header title={t.menu.title} description={t.menu.description} organizationStatus={orgStatus} lang={locale}>
         <Button variant="outline" onClick={() => setIsPreviewOpen(true)} disabled={!categories?.length}>
           <Eye className="h-4 w-4 mr-2" />
           {t.menu.preview}

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Building2,
@@ -49,16 +50,22 @@ import {
 } from '@/components/ui/select';
 import { LoadingState, ConfirmDialog } from '@/components/shared';
 
+// Map loading placeholder (uses useLanguage hook)
+function MapLoadingPlaceholder() {
+  const { t } = useLanguage();
+  return (
+    <div className="w-full h-[500px] bg-slate-100 flex items-center justify-center rounded-lg">
+      <p className="text-slate-500">{t.admin.loadingMap}</p>
+    </div>
+  );
+}
+
 // Map is loaded client-side only
 const RestaurantMap = dynamic(
   () => import('@/components/shared/RestaurantMap').then((mod) => mod.RestaurantMap),
   {
     ssr: false,
-    loading: () => (
-      <div className="w-full h-[500px] bg-slate-100 flex items-center justify-center rounded-lg">
-        <p className="text-slate-500">Loading map...</p>
-      </div>
-    ),
+    loading: () => <MapLoadingPlaceholder />,
   }
 );
 
@@ -75,10 +82,14 @@ const statusIcons: Record<CompanyStatus, typeof Clock> = {
 };
 
 const statusLabels: Record<CompanyStatus, string> = {
-  pending: 'Beklemede',
-  active: 'Aktif',
-  suspended: 'Askıya Alındı',
+  pending: 'statusPending',
+  active: 'statusActive',
+  suspended: 'statusSuspended',
 };
+
+function resolveImageUrl(company: CompanyDto): string | null {
+  return company.coverImageUrl || null;
+}
 
 // Expandable company detail card
 function CompanyDetailCard({
@@ -89,8 +100,10 @@ function CompanyDetailCard({
   onStatusUpdate: (company: CompanyDto, newStatus: CompanyStatus) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [imgError, setImgError] = useState(false);
   const { t } = useLanguage();
   const StatusIcon = statusIcons[company.status];
+  const coverUrl = resolveImageUrl(company);
 
   const hasLocation = company.lat && company.lng;
   const fullAddress = [
@@ -110,11 +123,12 @@ function CompanyDetailCard({
           <div className="flex items-start gap-4">
             {/* Cover Image */}
             <div className="h-20 w-20 rounded-xl bg-orange-50 border border-orange-100 flex-shrink-0 flex items-center justify-center overflow-hidden">
-              {company.coverImageUrl ? (
+              {coverUrl && !imgError ? (
                 <img
-                  src={company.coverImageUrl}
+                  src={coverUrl}
                   alt={company.name}
                   className="h-full w-full object-cover"
+                  onError={() => setImgError(true)}
                 />
               ) : (
                 <Building2 className="h-8 w-8 text-orange-400" />
@@ -131,7 +145,7 @@ function CompanyDetailCard({
                     </h3>
                     <Badge className={`${statusColors[company.status]} text-xs`}>
                       <StatusIcon className="h-3 w-3 mr-1" />
-                      {statusLabels[company.status]}
+                      {(t.admin as Record<string, string>)[statusLabels[company.status]] || statusLabels[company.status]}
                     </Badge>
                     {company.category?.name && (
                       <Badge variant="outline" className="text-xs">
@@ -149,6 +163,12 @@ function CompanyDetailCard({
 
                 {/* Actions */}
                 <div className="flex items-center gap-1 flex-shrink-0">
+                  <Link href={`/admin/restaurants/${company.id}`}>
+                    <Button variant="outline" size="sm" className="text-orange-600 border-orange-200 hover:bg-orange-50">
+                      <ExternalLink className="h-4 w-4 mr-1" />
+                      {(t.admin as Record<string, string>).goToDetail}
+                    </Button>
+                  </Link>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -156,7 +176,7 @@ function CompanyDetailCard({
                     className="text-slate-500"
                   >
                     <Eye className="h-4 w-4 mr-1" />
-                    Detay
+                    {t.admin.detail}
                     {expanded ? (
                       <ChevronUp className="h-3 w-3 ml-1" />
                     ) : (
@@ -197,7 +217,7 @@ function CompanyDetailCard({
                     <Star className="h-3.5 w-3.5 text-amber-400 fill-amber-400" />
                     <span className="font-medium">{company.averageRating}</span>
                     <span className="text-slate-400">
-                      ({company.totalReviews} değerlendirme)
+                      ({company.totalReviews} {t.admin.reviewCount})
                     </span>
                   </div>
                 )}
@@ -222,32 +242,32 @@ function CompanyDetailCard({
                 <div className="space-y-3">
                   <h4 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                     <MapPin className="h-4 w-4 text-orange-500" />
-                    Adres & Konum
+                    {t.admin.addressAndLocation}
                   </h4>
                   <div className="space-y-2 text-sm">
                     <div>
-                      <span className="text-slate-400 block text-xs mb-0.5">Adres</span>
+                      <span className="text-slate-400 block text-xs mb-0.5">{t.admin.addressLabel}</span>
                       <span className="text-slate-700">{fullAddress || '-'}</span>
                     </div>
                     {company.country?.name && (
                       <div className="flex items-center gap-4">
                         <div>
-                          <span className="text-slate-400 block text-xs mb-0.5">Ülke</span>
+                          <span className="text-slate-400 block text-xs mb-0.5">{t.admin.countryLabel}</span>
                           <span className="text-slate-700">{company.country.name}</span>
                         </div>
                         <div>
-                          <span className="text-slate-400 block text-xs mb-0.5">Şehir</span>
+                          <span className="text-slate-400 block text-xs mb-0.5">{t.admin.cityLabel}</span>
                           <span className="text-slate-700">{company.city?.name || '-'}</span>
                         </div>
                         <div>
-                          <span className="text-slate-400 block text-xs mb-0.5">İlçe</span>
+                          <span className="text-slate-400 block text-xs mb-0.5">{t.admin.districtLabel}</span>
                           <span className="text-slate-700">{company.district?.name || '-'}</span>
                         </div>
                       </div>
                     )}
                     {hasLocation && (
                       <div>
-                        <span className="text-slate-400 block text-xs mb-0.5">Koordinatlar</span>
+                        <span className="text-slate-400 block text-xs mb-0.5">{t.admin.coordinatesLabel}</span>
                         <div className="flex items-center gap-2">
                           <Navigation className="h-3 w-3 text-blue-500" />
                           <code className="text-xs bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">
@@ -268,7 +288,7 @@ function CompanyDetailCard({
                     {!hasLocation && (
                       <div className="flex items-center gap-2 text-amber-600 bg-amber-50 px-2 py-1.5 rounded text-xs">
                         <MapPin className="h-3 w-3" />
-                        Konum bilgisi girilmemiş
+                        {t.admin.noLocation}
                       </div>
                     )}
                   </div>
@@ -278,11 +298,11 @@ function CompanyDetailCard({
                 <div className="space-y-3">
                   <h4 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                     <Phone className="h-4 w-4 text-orange-500" />
-                    İletişim Bilgileri
+                    {t.admin.contactInfo}
                   </h4>
                   <div className="space-y-2 text-sm">
                     <div>
-                      <span className="text-slate-400 block text-xs mb-0.5">E-posta</span>
+                      <span className="text-slate-400 block text-xs mb-0.5">{t.admin.emailLabel}</span>
                       <a
                         href={`mailto:${company.email}`}
                         className="text-blue-600 hover:underline flex items-center gap-1"
@@ -292,7 +312,7 @@ function CompanyDetailCard({
                       </a>
                     </div>
                     <div>
-                      <span className="text-slate-400 block text-xs mb-0.5">Telefon</span>
+                      <span className="text-slate-400 block text-xs mb-0.5">{t.admin.phoneLabel}</span>
                       <span className="text-slate-700 flex items-center gap-1">
                         <Phone className="h-3 w-3 text-slate-400" />
                         +{company.phoneCountryCode} {company.phone}
@@ -300,7 +320,7 @@ function CompanyDetailCard({
                     </div>
                     {company.authorizedPerson && (
                       <div className="pt-1">
-                        <span className="text-slate-400 block text-xs mb-0.5">Yetkili Kişi</span>
+                        <span className="text-slate-400 block text-xs mb-0.5">{t.admin.authorizedPerson}</span>
                         <div className="flex items-center gap-2 bg-white border rounded-lg px-3 py-2">
                           <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
                             <User className="h-4 w-4 text-blue-600" />
@@ -310,8 +330,11 @@ function CompanyDetailCard({
                               {company.authorizedPerson.firstName}{' '}
                               {company.authorizedPerson.lastName}
                             </span>
-                            <span className="text-slate-400 text-xs">
+                            <span className="text-slate-400 text-xs block">
                               {company.authorizedPerson.email}
+                            </span>
+                            <span className="text-slate-400 text-xs">
+                              +{company.authorizedPerson.phoneCountryCode} {company.authorizedPerson.phone}
                             </span>
                           </div>
                         </div>
@@ -324,22 +347,22 @@ function CompanyDetailCard({
                 <div className="space-y-3">
                   <h4 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                     <Landmark className="h-4 w-4 text-orange-500" />
-                    Vergi & Yasal Bilgiler
+                    {t.admin.taxAndLegal}
                   </h4>
                   <div className="space-y-2 text-sm">
                     <div>
-                      <span className="text-slate-400 block text-xs mb-0.5">Ticari Unvan</span>
+                      <span className="text-slate-400 block text-xs mb-0.5">{t.admin.legalName}</span>
                       <span className="text-slate-700">{company.legalName || '-'}</span>
                     </div>
                     <div>
-                      <span className="text-slate-400 block text-xs mb-0.5">Vergi No</span>
+                      <span className="text-slate-400 block text-xs mb-0.5">{t.admin.taxNumber}</span>
                       <span className="text-slate-700 flex items-center gap-1">
                         <Hash className="h-3 w-3 text-slate-400" />
                         {company.taxNumber || '-'}
                       </span>
                     </div>
                     <div>
-                      <span className="text-slate-400 block text-xs mb-0.5">Vergi Dairesi</span>
+                      <span className="text-slate-400 block text-xs mb-0.5">{t.admin.taxOffice}</span>
                       <span className="text-slate-700 flex items-center gap-1">
                         <Landmark className="h-3 w-3 text-slate-400" />
                         {company.taxOffice || '-'}
@@ -351,7 +374,7 @@ function CompanyDetailCard({
                   <div className="pt-2">
                     <h4 className="text-sm font-semibold text-slate-700 flex items-center gap-2 mb-2">
                       <Star className="h-4 w-4 text-orange-500" />
-                      İstatistikler
+                      {t.admin.statistics}
                     </h4>
                     <div className="flex gap-3">
                       <div className="bg-white border rounded-lg px-3 py-2 text-center flex-1">
@@ -361,7 +384,7 @@ function CompanyDetailCard({
                             {company.averageRating || '0.00'}
                           </span>
                         </div>
-                        <span className="text-xs text-slate-400">Puan</span>
+                        <span className="text-xs text-slate-400">{t.admin.score}</span>
                       </div>
                       <div className="bg-white border rounded-lg px-3 py-2 text-center flex-1">
                         <div className="flex items-center justify-center gap-1">
@@ -370,7 +393,7 @@ function CompanyDetailCard({
                             {company.totalReviews ?? 0}
                           </span>
                         </div>
-                        <span className="text-xs text-slate-400">Değerlendirme</span>
+                        <span className="text-xs text-slate-400">{t.admin.reviewLabel}</span>
                       </div>
                     </div>
                   </div>
@@ -380,7 +403,7 @@ function CompanyDetailCard({
               {/* Description if available */}
               {company.description && (
                 <div className="mt-4 pt-4 border-t">
-                  <h4 className="text-sm font-semibold text-slate-700 mb-1">Açıklama</h4>
+                  <h4 className="text-sm font-semibold text-slate-700 mb-1">{t.admin.descriptionLabel}</h4>
                   <p className="text-sm text-slate-600">{company.description}</p>
                 </div>
               )}
@@ -388,10 +411,10 @@ function CompanyDetailCard({
               {/* Timestamps */}
               <div className="mt-4 pt-4 border-t flex items-center gap-6 text-xs text-slate-400">
                 <span>
-                  Kayıt: {new Date(company.createdAt).toLocaleString('tr-TR')}
+                  {t.admin.registrationDate}: {new Date(company.createdAt).toLocaleString('tr-TR')}
                 </span>
                 <span>
-                  Güncelleme: {new Date(company.updatedAt).toLocaleString('tr-TR')}
+                  {t.admin.updateDate}: {new Date(company.updatedAt).toLocaleString('tr-TR')}
                 </span>
                 <span>ID: {company.id}</span>
               </div>
@@ -405,7 +428,7 @@ function CompanyDetailCard({
                     onClick={() => onStatusUpdate(company, 'active')}
                   >
                     <CheckCircle className="h-4 w-4 mr-1" />
-                    Onayla
+                    {t.admin.approve}
                   </Button>
                 )}
                 {company.status !== 'suspended' && (
@@ -415,7 +438,7 @@ function CompanyDetailCard({
                     onClick={() => onStatusUpdate(company, 'suspended')}
                   >
                     <XCircle className="h-4 w-4 mr-1" />
-                    Askıya Al
+                    {t.admin.suspend}
                   </Button>
                 )}
                 {company.status !== 'pending' && (
@@ -426,7 +449,7 @@ function CompanyDetailCard({
                     className="text-yellow-600 border-yellow-200 hover:bg-yellow-50"
                   >
                     <Clock className="h-4 w-4 mr-1" />
-                    Beklemeye Al
+                    {t.admin.setPending}
                   </Button>
                 )}
                 {hasLocation && (
@@ -437,7 +460,7 @@ function CompanyDetailCard({
                   >
                     <Button variant="outline" size="sm">
                       <Globe className="h-4 w-4 mr-1" />
-                      Haritada Gör
+                      {t.admin.viewOnMap}
                     </Button>
                   </a>
                 )}
@@ -463,7 +486,17 @@ export default function AdminRestaurantsPage() {
     newStatus: CompanyStatus;
   } | null>(null);
 
-  // Fetch organizations from real API
+  // Fetch all organizations (for status counts)
+  const { data: allOrgsResult } = useQuery({
+    queryKey: ['admin-organizations-counts'],
+    queryFn: () =>
+      adminApi.getCompanies({
+        type: 'organization',
+        limit: 100,
+      }),
+  });
+
+  // Fetch organizations with current filter (for the list)
   const { data: companiesResult, isLoading } = useQuery({
     queryKey: ['admin-organizations', statusFilter, page, limit],
     queryFn: () =>
@@ -485,11 +518,12 @@ export default function AdminRestaurantsPage() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-organizations'] });
-      toast.success('İşletme durumu güncellendi');
+      queryClient.invalidateQueries({ queryKey: ['admin-organizations-counts'] });
+      toast.success(t.admin.orgStatusUpdated);
       setStatusUpdateTarget(null);
     },
     onError: (error) => {
-      toast.error((error as Error).message || 'Durum güncellenemedi');
+      toast.error((error as Error).message || t.admin.statusUpdateError);
     },
   });
 
@@ -510,12 +544,14 @@ export default function AdminRestaurantsPage() {
       company.authorizedPerson?.lastName?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Status counts
+  // Status counts from the unfiltered query
+  const allOrgs = allOrgsResult?.success ? allOrgsResult.data?.data || [] : [];
+  const allOrgsMeta = allOrgsResult?.success ? allOrgsResult.data?.meta : null;
   const statusCounts = {
-    all: companies.length,
-    pending: companies.filter((c) => c.status === 'pending').length,
-    active: companies.filter((c) => c.status === 'active').length,
-    suspended: companies.filter((c) => c.status === 'suspended').length,
+    all: allOrgsMeta?.total || allOrgs.length,
+    pending: allOrgs.filter((c) => c.status === 'pending').length,
+    active: allOrgs.filter((c) => c.status === 'active').length,
+    suspended: allOrgs.filter((c) => c.status === 'suspended').length,
   };
 
   // Transform for map
@@ -555,7 +591,7 @@ export default function AdminRestaurantsPage() {
             <h1 className="text-2xl font-bold text-slate-900">
               {t.admin.restaurantManagement}
             </h1>
-            <p className="text-slate-500 text-sm">İşletmeleri yönetin ve onaylayın</p>
+            <p className="text-slate-500 text-sm">{t.admin.manageAndApprove}</p>
           </div>
         </div>
       </div>
@@ -574,8 +610,8 @@ export default function AdminRestaurantsPage() {
               <Building2 className="h-5 w-5 text-slate-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-slate-900">{meta?.total || 0}</p>
-              <p className="text-xs text-slate-500">Toplam İşletme</p>
+              <p className="text-2xl font-bold text-slate-900">{statusCounts.all}</p>
+              <p className="text-xs text-slate-500">{t.admin.totalOrg}</p>
             </div>
           </CardContent>
         </Card>
@@ -592,7 +628,7 @@ export default function AdminRestaurantsPage() {
             </div>
             <div>
               <p className="text-2xl font-bold text-yellow-600">{statusCounts.pending}</p>
-              <p className="text-xs text-slate-500">Beklemede</p>
+              <p className="text-xs text-slate-500">{t.admin.statusPending}</p>
             </div>
           </CardContent>
         </Card>
@@ -609,7 +645,7 @@ export default function AdminRestaurantsPage() {
             </div>
             <div>
               <p className="text-2xl font-bold text-green-600">{statusCounts.active}</p>
-              <p className="text-xs text-slate-500">Aktif</p>
+              <p className="text-xs text-slate-500">{t.admin.statusActive}</p>
             </div>
           </CardContent>
         </Card>
@@ -626,7 +662,7 @@ export default function AdminRestaurantsPage() {
             </div>
             <div>
               <p className="text-2xl font-bold text-red-600">{statusCounts.suspended}</p>
-              <p className="text-xs text-slate-500">Askıda</p>
+              <p className="text-xs text-slate-500">{t.admin.suspended}</p>
             </div>
           </CardContent>
         </Card>
@@ -638,7 +674,7 @@ export default function AdminRestaurantsPage() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
-              placeholder="İşletme adı, e-posta, adres, vergi no veya yetkili kişi ara..."
+              placeholder={t.admin.searchOrgPlaceholder}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
@@ -665,7 +701,7 @@ export default function AdminRestaurantsPage() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <p className="text-sm text-slate-500">
-                {filteredCompanies.length} işletme listeleniyor
+                {filteredCompanies.length} {t.admin.orgListing}
               </p>
             </div>
 
@@ -673,9 +709,9 @@ export default function AdminRestaurantsPage() {
               <Card className="border-0 shadow-sm">
                 <CardContent className="py-12 text-center">
                   <Building2 className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-                  <p className="text-slate-500 font-medium">İşletme bulunamadı</p>
+                  <p className="text-slate-500 font-medium">{t.admin.orgNotFound}</p>
                   <p className="text-slate-400 text-sm mt-1">
-                    Arama kriterlerinizi değiştirmeyi deneyin
+                    {t.admin.tryChangingSearch}
                   </p>
                 </CardContent>
               </Card>
@@ -693,7 +729,7 @@ export default function AdminRestaurantsPage() {
             {meta && meta.totalPages > 1 && (
               <div className="flex items-center justify-between pt-4">
                 <p className="text-sm text-slate-500">
-                  Sayfa {meta.page} / {meta.totalPages} (Toplam {meta.total} kayıt)
+                  {t.admin.paginationPage} {meta.page} / {meta.totalPages} ({t.admin.paginationTotal} {meta.total} {t.admin.paginationRecords})
                 </p>
                 <div className="flex gap-2">
                   <Button
@@ -702,7 +738,7 @@ export default function AdminRestaurantsPage() {
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                     disabled={page === 1}
                   >
-                    Önceki
+                    {t.admin.previous}
                   </Button>
                   <Button
                     variant="outline"
@@ -710,7 +746,7 @@ export default function AdminRestaurantsPage() {
                     onClick={() => setPage((p) => Math.min(meta.totalPages, p + 1))}
                     disabled={page === meta.totalPages}
                   >
-                    Sonraki
+                    {t.admin.nextPage}
                   </Button>
                 </div>
               </div>
@@ -729,11 +765,10 @@ export default function AdminRestaurantsPage() {
                   {t.admin.restaurants}
                 </CardTitle>
                 <CardDescription>
-                  {mapRestaurants.length} işletme haritada
+                  {mapRestaurants.length} {t.admin.orgOnMap}
                   {mapRestaurants.length < filteredCompanies.length && (
                     <span className="text-amber-600 ml-1">
-                      ({filteredCompanies.length - mapRestaurants.length} işletmenin konum bilgisi
-                      yok)
+                      ({filteredCompanies.length - mapRestaurants.length} {t.admin.orgNoLocation})
                     </span>
                   )}
                 </CardDescription>
@@ -759,9 +794,9 @@ export default function AdminRestaurantsPage() {
               <CardContent>
                 {selectedCompany ? (
                   <div className="space-y-4">
-                    {selectedCompany.coverImageUrl && (
+                    {resolveImageUrl(selectedCompany) && (
                       <img
-                        src={selectedCompany.coverImageUrl}
+                        src={resolveImageUrl(selectedCompany)!}
                         alt={selectedCompany.name}
                         className="w-full h-40 object-cover rounded-lg"
                       />
@@ -777,12 +812,12 @@ export default function AdminRestaurantsPage() {
                     </div>
 
                     <Badge className={statusColors[selectedCompany.status]}>
-                      {statusLabels[selectedCompany.status]}
+                      {(t.admin as Record<string, string>)[statusLabels[selectedCompany.status]] || statusLabels[selectedCompany.status]}
                     </Badge>
 
                     <div className="space-y-2 text-sm">
                       <p className="text-slate-600">
-                        <span className="font-medium">Kategori:</span>{' '}
+                        <span className="font-medium">{t.admin.categoryLabel}:</span>{' '}
                         {selectedCompany.category?.name || '-'}
                       </p>
                       <p className="text-slate-600">
@@ -795,14 +830,14 @@ export default function AdminRestaurantsPage() {
                       </p>
                       {selectedCompany.city?.name && (
                         <p className="text-slate-600">
-                          <span className="font-medium">Konum:</span>{' '}
+                          <span className="font-medium">{t.admin.locationLabel}:</span>{' '}
                           {selectedCompany.country?.name} / {selectedCompany.city.name} /{' '}
                           {selectedCompany.district?.name}
                         </p>
                       )}
                       {selectedCompany.lat && selectedCompany.lng && (
                         <p className="text-slate-600">
-                          <span className="font-medium">Koordinat:</span>{' '}
+                          <span className="font-medium">{t.admin.coordinateLabel}:</span>{' '}
                           <code className="text-xs bg-slate-100 px-1 py-0.5 rounded">
                             {parseFloat(selectedCompany.lat).toFixed(6)},{' '}
                             {parseFloat(selectedCompany.lng).toFixed(6)}
@@ -811,26 +846,48 @@ export default function AdminRestaurantsPage() {
                       )}
                       {selectedCompany.taxOffice && (
                         <p className="text-slate-600">
-                          <span className="font-medium">Vergi Dairesi:</span>{' '}
+                          <span className="font-medium">{t.admin.taxOffice}:</span>{' '}
                           {selectedCompany.taxOffice}
                         </p>
                       )}
                       {selectedCompany.taxNumber && (
                         <p className="text-slate-600">
-                          <span className="font-medium">Vergi No:</span>{' '}
+                          <span className="font-medium">{t.admin.taxNumber}:</span>{' '}
                           {selectedCompany.taxNumber}
                         </p>
                       )}
                       {selectedCompany.authorizedPerson && (
-                        <p className="text-slate-600">
-                          <span className="font-medium">Yetkili:</span>{' '}
+                        <div className="text-slate-600">
+                          <span className="font-medium">{t.admin.authorized}:</span>{' '}
                           {selectedCompany.authorizedPerson.firstName}{' '}
                           {selectedCompany.authorizedPerson.lastName}
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            {selectedCompany.authorizedPerson.email}
+                          </p>
+                          <p className="text-xs text-slate-400">
+                            +{selectedCompany.authorizedPerson.phoneCountryCode} {selectedCompany.authorizedPerson.phone}
+                          </p>
+                        </div>
+                      )}
+                      {selectedCompany.description && (
+                        <p className="text-slate-600">
+                          <span className="font-medium">{t.admin.descriptionLabel}:</span>{' '}
+                          {selectedCompany.description}
+                        </p>
+                      )}
+                      {(selectedCompany.totalReviews ?? 0) > 0 && (
+                        <p className="text-slate-600">
+                          <span className="font-medium">{t.admin.reviewLabel}:</span>{' '}
+                          {selectedCompany.averageRating} {t.admin.points} ({selectedCompany.totalReviews} {t.admin.comments})
                         </p>
                       )}
                       <p className="text-slate-600">
-                        <span className="font-medium">{t.regions.createdAt}:</span>{' '}
+                        <span className="font-medium">{t.common.createdAt}:</span>{' '}
                         {new Date(selectedCompany.createdAt).toLocaleString('tr-TR')}
+                      </p>
+                      <p className="text-slate-600">
+                        <span className="font-medium">{t.admin.updateDate}:</span>{' '}
+                        {new Date(selectedCompany.updatedAt).toLocaleString('tr-TR')}
                       </p>
                     </div>
 
@@ -842,7 +899,7 @@ export default function AdminRestaurantsPage() {
                           onClick={() => handleStatusUpdate(selectedCompany, 'active')}
                         >
                           <CheckCircle className="h-4 w-4 mr-1" />
-                          Onayla
+                          {t.admin.approve}
                         </Button>
                       )}
                       {selectedCompany.status !== 'suspended' && (
@@ -852,14 +909,14 @@ export default function AdminRestaurantsPage() {
                           onClick={() => handleStatusUpdate(selectedCompany, 'suspended')}
                         >
                           <XCircle className="h-4 w-4 mr-1" />
-                          Askıya Al
+                          {t.admin.suspend}
                         </Button>
                       )}
                     </div>
                   </div>
                 ) : (
                   <p className="text-slate-500 text-center py-8">
-                    Detay görmek için bir işletme seçin
+                    {t.admin.selectOrgForDetail}
                   </p>
                 )}
               </CardContent>
@@ -872,15 +929,15 @@ export default function AdminRestaurantsPage() {
       <ConfirmDialog
         open={!!statusUpdateTarget}
         onOpenChange={() => setStatusUpdateTarget(null)}
-        title="Durum Güncelle"
+        title={t.admin.updateStatus}
         description={
           statusUpdateTarget
-            ? `"${statusUpdateTarget.company.name}" işletmesinin durumunu "${statusLabels[statusUpdateTarget.newStatus]}" olarak güncellemek istediğinize emin misiniz?`
+            ? `"${statusUpdateTarget.company.name}" ${t.admin.statusUpdateConfirm} "${(t.admin as Record<string, string>)[statusLabels[statusUpdateTarget.newStatus]]}" ${t.admin.statusUpdateConfirmEnd}`
             : ''
         }
         onConfirm={confirmStatusUpdate}
         variant={statusUpdateTarget?.newStatus === 'suspended' ? 'destructive' : 'default'}
-        confirmLabel="Güncelle"
+        confirmLabel={t.admin.updateBtn}
       />
     </div>
   );

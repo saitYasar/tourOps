@@ -28,11 +28,17 @@ interface TourStatusBadgeProps {
 export function TourStatusBadge({ status }: TourStatusBadgeProps) {
   const { t } = useLanguage();
 
-  const config: Record<TourStatus, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-    Draft: { label: t.tours.draft, variant: 'secondary' },
-    Published: { label: t.tours.published, variant: 'default' },
+  const config: Record<TourStatus, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; className?: string }> = {
+    draft: { label: t.tours.draft, variant: 'secondary' },
+    published: { label: t.tours.published, variant: 'default' },
+    cancelled: { label: t.tours.cancelled || 'Cancelled', variant: 'destructive' },
+    completed: { label: t.tours.completed || 'Completed', variant: 'outline', className: 'border-blue-300 bg-blue-50 text-blue-700' },
   };
 
   const statusConfig = config[status];
-  return <Badge variant={statusConfig.variant}>{statusConfig.label}</Badge>;
+  return (
+    <Badge variant={statusConfig.variant} className={statusConfig.className}>
+      {statusConfig.label}
+    </Badge>
+  );
 }

@@ -341,7 +341,7 @@ function LoginPageContent() {
                 </div>
 
                 {error && (
-                  <ErrorMessage error={error} selectedRole={selectedRole} t={t} />
+                  <ErrorMessage error={error} selectedRole={selectedRole} t={t} email={loginEmail} />
                 )}
 
                 <div className="space-y-4">
@@ -354,6 +354,7 @@ function LoginPageContent() {
                       maxLength={6}
                       value={otp}
                       onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                      onKeyDown={(e) => { if (e.key === 'Enter' && otp.length === 6 && !isSubmitting) onVerifyOtp(); }}
                       className="h-14 text-center text-2xl tracking-[0.5em] font-mono rounded-xl border-slate-200 focus:border-blue-400 focus:ring-blue-400"
                       autoFocus
                     />
@@ -431,7 +432,7 @@ function LoginPageContent() {
                 {/* Form */}
                 <form onSubmit={handleSubmit(onSubmitEmail)} className="space-y-4">
                   {error && (
-                    <ErrorMessage error={error} selectedRole={selectedRole} t={t} />
+                    <ErrorMessage error={error} selectedRole={selectedRole} t={t} email={loginEmail} />
                   )}
 
                   <div className="space-y-1.5">
@@ -469,7 +470,7 @@ function LoginPageContent() {
 
                   <p className="text-sm text-slate-500 text-center">
                     {t.auth.noAccount}{' '}
-                    <Link href={`/register?type=${selectedRole}`} className={`${theme.primaryText} hover:underline font-semibold`}>
+                    <Link href={`/register?type=${selectedRole}${loginEmail ? `&email=${encodeURIComponent(loginEmail)}` : ''}`} className={`${theme.primaryText} hover:underline font-semibold`}>
                       {t.auth.register}
                     </Link>
                   </p>
@@ -487,17 +488,6 @@ function LoginPageContent() {
         </div>
       </div>
 
-      {/* CSS Animasyonlar */}
-      <style jsx global>{`
-        @keyframes shake {
-          0%, 100% { transform: translateX(0); }
-          25% { transform: translateX(-5px); }
-          75% { transform: translateX(5px); }
-        }
-        .animate-shake {
-          animation: shake 0.5s ease-in-out;
-        }
-      `}</style>
     </div>
   );
 }
@@ -525,10 +515,12 @@ function ErrorMessage({
   error,
   selectedRole,
   t,
+  email,
 }: {
   error: ErrorState;
   selectedRole: LoginRole;
   t: Translations;
+  email?: string;
 }) {
   const theme = roleThemes[selectedRole];
 
@@ -546,7 +538,7 @@ function ErrorMessage({
               {error.message}
             </p>
             <Link
-              href={`/register?type=${selectedRole}`}
+              href={`/register?type=${selectedRole}${email ? `&email=${encodeURIComponent(email)}` : ''}`}
               className={`inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-white ${theme.primary} rounded-lg transition-colors`}
             >
               <UserPlus className="h-3.5 w-3.5" />
@@ -572,7 +564,7 @@ function ErrorMessage({
               {error.message}
             </p>
             <Link
-              href={`/register?type=${selectedRole}`}
+              href={`/register?type=${selectedRole}${email ? `&email=${encodeURIComponent(email)}` : ''}`}
               className={`inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-white ${theme.primary} rounded-lg transition-colors`}
             >
               <UserPlus className="h-3.5 w-3.5" />

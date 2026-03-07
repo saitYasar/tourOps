@@ -122,6 +122,7 @@ export type EditorAction =
   | { type: 'MOVE_TABLE'; id: number; x: number; y: number }
   | { type: 'ROTATE_TABLE'; id: number; r: number }
   | { type: 'MOVE_ROOM'; id: number; x: number; y: number }
+  | { type: 'MOVE_ROOM_WITH_CHILDREN'; id: number; x: number; y: number }
   | { type: 'RESIZE_ROOM'; id: number; w: number; h: number; x?: number; y?: number }
   | { type: 'UPDATE_TABLE_PROPERTY'; id: number; key: keyof Pick<EditorTable, 'name' | 'capacity' | 'roomId'>; value: string | number }
   | { type: 'UPDATE_ROOM_PROPERTY'; id: number; key: keyof Pick<EditorRoom, 'name' | 'w' | 'h' | 'capacity'>; value: string | number }
@@ -135,7 +136,21 @@ export type EditorAction =
   | { type: 'SET_ZOOM'; zoom: number }
   | { type: 'SET_PAN'; x: number; y: number }
   | { type: 'MARK_CLEAN' }
-  | { type: 'SET_COLLISION'; tableId: number | null };
+  | { type: 'SET_COLLISION'; tableId: number | null }
+  | { type: 'RESTORE_SNAPSHOT'; snapshot: UndoableSnapshot };
+
+// Undo system types
+export interface UndoableSnapshot {
+  rooms: EditorRoom[];
+  tables: EditorTable[];
+  objects: EditorObject[];
+}
+
+export interface UndoEntry {
+  label: string;
+  snapshot: UndoableSnapshot;
+  apiReverseOps?: { action: 'delete'; resourceIds: number[] }[];
+}
 
 export interface LayoutEditorProps {
   resources: ResourceDto[];

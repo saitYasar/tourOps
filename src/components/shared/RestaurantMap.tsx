@@ -210,21 +210,6 @@ export function RestaurantMap({
   }
 
   return (
-    <>
-      <div ref={mapRef} className="w-full rounded-lg" style={{ height }} />
-      <style jsx global>{`
-        .restaurant-popup .leaflet-popup-content-wrapper {
-          border-radius: 8px;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        }
-        .restaurant-popup .leaflet-popup-content {
-          margin: 8px;
-        }
-        .custom-marker {
-          background: transparent !important;
-          border: none !important;
-        }
-      `}</style>
-    </>
+    <div ref={mapRef} className="w-full rounded-lg" style={{ height }} />
   );
 }

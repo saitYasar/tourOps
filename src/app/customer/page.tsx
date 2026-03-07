@@ -227,24 +227,6 @@ export default function CustomerDashboard() {
         )}
       </div>
 
-      {/* CSS Animations */}
-      <style jsx global>{`
-        @keyframes float {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-8px); }
-        }
-        @keyframes float-delayed {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-12px); }
-        }
-        .animate-float {
-          animation: float 3s ease-in-out infinite;
-        }
-        .animate-float-delayed {
-          animation: float-delayed 4s ease-in-out infinite;
-          animation-delay: 1s;
-        }
-      `}</style>
     </div>
   );
 }
@@ -429,8 +411,8 @@ function ReservationsView({
     pending: { icon: Clock, color: 'text-amber-600 bg-amber-50', label: t.requests.pending },
     approved: { icon: CheckCircle2, color: 'text-emerald-600 bg-emerald-50', label: t.requests.approved },
     rejected: { icon: XCircle, color: 'text-red-600 bg-red-50', label: t.requests.rejected },
-    completed: { icon: CheckCircle2, color: 'text-blue-600 bg-blue-50', label: 'Tamamlandı' },
-    cancelled: { icon: AlertCircle, color: 'text-slate-600 bg-slate-50', label: 'İptal Edildi' },
+    completed: { icon: CheckCircle2, color: 'text-blue-600 bg-blue-50', label: t.tours.completed },
+    cancelled: { icon: AlertCircle, color: 'text-slate-600 bg-slate-50', label: t.tours.cancelled },
   };
 
   return (
@@ -671,7 +653,7 @@ function ProfileView({
             <ProfileRow label={t.admin.lastLogin} value={
               profile.lastLoginAt ? new Date(profile.lastLoginAt).toLocaleString('tr-TR') : '-'
             } />
-            <ProfileRow label="Durum" value={profile.active ? 'Aktif' : 'Pasif'} />
+            <ProfileRow label={t.customer.statusLabel} value={profile.active ? t.customer.statusActiveLabel : t.customer.statusInactiveLabel} />
           </div>
 
           {/* Profile Edit - Link to dedicated page */}

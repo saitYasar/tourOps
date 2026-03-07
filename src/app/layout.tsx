@@ -8,9 +8,52 @@ import { Toaster } from '@/components/ui/sonner';
 
 import './globals.css';
 
+const siteUrl = 'https://tourops.app';
+
 export const metadata: Metadata = {
-  title: 'TourOps - Tour Management System',
-  description: 'Tour management platform for agencies, restaurants and customers',
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: 'TourOps - Tur Yönetim Sistemi',
+    template: '%s | TourOps',
+  },
+  description:
+    'Acenteler, işletmeler ve gezginler için hepsi bir arada tur yönetim platformu. Turları planlayın, işletmelerle bağlantı kurun.',
+  keywords: [
+    'tur yönetimi',
+    'seyahat acentesi',
+    'tur planlama',
+    'turizm platformu',
+    'tur operatörü',
+  ],
+  authors: [{ name: 'TourOps' }],
+  creator: 'TourOps',
+  icons: {
+    icon: '/favicon.svg',
+  },
+  openGraph: {
+    type: 'website',
+    locale: 'tr_TR',
+    url: siteUrl,
+    siteName: 'TourOps',
+    title: 'TourOps - Tur Yönetiminin Dijital Merkezi',
+    description:
+      'Acenteler, işletmeler ve gezginler için hepsi bir arada tur yönetim platformu.',
+    images: [
+      {
+        url: '/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: 'TourOps - Tur Yönetim Platformu',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'TourOps - Tur Yönetiminin Dijital Merkezi',
+    description:
+      'Acenteler, işletmeler ve gezginler için hepsi bir arada tur yönetim platformu.',
+    images: ['/og-image.png'],
+  },
 };
 
 export default function RootLayout({
@@ -20,7 +63,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="tr" suppressHydrationWarning>
-      <body className="font-sans antialiased">
+      <body className="font-sans antialiased" suppressHydrationWarning>
         <QueryProvider>
           <LanguageProvider>
             <AuthProvider>

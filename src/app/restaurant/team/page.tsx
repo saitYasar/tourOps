@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 
 import { organizationApi, invitationApi, type InviteUserDto, type InvitationDto, type TeamMemberDto, type RoleDto } from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { formatPhoneNumber, cleanPhoneNumber } from '@/lib/utils';
 import { SprinterLoading } from '@/components/shared';
 
@@ -71,10 +72,17 @@ const countryCodes = [
 ];
 
 export default function TeamPage() {
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [formData, setFormData] = useState<InviteFormData>(initialFormData);
   const [errors, setErrors] = useState<Partial<Record<keyof InviteFormData, string>>>({});
+
+  const { data: orgResult } = useQuery({
+    queryKey: ['my-organization'],
+    queryFn: () => organizationApi.getMyOrganization(),
+  });
+  const orgStatus = orgResult?.success ? orgResult.data?.status : undefined;
 
   // Role management dialog state
   const [roleDialogOpen, setRoleDialogOpen] = useState(false);
@@ -133,14 +141,14 @@ export default function TeamPage() {
     mutationFn: (invitationId: number) => invitationApi.cancel(invitationId),
     onSuccess: (result) => {
       if (result.success) {
-        toast.success('Davet iptal edildi');
+        toast.success(t.team.inviteCancelled);
         queryClient.invalidateQueries({ queryKey: ['my-invitations'] });
       } else {
-        toast.error(result.error || 'Davet iptal edilemedi');
+        toast.error(result.error || t.team.inviteCancelError);
       }
     },
     onError: () => {
-      toast.error('Davet iptal edilemedi');
+      toast.error(t.team.inviteCancelError);
     },
   });
 
@@ -148,14 +156,14 @@ export default function TeamPage() {
     mutationFn: (userId: number) => organizationApi.removeTeamMember(userId),
     onSuccess: (result) => {
       if (result.success) {
-        toast.success('Ekip üyesi çıkarıldı');
+        toast.success(t.team.memberRemoved);
         queryClient.invalidateQueries({ queryKey: ['team-members'] });
       } else {
-        toast.error(result.error || 'Ekip üyesi çıkarılamadı');
+        toast.error(result.error || t.team.memberRemoveError);
       }
     },
     onError: () => {
-      toast.error('Ekip üyesi çıkarılamadı');
+      toast.error(t.team.memberRemoveError);
     },
   });
 
@@ -164,14 +172,14 @@ export default function TeamPage() {
       organizationApi.updateTeamMemberStatus(userId, status),
     onSuccess: (result) => {
       if (result.success) {
-        toast.success('Üye durumu güncellendi');
+        toast.success(t.team.statusUpdated);
         queryClient.invalidateQueries({ queryKey: ['team-members'] });
       } else {
-        toast.error(result.error || 'Durum güncellenemedi');
+        toast.error(result.error || t.team.statusUpdateError);
       }
     },
     onError: () => {
-      toast.error('Durum güncellenemedi');
+      toast.error(t.team.statusUpdateError);
     },
   });
 
@@ -180,14 +188,14 @@ export default function TeamPage() {
       organizationApi.assignRole(userId, roleId),
     onSuccess: (result) => {
       if (result.success) {
-        toast.success('Rol atandı');
+        toast.success(t.team.roleAssigned);
         queryClient.invalidateQueries({ queryKey: ['team-members'] });
       } else {
-        toast.error(result.error || 'Rol atanamadı');
+        toast.error(result.error || t.team.roleAssignError);
       }
     },
     onError: () => {
-      toast.error('Rol atanamadı');
+      toast.error(t.team.roleAssignError);
     },
   });
 
@@ -196,14 +204,14 @@ export default function TeamPage() {
       organizationApi.removeRole(userId, roleId),
     onSuccess: (result) => {
       if (result.success) {
-        toast.success('Rol kaldırıldı');
+        toast.success(t.team.roleRemoved);
         queryClient.invalidateQueries({ queryKey: ['team-members'] });
       } else {
-        toast.error(result.error || 'Rol kaldırılamadı');
+        toast.error(result.error || t.team.roleRemoveError);
       }
     },
     onError: () => {
-      toast.error('Rol kaldırılamadı');
+      toast.error(t.team.roleRemoveError);
     },
   });
 
@@ -219,7 +227,7 @@ export default function TeamPage() {
     if (hasRole) {
       // Check if it's the last role
       if (selectedMember.roles.length === 1) {
-        toast.error('Son rol kaldırılamaz');
+        toast.error(t.team.lastRoleError);
         return;
       }
       removeRoleMutation.mutate({ userId: selectedMember.id, roleId });
@@ -292,14 +300,14 @@ export default function TeamPage() {
       return (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
           <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-          Aktif
+          {t.team.active}
         </span>
       );
     }
     return (
       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
         <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-        Pasif
+        {t.team.inactive}
       </span>
     );
   };
@@ -310,28 +318,28 @@ export default function TeamPage() {
         return (
           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">
             <Clock className="h-3 w-3" />
-            Bekliyor
+            {t.team.invPending}
           </span>
         );
       case 'accepted':
         return (
           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
             <CheckCircle className="h-3 w-3" />
-            Kabul Edildi
+            {t.team.invAccepted}
           </span>
         );
       case 'expired':
         return (
           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
             <XCircle className="h-3 w-3" />
-            Süresi Doldu
+            {t.team.invExpired}
           </span>
         );
       case 'cancelled':
         return (
           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">
             <Ban className="h-3 w-3" />
-            İptal Edildi
+            {t.team.invCancelled}
           </span>
         );
       default:
@@ -341,7 +349,7 @@ export default function TeamPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <Header title={t.team.title} description={t.team.description} />
+      <Header title={t.team.title} description={t.team.description} organizationStatus={orgStatus} lang={locale} />
 
       <div className="flex-1 p-6 overflow-auto">
         <div className="max-w-6xl mx-auto space-y-6">
@@ -354,12 +362,12 @@ export default function TeamPage() {
                     <Users className="h-6 w-6 text-purple-600" />
                   </div>
                   <div>
-                    <CardTitle>Ekip Üyeleri</CardTitle>
-                    <CardDescription>İşletmenizde çalışan ekip üyeleri</CardDescription>
+                    <CardTitle>{t.team.teamMembers}</CardTitle>
+                    <CardDescription>{t.team.teamMembersOrgDesc}</CardDescription>
                   </div>
                 </div>
                 <span className="text-sm text-slate-500">
-                  {teamMembers.filter(m => m.status === 'active').length} aktif üye
+                  {teamMembers.filter(m => m.status === 'active').length} {t.team.activeMembersCount}
                 </span>
               </div>
             </CardHeader>
@@ -371,19 +379,19 @@ export default function TeamPage() {
               ) : teamMembers.length === 0 ? (
                 <div className="text-center py-8 text-slate-500">
                   <Users className="h-12 w-12 mx-auto mb-3 text-slate-300" />
-                  <p>Henüz ekip üyesi yok</p>
-                  <p className="text-sm mt-1">Aşağıdaki formu kullanarak ekip üyesi davet edebilirsiniz</p>
+                  <p>{t.team.noMembers}</p>
+                  <p className="text-sm mt-1">{t.team.noMembersDesc}</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
                       <tr className="border-b text-left text-xs text-slate-500 uppercase">
-                        <th className="pb-3 font-medium">Üye</th>
-                        <th className="pb-3 font-medium">Durum</th>
-                        <th className="pb-3 font-medium">Roller</th>
-                        <th className="pb-3 font-medium">Katılım</th>
-                        <th className="pb-3 font-medium text-right">İşlem</th>
+                        <th className="pb-3 font-medium">{t.team.member}</th>
+                        <th className="pb-3 font-medium">{t.team.status}</th>
+                        <th className="pb-3 font-medium">{t.team.roles}</th>
+                        <th className="pb-3 font-medium">{t.team.joinDate}</th>
+                        <th className="pb-3 font-medium text-right">{t.team.action}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y">
@@ -426,47 +434,51 @@ export default function TeamPage() {
                             </span>
                           </td>
                           <td className="py-3 text-right">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                  <MoreVertical className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem
-                                  onClick={() => handleOpenRoleDialog(member)}
-                                >
-                                  <Shield className="h-4 w-4 mr-2" />
-                                  Rolleri Düzenle
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => toggleStatusMutation.mutate({
-                                    userId: member.id,
-                                    status: member.status === 'active' ? 'inactive' : 'active'
-                                  })}
-                                >
-                                  {member.status === 'active' ? (
-                                    <>
-                                      <UserX className="h-4 w-4 mr-2" />
-                                      Pasif Yap
-                                    </>
-                                  ) : (
-                                    <>
-                                      <CheckCircle className="h-4 w-4 mr-2" />
-                                      Aktif Yap
-                                    </>
-                                  )}
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  className="text-red-600"
-                                  onClick={() => removeTeamMemberMutation.mutate(member.id)}
-                                >
-                                  <UserMinus className="h-4 w-4 mr-2" />
-                                  Ekipten Çıkar
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                            {String(member.id) === user?.id ? (
+                              <span className="text-xs text-slate-400 italic">{t.team.you}</span>
+                            ) : (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem
+                                    onClick={() => handleOpenRoleDialog(member)}
+                                  >
+                                    <Shield className="h-4 w-4 mr-2" />
+                                    {t.team.editRoles}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => toggleStatusMutation.mutate({
+                                      userId: member.id,
+                                      status: member.status === 'active' ? 'inactive' : 'active'
+                                    })}
+                                  >
+                                    {member.status === 'active' ? (
+                                      <>
+                                        <UserX className="h-4 w-4 mr-2" />
+                                        {t.team.makeInactive}
+                                      </>
+                                    ) : (
+                                      <>
+                                        <CheckCircle className="h-4 w-4 mr-2" />
+                                        {t.team.makeActive}
+                                      </>
+                                    )}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    className="text-red-600"
+                                    onClick={() => removeTeamMemberMutation.mutate(member.id)}
+                                  >
+                                    <UserMinus className="h-4 w-4 mr-2" />
+                                    {t.team.removeFromTeam}
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -487,8 +499,8 @@ export default function TeamPage() {
                   <Send className="h-6 w-6 text-emerald-600" />
                 </div>
                 <div>
-                  <CardTitle>Gönderilen Davetler</CardTitle>
-                  <CardDescription>Ekibe katılması için gönderdiğiniz davetler</CardDescription>
+                  <CardTitle>{t.team.sentInvitations}</CardTitle>
+                  <CardDescription>{t.team.sentInvitationsDesc}</CardDescription>
                 </div>
               </div>
             </CardHeader>
@@ -500,8 +512,8 @@ export default function TeamPage() {
               ) : invitations.length === 0 ? (
                 <div className="text-center py-8 text-slate-500">
                   <Mail className="h-12 w-12 mx-auto mb-3 text-slate-300" />
-                  <p>Henüz gönderilmiş davet yok</p>
-                  <p className="text-sm mt-1">Soldaki formu kullanarak davet gönderebilirsiniz</p>
+                  <p>{t.team.noInvitations}</p>
+                  <p className="text-sm mt-1">{t.team.noInvitationsDesc}</p>
                 </div>
               ) : (
                 <div className="space-y-3 max-h-[500px] overflow-auto">
@@ -548,7 +560,7 @@ export default function TeamPage() {
                               {cancelMutation.isPending ? (
                                 <SprinterLoading size="xs" />
                               ) : (
-                                'İptal Et'
+                                t.team.cancelInvite
                               )}
                             </Button>
                           )}
@@ -691,11 +703,11 @@ export default function TeamPage() {
                   {rolesLoading ? (
                     <div className="flex items-center justify-center py-4">
                       <SprinterLoading size="xs" />
-                      <span className="ml-2 text-sm text-slate-500">Roller yükleniyor...</span>
+                      <span className="ml-2 text-sm text-slate-500">{t.team.rolesLoading}</span>
                     </div>
                   ) : availableRoles.length === 0 ? (
                     <p className="text-sm text-slate-500 py-4 text-center">
-                      Henüz tanımlı rol bulunmuyor
+                      {t.team.noRoles}
                     </p>
                   ) : (
                     <div className="grid grid-cols-1 gap-2">
@@ -791,12 +803,12 @@ export default function TeamPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Shield className="h-5 w-5 text-blue-600" />
-              Rolleri Düzenle
+              {t.team.editRoles}
             </DialogTitle>
             <DialogDescription>
               {selectedMember && (
                 <span>
-                  <strong>{selectedMember.firstName} {selectedMember.lastName}</strong> için rolleri yönetin.
+                  <strong>{selectedMember.firstName} {selectedMember.lastName}</strong> {t.team.manageRolesFor}
                 </span>
               )}
             </DialogDescription>
@@ -806,11 +818,11 @@ export default function TeamPage() {
             {rolesLoading ? (
               <div className="flex items-center justify-center py-4">
                 <SprinterLoading size="xs" />
-                <span className="ml-2 text-sm text-slate-500">Roller yükleniyor...</span>
+                <span className="ml-2 text-sm text-slate-500">{t.team.rolesLoading}</span>
               </div>
             ) : availableRoles.length === 0 ? (
               <p className="text-sm text-slate-500 text-center py-4">
-                Kullanılabilir rol bulunamadı
+                {t.team.noRolesAvailable}
               </p>
             ) : (
               availableRoles.map((role) => {
@@ -830,7 +842,7 @@ export default function TeamPage() {
                       <div>
                         <p className="font-medium text-sm">{role.description || role.name}</p>
                         {isLastRole && (
-                          <p className="text-xs text-amber-600 mt-1">Son rol kaldırılamaz</p>
+                          <p className="text-xs text-amber-600 mt-1">{t.team.lastRoleError}</p>
                         )}
                       </div>
                       <div
@@ -863,7 +875,7 @@ export default function TeamPage() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setRoleDialogOpen(false)}>
-              Kapat
+              {t.common.close}
             </Button>
           </DialogFooter>
         </DialogContent>

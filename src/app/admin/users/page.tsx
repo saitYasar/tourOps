@@ -16,6 +16,7 @@ import {
 import { toast } from 'sonner';
 
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { adminApi, type AdminUserDto } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -39,28 +40,29 @@ import { LoadingState, ConfirmDialog } from '@/components/shared';
 
 // Map backend roles to display info
 const getRoleInfo = (role: string) => {
-  const roleMap: Record<string, { icon: React.ElementType; color: string; label: string }> = {
-    system_admin: { icon: Shield, color: 'bg-red-500', label: 'Sistem Admin' },
-    organization_owner: { icon: Building2, color: 'bg-emerald-500', label: 'İşletme Sahibi' },
-    agency_owner: { icon: MapPin, color: 'bg-blue-500', label: 'Acente Sahibi' },
-    organization_user: { icon: Building2, color: 'bg-emerald-400', label: 'İşletme Kullanıcısı' },
-    org_user: { icon: Building2, color: 'bg-emerald-400', label: 'İşletme Kullanıcısı' },
-    agency_user: { icon: MapPin, color: 'bg-blue-400', label: 'Acente Kullanıcısı' },
+  const roleMap: Record<string, { icon: React.ElementType; color: string; label: string; avatarBg: string; avatarText: string }> = {
+    system_admin: { icon: Shield, color: 'bg-red-500', label: 'roleSystemAdmin', avatarBg: 'bg-red-100', avatarText: 'text-red-600' },
+    organization_owner: { icon: Building2, color: 'bg-emerald-500', label: 'roleOrgOwner', avatarBg: 'bg-emerald-100', avatarText: 'text-emerald-600' },
+    agency_owner: { icon: MapPin, color: 'bg-blue-500', label: 'roleAgencyOwner', avatarBg: 'bg-blue-100', avatarText: 'text-blue-600' },
+    organization_user: { icon: Building2, color: 'bg-emerald-400', label: 'roleOrgUser', avatarBg: 'bg-emerald-50', avatarText: 'text-emerald-500' },
+    org_user: { icon: Building2, color: 'bg-emerald-400', label: 'roleOrgUser', avatarBg: 'bg-emerald-50', avatarText: 'text-emerald-500' },
+    agency_user: { icon: MapPin, color: 'bg-blue-400', label: 'roleAgencyUser', avatarBg: 'bg-blue-50', avatarText: 'text-blue-500' },
   };
-  return roleMap[role] || { icon: User, color: 'bg-slate-500', label: role };
+  return roleMap[role] || { icon: User, color: 'bg-slate-500', label: role, avatarBg: 'bg-slate-100', avatarText: 'text-slate-600' };
 };
 
 const getStatusInfo = (status: string) => {
   const statusMap: Record<string, { color: string; label: string }> = {
-    active: { color: 'bg-green-500', label: 'Aktif' },
-    inactive: { color: 'bg-slate-400', label: 'Pasif' },
-    pending: { color: 'bg-amber-500', label: 'Beklemede' },
+    active: { color: 'bg-green-500', label: 'statusActive' },
+    inactive: { color: 'bg-slate-400', label: 'statusInactive' },
+    pending: { color: 'bg-amber-500', label: 'statusPending' },
   };
   return statusMap[status] || { color: 'bg-slate-400', label: status };
 };
 
 export default function AdminUsersPage() {
   const { t } = useLanguage();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [deleteUserId, setDeleteUserId] = useState<number | null>(null);
@@ -77,11 +79,11 @@ export default function AdminUsersPage() {
     mutationFn: (id: number) => adminApi.deleteUser(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
-      toast.success('Kullanıcı silindi');
+      toast.success(t.admin.userDeleted);
       setDeleteUserId(null);
     },
     onError: (error) => {
-      toast.error((error as Error).message || 'Kullanıcı silinemedi');
+      toast.error((error as Error).message || t.admin.userDeleteError);
     },
   });
 
@@ -123,8 +125,8 @@ export default function AdminUsersPage() {
         <div className="p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3">
           <AlertTriangle className="h-5 w-5 text-red-500 flex-shrink-0" />
           <div>
-            <p className="text-sm font-medium text-red-800">API bağlantı hatası</p>
-            <p className="text-xs text-red-600">{errorMessage || 'Kullanıcılar yüklenemedi'}</p>
+            <p className="text-sm font-medium text-red-800">{t.admin.apiError}</p>
+            <p className="text-xs text-red-600">{errorMessage || t.admin.usersLoadError}</p>
           </div>
         </div>
       )}
@@ -157,8 +159,8 @@ export default function AdminUsersPage() {
                 <TableHead>{t.auth.name}</TableHead>
                 <TableHead>{t.auth.email}</TableHead>
                 <TableHead>{t.admin.userRole}</TableHead>
-                <TableHead>Durum</TableHead>
-                <TableHead>{t.regions.createdAt}</TableHead>
+                <TableHead>{t.admin.status}</TableHead>
+                <TableHead>{t.common.createdAt}</TableHead>
                 <TableHead className="text-right">{t.common.actions}</TableHead>
               </TableRow>
             </TableHeader>
@@ -166,38 +168,38 @@ export default function AdminUsersPage() {
               {filteredUsers.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center text-slate-500 py-8">
-                    {hasError ? 'Veriler yüklenemedi' : 'Kullanıcı bulunamadı'}
+                    {hasError ? t.admin.dataLoadError : t.admin.userNotFound}
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredUsers.map((user) => {
-                  const roleInfo = getRoleInfo(user.role);
-                  const statusInfo = getStatusInfo(user.status);
+                filteredUsers.map((adminUser) => {
+                  const roleInfo = getRoleInfo(adminUser.role);
+                  const statusInfo = getStatusInfo(adminUser.status);
                   const RoleIcon = roleInfo.icon;
                   return (
-                    <TableRow key={user.id}>
+                    <TableRow key={adminUser.id}>
                       <TableCell>
                         <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center">
-                            <User className="h-5 w-5 text-slate-600" />
+                          <div className={`h-10 w-10 rounded-full ${roleInfo.avatarBg} flex items-center justify-center font-semibold text-sm ${roleInfo.avatarText}`}>
+                            {adminUser.firstName?.charAt(0)?.toUpperCase()}{adminUser.lastName?.charAt(0)?.toUpperCase()}
                           </div>
-                          <span className="font-medium">{user.firstName} {user.lastName}</span>
+                          <span className="font-medium">{adminUser.firstName} {adminUser.lastName}</span>
                         </div>
                       </TableCell>
-                      <TableCell className="text-slate-500">{user.email}</TableCell>
+                      <TableCell className="text-slate-500">{adminUser.email}</TableCell>
                       <TableCell>
                         <Badge className={`${roleInfo.color} text-white`}>
                           <RoleIcon className="h-3 w-3 mr-1" />
-                          {roleInfo.label}
+                          {(t.admin as Record<string, string>)[roleInfo.label] || roleInfo.label}
                         </Badge>
                       </TableCell>
                       <TableCell>
                         <Badge className={`${statusInfo.color} text-white`}>
-                          {statusInfo.label}
+                          {(t.admin as Record<string, string>)[statusInfo.label] || statusInfo.label}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-slate-500">
-                        {new Date(user.createdAt).toLocaleDateString('tr-TR')}
+                        {new Date(adminUser.createdAt).toLocaleDateString('tr-TR')}
                       </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
@@ -209,8 +211,8 @@ export default function AdminUsersPage() {
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem
                               className="text-red-600"
-                              onClick={() => setDeleteUserId(user.id)}
-                              disabled={user.role === 'system_admin'}
+                              onClick={() => setDeleteUserId(adminUser.id)}
+                              disabled={adminUser.role === 'system_admin' || String(adminUser.id) === user?.id}
                             >
                               <Trash2 className="h-4 w-4 mr-2" />
                               {t.admin.deleteUser}
@@ -229,7 +231,7 @@ export default function AdminUsersPage() {
           {meta && meta.totalPages > 1 && (
             <div className="flex items-center justify-between mt-4 pt-4 border-t">
               <p className="text-sm text-slate-500">
-                Toplam {meta.total} kullanıcı, Sayfa {meta.page} / {meta.totalPages}
+                {t.admin.paginationTotal} {meta.total} {t.admin.paginationUsers}, {t.admin.paginationPage} {meta.page} / {meta.totalPages}
               </p>
               <div className="flex gap-2">
                 <Button
@@ -238,7 +240,7 @@ export default function AdminUsersPage() {
                   onClick={() => setPage(p => Math.max(1, p - 1))}
                   disabled={page <= 1}
                 >
-                  Önceki
+                  {t.admin.previous}
                 </Button>
                 <Button
                   variant="outline"
@@ -246,7 +248,7 @@ export default function AdminUsersPage() {
                   onClick={() => setPage(p => p + 1)}
                   disabled={page >= meta.totalPages}
                 >
-                  Sonraki
+                  {t.admin.nextPage}
                 </Button>
               </div>
             </div>
@@ -259,7 +261,7 @@ export default function AdminUsersPage() {
         open={!!deleteUserId}
         onOpenChange={() => setDeleteUserId(null)}
         title={t.admin.deleteUser}
-        description={t.regions.deleteConfirm}
+        description={t.common.deleteConfirm}
         onConfirm={() => deleteUserId && deleteMutation.mutate(deleteUserId)}
         variant="destructive"
       />

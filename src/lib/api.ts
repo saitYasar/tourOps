@@ -51,10 +51,12 @@ export interface LoginResponseDto {
   user: ApiUserDto;
   isNewUser?: boolean;
   agency?: {
+    id?: number;
     status: string;
     message: string;
   };
   organization?: {
+    id?: number;
     status: string;
     message: string;
   };
@@ -117,6 +119,30 @@ export interface OrganizationRegisterResponseDto {
   };
 }
 
+// Agency Register DTO
+export interface AgencyRegisterDto {
+  name: string;
+  phoneCountryCode: number;
+  phone: number;
+  email: string;
+  legalName: string;
+  taxNumber: number;
+  taxOffice: string;
+  description?: string;
+}
+
+// Agency Registration Response (includes auth tokens)
+export interface AgencyRegisterResponseDto {
+  accessToken: string;
+  refreshToken: string;
+  user: ApiUserDto;
+  agency: {
+    id: number;
+    status: string;
+    message: string;
+  };
+}
+
 // Organization Response
 export interface OrganizationDto {
   id: number;
@@ -160,6 +186,25 @@ export interface OrganizationDto {
   resources?: unknown[];
   agencies?: unknown[];
   photos?: PhotoDto[];
+}
+
+// Tour Client DTO (from /agency/tours/:tourId/clients API)
+export interface TourClientDto {
+  id: number;
+  tourId: number;
+  clientId: number;
+  status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'no_show';
+  client: {
+    id: number;
+    firstName: string;
+    lastName: string;
+    username: string;
+    email: string | null;
+    phone: string | null;
+    profilePhoto: string | null;
+  };
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 // Agency Client DTO (from /agencies/clients API - nested structure)
@@ -208,6 +253,7 @@ export interface AgencyResponseDto {
   address: string | null;
   status: 'pending' | 'active' | 'suspended';
   uuid: string;
+  coverImageUrl?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -445,6 +491,7 @@ export interface PaginatedResponse<T> {
   data: T[];
   meta: {
     total: number;
+    totalCount?: number;
     page: number;
     limit: number;
     totalPages: number;
@@ -542,6 +589,7 @@ export interface CompanyDto {
   district?: LocationDto;
   lat?: string;
   lng?: string;
+  coverImageKey?: string | null;
   coverImageUrl?: string | null;
   description?: string;
   totalReviews?: number;
@@ -573,6 +621,45 @@ export interface UpdateCompanyStatusDto {
   type: CompanyType;
   id: number;
   status: CompanyStatus;
+}
+
+// Admin Update Agency DTO
+export interface AdminUpdateAgencyDto {
+  name?: string;
+  description?: string;
+  phone?: string;
+  email?: string;
+  legalName?: string;
+  taxNumber?: string;
+  taxOffice?: string;
+  address?: string;
+  status?: CompanyStatus;
+}
+
+// Admin Update Organization DTO
+export interface AdminUpdateOrganizationDto {
+  name?: string;
+  categoryId?: number;
+  address?: string;
+  lat?: string;
+  lng?: string;
+  countryId?: number;
+  cityId?: number;
+  districtId?: number;
+  phone?: string;
+  email?: string;
+  description?: string;
+  socialMediaUrls?: {
+    instagram?: string | null;
+    facebook?: string | null;
+    youtube?: string | null;
+    pinterest?: string | null;
+    twitter?: string | null;
+  };
+  legalName?: string;
+  taxNumber?: string;
+  taxOffice?: string;
+  status?: CompanyStatus;
 }
 
 // Admin Login DTO
@@ -674,10 +761,10 @@ export interface ClientTourDto {
 }
 
 export interface ClientReservationDto {
-  id: string;
-  tourId: string;
-  organizationId: string;
-  clientId: string;
+  id: number;
+  tourId: number;
+  organizationId: number;
+  clientId: number;
   reservationDate: string;
   numberOfParticipants: number;
   specialRequests?: string;
@@ -690,9 +777,9 @@ export interface ClientReservationDto {
 }
 
 export interface CreateReservationDto {
-  tourId: string;
-  organizationId: string;
-  clientId: string;
+  tourId: number;
+  organizationId: number;
+  clientId: number;
   reservationDate: string;
   numberOfParticipants: number;
   specialRequests?: string;
@@ -807,6 +894,79 @@ export interface RefreshTokenDto {
 export interface RefreshTokenResponseDto {
   accessToken: string;
   refreshToken: string;
+}
+
+// ============================================
+// Tour Types
+// ============================================
+
+export interface ApiTourDto {
+  id: number;
+  uuid?: string;
+  agencyId: number;
+  tourCode: string;
+  tourName: string;
+  description?: string;
+  startDate: string;
+  endDate: string;
+  maxParticipants?: number;
+  minParticipants?: number;
+  status: 'draft' | 'published' | 'cancelled' | 'completed';
+  coverImageUrl?: string | null;
+  galleryImages?: { id: number; imageUrl: string }[];
+  stops?: ApiTourStopDto[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateTourPayload {
+  tourCode: string;
+  tourName: string;
+  description?: string;
+  startDate: string;
+  endDate: string;
+  maxParticipants?: number;
+  minParticipants?: number;
+}
+
+export interface UpdateTourPayload {
+  tourCode?: string;
+  tourName?: string;
+  description?: string;
+  startDate?: string;
+  endDate?: string;
+  maxParticipants?: number;
+  minParticipants?: number;
+}
+
+export interface ApiTourStopDto {
+  id: number;
+  tourId: number;
+  organizationId: number;
+  organization?: { id: number; name: string; address?: string };
+  description?: string;
+  scheduledStartTime: string;
+  scheduledEndTime: string;
+  showPriceToCustomer?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateTourStopPayload {
+  tourId: number;
+  organizationId: number;
+  description?: string;
+  scheduledStartTime: string;
+  scheduledEndTime: string;
+  showPriceToCustomer?: boolean;
+}
+
+export interface UpdateTourStopPayload {
+  organizationId?: number;
+  description?: string;
+  scheduledStartTime?: string;
+  scheduledEndTime?: string;
+  showPriceToCustomer?: boolean;
 }
 
 // ============================================
@@ -1018,11 +1178,12 @@ class ApiClient {
   }
 
   // Client Email Login/Register (OTP-based)
-  async clientLoginRegister(email: string, firstName?: string, lastName?: string, agencyUuid?: string, lang: 'tr' | 'en' = 'tr') {
+  async clientLoginRegister(email: string, firstName?: string, lastName?: string, agencyUuid?: string, tourUuid?: string, lang: 'tr' | 'en' = 'tr') {
     const body: Record<string, string> = { email };
     if (firstName) body.firstName = firstName;
     if (lastName) body.lastName = lastName;
     if (agencyUuid) body.agencyUuid = agencyUuid;
+    if (tourUuid) body.tourUuid = tourUuid;
 
     return this.request<{ message: string }>('/auth/client/login-register', {
       method: 'POST',
@@ -1102,9 +1263,16 @@ class ApiClient {
   // ============================================
 
   async getClientTours(agencyId: number, page = 1, limit = 10, lang: 'tr' | 'en' = 'tr') {
-    return this.request<PaginatedResponse<ClientTourDto>>(`/tours/agency/${agencyId}?page=${page}&limit=${limit}`, {
-      method: 'GET',
-    }, lang);
+    // Note: /tours/agency/{agencyId} endpoint doesn't exist in current backend
+    // Falling back to /agency/tours which returns agency's tours
+    try {
+      return await this.request<PaginatedResponse<ClientTourDto>>(`/agency/tours?page=${page}&limit=${limit}`, {
+        method: 'GET',
+      }, lang);
+    } catch {
+      // Return empty data if endpoint fails
+      return { data: [], meta: { total: 0, page: 1, limit: 10, totalPages: 0 } } as PaginatedResponse<ClientTourDto>;
+    }
   }
 
   async getClientTourById(tourId: number, lang: 'tr' | 'en' = 'tr') {
@@ -1185,16 +1353,16 @@ class ApiClient {
     }, lang);
   }
 
-  async getServiceRequestsByTour(tourId: number, page = 1, limit = 10, lang: 'tr' | 'en' = 'tr') {
+  async getServiceRequestsByTour(tourId: number, page = 1, limit = 10) {
     return this.request<PaginatedResponse<ServiceRequestDto>>(`/service-requests/tour/${tourId}?page=${page}&limit=${limit}`, {
       method: 'GET',
-    }, lang);
+    }, 'tr', true);
   }
 
-  async cancelServiceRequest(id: number, lang: 'tr' | 'en' = 'tr') {
+  async cancelServiceRequest(id: number) {
     return this.request<ServiceRequestDto>(`/service-requests/${id}/cancel`, {
       method: 'PUT',
-    }, lang);
+    }, 'tr', true);
   }
 
   async retryServiceRequest(id: number, lang: 'tr' | 'en' = 'tr') {
@@ -1218,9 +1386,9 @@ class ApiClient {
   // ============================================
 
   async getOrganizationsPublic(page = 1, limit = 10, name?: string, lang: 'tr' | 'en' = 'tr') {
-    const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+    const params = new URLSearchParams({ page: String(page), limit: String(limit), status: 'active' });
     if (name) params.set('name', name);
-    return this.request<PaginatedResponse<OrganizationPublicDto>>(`/organizations/public/list?${params}`, {
+    return this.request<PaginatedResponse<OrganizationPublicDto>>(`/organizations?${params}`, {
       method: 'GET',
     }, lang);
   }
@@ -1412,6 +1580,77 @@ class ApiClient {
   }
 
   // ============================================
+  // Agencies - Register (Create)
+  // ============================================
+
+  async agencyRegisterBusiness(
+    data: AgencyRegisterDto,
+    coverImage?: File,
+    galleryImages?: File[],
+    lang: 'tr' | 'en' = 'tr'
+  ) {
+    const formData = new FormData();
+
+    // Add all required fields
+    Object.entries(data).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        formData.append(key, String(value));
+      }
+    });
+
+    // Add cover image if provided
+    if (coverImage) {
+      formData.append('coverImage', coverImage);
+    }
+
+    // Add gallery images if provided
+    if (galleryImages && galleryImages.length > 0) {
+      galleryImages.forEach((img) => {
+        formData.append('galleryImages', img);
+      });
+    }
+
+    const url = `${this.baseUrl}/agencies/register?lang=${lang}`;
+
+    const headers: HeadersInit = {};
+    const token = this.resolveToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    const jsonResponse = await response.json().catch(() => ({
+      message: 'Bir hata olustu',
+      statusCode: response.status,
+    }));
+
+    if (!response.ok) {
+      if (this.checkUnauthorized(response.status)) {
+        throw new Error('Oturum süresi doldu');
+      }
+      const errorMessage =
+        jsonResponse.errorMessage?.client ||
+        jsonResponse.errorMessage?.system ||
+        jsonResponse.message ||
+        'API istegi basarisiz';
+      throw new Error(errorMessage);
+    }
+
+    // Registration returns accessToken - save it
+    const responseData = jsonResponse.data as AgencyRegisterResponseDto;
+    if (responseData.accessToken) {
+      this.setAccessToken(responseData.accessToken);
+    }
+
+    return responseData;
+  }
+
+  // ============================================
   // Agencies - Get My Agency
   // ============================================
 
@@ -1419,6 +1658,53 @@ class ApiClient {
     return this.request<AgencyResponseDto>('/agencies/my', {
       method: 'GET',
     }, lang);
+  }
+
+  // ============================================
+  // Agencies - Update My Agency
+  // ============================================
+
+  async updateMyAgency(
+    data: Partial<Pick<AgencyResponseDto, 'name' | 'description' | 'phone' | 'phoneCountryCode' | 'address'>>,
+    coverImage?: File,
+    lang: 'tr' | 'en' = 'tr'
+  ) {
+    const formData = new FormData();
+
+    Object.entries(data).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        formData.append(key, String(value));
+      }
+    });
+
+    if (coverImage) {
+      formData.append('coverImage', coverImage);
+    }
+
+    const url = `${this.baseUrl}/agencies/my?lang=${lang}`;
+
+    const headers: HeadersInit = {};
+    const token = this.resolveToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers,
+      body: formData,
+    });
+
+    const jsonResponse = await response.json().catch(() => ({
+      message: 'Bir hata olustu',
+      statusCode: response.status,
+    }));
+
+    if (!response.ok) {
+      throw new Error(jsonResponse.message || 'Acente güncellenemedi');
+    }
+
+    return jsonResponse as AgencyResponseDto;
   }
 
   // ============================================
@@ -1497,6 +1783,7 @@ class ApiClient {
     }, 'tr', true);
   }
 
+  // Note: GET /agencies/clients/{clientId} returns 404 - backend only supports list and delete
   async getAgencyClient(clientId: number) {
     return this.request<AgencyClientDto>(`/agencies/clients/${clientId}`, {
       method: 'GET',
@@ -2081,6 +2368,28 @@ class ApiClient {
   }
 
   // ============================================
+  // Organization Pre-Reservations
+  // ============================================
+
+  async getOrgPreReservations(page = 1, limit = 100) {
+    return this.request<PaginatedResponse<any>>(`/organization/pre-reservations?page=${page}&limit=${limit}`, {
+      method: 'GET',
+    }, 'tr', true);
+  }
+
+  async approveOrgPreReservation(id: number) {
+    return this.request<any>(`/organization/pre-reservations/${id}/approve`, {
+      method: 'PUT',
+    }, 'tr', true);
+  }
+
+  async rejectOrgPreReservation(id: number) {
+    return this.request<any>(`/organization/pre-reservations/${id}/reject`, {
+      method: 'PUT',
+    }, 'tr', true);
+  }
+
+  // ============================================
   // Admin - Auth
   // ============================================
 
@@ -2122,11 +2431,45 @@ class ApiClient {
     }, filters.lang || 'tr', true); // skipLang since we add it manually
   }
 
+  async getAgencyById(id: number) {
+    return this.request<AgencyResponseDto & { coverImageKey?: string | null; coverImageUrl?: string | null }>(`/agencies/${id}`);
+  }
+
+  async getOrganizationByIdAdmin(id: number) {
+    return this.request<OrganizationDto>(`/organizations/${id}`);
+  }
+
   async updateCompanyStatus(data: UpdateCompanyStatusDto, lang: 'tr' | 'en' = 'tr') {
     return this.request<{ message: string }>('/admin/companies/status', {
       method: 'PUT',
       body: JSON.stringify(data),
     }, lang);
+  }
+
+  async adminUpdateAgency(id: number, data: AdminUpdateAgencyDto) {
+    return this.request<AgencyResponseDto>(`/agencies/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async adminUpdateOrganization(id: number, data: AdminUpdateOrganizationDto) {
+    return this.request<OrganizationDto>(`/organizations/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async adminDeleteAgency(id: number) {
+    return this.request<{ message: string }>(`/agencies/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async adminDeleteOrganization(id: number) {
+    return this.request<{ message: string }>(`/organizations/${id}`, {
+      method: 'DELETE',
+    });
   }
 
   // ============================================
@@ -2308,6 +2651,210 @@ class ApiClient {
       method: 'DELETE',
     }, 'tr', true); // skipLang
   }
+
+  // ============================================
+  // Admin - Tours
+  // ============================================
+
+  async getAdminTours(page = 1, limit = 10) {
+    return this.request<PaginatedResponse<ApiTourDto>>(`/admin/tours?page=${page}&limit=${limit}`);
+  }
+
+  async getAdminTourById(id: number) {
+    return this.request<ApiTourDto>(`/admin/tours/${id}`);
+  }
+
+  // ============================================
+  // Agency Tours
+  // ============================================
+
+  async getAgencyTours(page = 1, limit = 10) {
+    return this.request<PaginatedResponse<ApiTourDto>>(`/agency/tours?page=${page}&limit=${limit}`);
+  }
+
+  async getAgencyTourById(id: number) {
+    return this.request<ApiTourDto>(`/agency/tours/${id}`);
+  }
+
+  async createAgencyTour(
+    data: CreateTourPayload,
+    coverImage?: File,
+    galleryImages?: File[]
+  ) {
+    const formData = new FormData();
+    Object.entries(data).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        formData.append(key, String(value));
+      }
+    });
+    if (coverImage) {
+      formData.append('coverImage', coverImage);
+    }
+    if (galleryImages && galleryImages.length > 0) {
+      galleryImages.forEach((img) => {
+        formData.append('galleryImages', img);
+      });
+    }
+
+    const url = `${this.baseUrl}/agency/tours?lang=tr`;
+    const headers: HeadersInit = {};
+    const token = this.resolveToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    const jsonResponse = await response.json().catch(() => ({
+      message: 'Bir hata olustu',
+      statusCode: response.status,
+    }));
+
+    if (!response.ok) {
+      if (this.checkUnauthorized(response.status)) {
+        throw new Error('Oturum süresi doldu');
+      }
+      const errorMessage =
+        jsonResponse.errorMessage?.client ||
+        jsonResponse.errorMessage?.system ||
+        jsonResponse.message ||
+        'API istegi basarisiz';
+      throw new Error(errorMessage);
+    }
+
+    return jsonResponse.data as ApiTourDto;
+  }
+
+  async updateAgencyTour(
+    id: number,
+    data: UpdateTourPayload,
+    coverImage?: File,
+    galleryImages?: File[]
+  ) {
+    const formData = new FormData();
+    Object.entries(data).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        formData.append(key, String(value));
+      }
+    });
+    if (coverImage) {
+      formData.append('coverImage', coverImage);
+    }
+    if (galleryImages && galleryImages.length > 0) {
+      galleryImages.forEach((img) => {
+        formData.append('galleryImages', img);
+      });
+    }
+
+    const url = `${this.baseUrl}/agency/tours/${id}?lang=tr`;
+    const headers: HeadersInit = {};
+    const token = this.resolveToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers,
+      body: formData,
+    });
+
+    const jsonResponse = await response.json().catch(() => ({
+      message: 'Bir hata olustu',
+      statusCode: response.status,
+    }));
+
+    if (!response.ok) {
+      if (this.checkUnauthorized(response.status)) {
+        throw new Error('Oturum süresi doldu');
+      }
+      const errorMessage =
+        jsonResponse.errorMessage?.client ||
+        jsonResponse.errorMessage?.system ||
+        jsonResponse.message ||
+        'API istegi basarisiz';
+      throw new Error(errorMessage);
+    }
+
+    return jsonResponse.data as ApiTourDto;
+  }
+
+  async deleteAgencyTour(id: number) {
+    return this.request<{ message: string }>(`/agency/tours/${id}`, {
+      method: 'DELETE',
+    }, 'tr', true);
+  }
+
+  async publishTour(id: number) {
+    return this.request<ApiTourDto>(`/agency/tours/${id}/publish`, {
+      method: 'PUT',
+    }, 'tr', true);
+  }
+
+  async cancelTour(id: number) {
+    return this.request<ApiTourDto>(`/agency/tours/${id}/cancel`, {
+      method: 'PUT',
+    }, 'tr', true);
+  }
+
+  async completeTour(id: number) {
+    return this.request<ApiTourDto>(`/agency/tours/${id}/complete`, {
+      method: 'PUT',
+    }, 'tr', true);
+  }
+
+  async deleteTourPhoto(tourId: number, photoId: number) {
+    return this.request<{ message: string }>(`/agency/tours/${tourId}/photos/${photoId}`, {
+      method: 'DELETE',
+    }, 'tr', true);
+  }
+
+  // ============================================
+  // Tour Participants
+  // ============================================
+
+  async getTourClients(tourId: number) {
+    return this.request<TourClientDto[]>(`/agency/tours/${tourId}/participants`, {}, 'tr', true);
+  }
+
+  async updateTourClientStatus(tourId: number, clientId: number, status: string) {
+    return this.request<TourClientDto>(`/agency/tours/${tourId}/participants/${clientId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    }, 'tr', true);
+  }
+
+  // ============================================
+  // Tour Stops
+  // ============================================
+
+  async getTourStops(tourId: number) {
+    return this.request<ApiTourStopDto[]>(`/tour-stops/tour/${tourId}`);
+  }
+
+  async createTourStop(data: CreateTourStopPayload) {
+    return this.request<ApiTourStopDto>('/tour-stops', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateTourStop(id: number, data: UpdateTourStopPayload) {
+    return this.request<ApiTourStopDto>(`/tour-stops/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteTourStop(id: number) {
+    return this.request<{ message: string }>(`/tour-stops/${id}`, {
+      method: 'DELETE',
+    });
+  }
 }
 
 // Singleton instance
@@ -2399,9 +2946,9 @@ export const realAuthApi = {
     }
   },
 
-  async clientLoginRegister(email: string, firstName?: string, lastName?: string, agencyUuid?: string) {
+  async clientLoginRegister(email: string, firstName?: string, lastName?: string, agencyUuid?: string, tourUuid?: string) {
     try {
-      const response = await apiClient.clientLoginRegister(email, firstName, lastName, agencyUuid);
+      const response = await apiClient.clientLoginRegister(email, firstName, lastName, agencyUuid, tourUuid);
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
@@ -2841,10 +3388,37 @@ export const organizationApi = {
 // ============================================
 
 export const agencyApi = {
+  // Register new agency (create business)
+  async register(
+    data: AgencyRegisterDto,
+    coverImage?: File,
+    galleryImages?: File[]
+  ) {
+    try {
+      const response = await apiClient.agencyRegisterBusiness(data, coverImage, galleryImages);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
   // Get my agency
   async getMyAgency() {
     try {
       const response = await apiClient.getMyAgency();
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  // Update my agency
+  async updateMyAgency(
+    data: Partial<Pick<AgencyResponseDto, 'name' | 'description' | 'phone' | 'phoneCountryCode' | 'address'>>,
+    coverImage?: File
+  ) {
+    try {
+      const response = await apiClient.updateMyAgency(data, coverImage);
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
@@ -3146,10 +3720,46 @@ export const adminApi = {
   // Companies (Organizations & Agencies)
   // ============================================
 
-  // List companies with filters
+  // List companies with filters (resolves coverImageUrl from detail endpoints)
   async getCompanies(filters: CompanyFilters) {
     try {
       const response = await apiClient.getCompanies(filters);
+
+      // Resolve coverImageUrl for all companies without coverImageUrl
+      // Note: /admin/companies endpoint may return stale coverImageKey (null even when image exists)
+      // so we fetch detail for ALL companies to get the correct coverImageUrl
+      const companies = response.data || [];
+      const needsResolve = companies.filter(c => !c.coverImageUrl);
+
+      if (needsResolve.length > 0) {
+        const results = await Promise.allSettled(
+          needsResolve.map(c => {
+            if (filters.type === 'agency') {
+              return apiClient.getAgencyById(c.id);
+            } else {
+              return apiClient.getOrganizationByIdAdmin(c.id);
+            }
+          })
+        );
+
+        results.forEach((result, idx) => {
+          if (result.status === 'fulfilled' && result.value) {
+            const detail = result.value as { coverImageUrl?: string | null; coverImageKey?: string | null };
+            if (detail.coverImageUrl) {
+              needsResolve[idx].coverImageUrl = detail.coverImageUrl;
+            }
+            if (detail.coverImageKey) {
+              needsResolve[idx].coverImageKey = detail.coverImageKey;
+            }
+          }
+        });
+      }
+
+      // Normalize meta: API returns totalCount, frontend expects total
+      if (response.meta && !response.meta.total && response.meta.totalCount) {
+        response.meta.total = response.meta.totalCount;
+      }
+
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
@@ -3160,6 +3770,64 @@ export const adminApi = {
   async updateCompanyStatus(data: UpdateCompanyStatusDto) {
     try {
       const response = await apiClient.updateCompanyStatus(data);
+      return { success: true, message: response.message };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  // ============================================
+  // Agency & Organization Detail
+  // ============================================
+
+  async getAgencyById(id: number) {
+    try {
+      const response = await apiClient.getAgencyById(id);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async getOrganizationById(id: number) {
+    try {
+      const response = await apiClient.getOrganizationByIdAdmin(id);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async updateAgency(id: number, data: AdminUpdateAgencyDto) {
+    try {
+      const response = await apiClient.adminUpdateAgency(id, data);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async updateOrganization(id: number, data: AdminUpdateOrganizationDto) {
+    try {
+      const response = await apiClient.adminUpdateOrganization(id, data);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async deleteAgency(id: number) {
+    try {
+      const response = await apiClient.adminDeleteAgency(id);
+      return { success: true, message: response.message };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async deleteOrganization(id: number) {
+    try {
+      const response = await apiClient.adminDeleteOrganization(id);
       return { success: true, message: response.message };
     } catch (error) {
       return { success: false, error: (error as Error).message };
@@ -3391,6 +4059,28 @@ export const adminApi = {
       return { success: false, error: (error as Error).message };
     }
   },
+
+  // ============================================
+  // Tours
+  // ============================================
+
+  async getTours(page = 1, limit = 50) {
+    try {
+      const response = await apiClient.getAdminTours(page, limit);
+      return { success: true, data: response.data, meta: response.meta };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async getTourById(id: number) {
+    try {
+      const response = await apiClient.getAdminTourById(id);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
 };
 
 // ============================================
@@ -3515,6 +4205,153 @@ export const serviceApi = {
 };
 
 // ============================================
+// Tour API Functions (Real API)
+// ============================================
+
+export const tourApi = {
+  async list(page = 1, limit = 10): Promise<{ success: boolean; data?: ApiTourDto[]; meta?: { total: number; page: number; limit: number; totalPages: number }; error?: string }> {
+    try {
+      const response = await apiClient.getAgencyTours(page, limit);
+      return { success: true, data: response.data, meta: response.meta };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async getById(id: number): Promise<{ success: boolean; data?: ApiTourDto; error?: string }> {
+    try {
+      const response = await apiClient.getAgencyTourById(id);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async create(data: CreateTourPayload, coverImage?: File, galleryImages?: File[]): Promise<{ success: boolean; data?: ApiTourDto; error?: string }> {
+    try {
+      const response = await apiClient.createAgencyTour(data, coverImage, galleryImages);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async update(id: number, data: UpdateTourPayload, coverImage?: File, galleryImages?: File[]): Promise<{ success: boolean; data?: ApiTourDto; error?: string }> {
+    try {
+      const response = await apiClient.updateAgencyTour(id, data, coverImage, galleryImages);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async delete(id: number): Promise<{ success: boolean; error?: string }> {
+    try {
+      await apiClient.deleteAgencyTour(id);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async publish(id: number): Promise<{ success: boolean; data?: ApiTourDto; error?: string }> {
+    try {
+      const response = await apiClient.publishTour(id);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async cancel(id: number): Promise<{ success: boolean; data?: ApiTourDto; error?: string }> {
+    try {
+      const response = await apiClient.cancelTour(id);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async complete(id: number): Promise<{ success: boolean; data?: ApiTourDto; error?: string }> {
+    try {
+      const response = await apiClient.completeTour(id);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async deletePhoto(tourId: number, photoId: number): Promise<{ success: boolean; error?: string }> {
+    try {
+      await apiClient.deleteTourPhoto(tourId, photoId);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async getClients(tourId: number): Promise<{ success: boolean; data?: TourClientDto[]; error?: string }> {
+    try {
+      const response = await apiClient.getTourClients(tourId);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async updateClientStatus(tourId: number, clientId: number, status: string): Promise<{ success: boolean; data?: TourClientDto; error?: string }> {
+    try {
+      const response = await apiClient.updateTourClientStatus(tourId, clientId, status);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+};
+
+// ============================================
+// Tour Stop API Functions (Real API)
+// ============================================
+
+export const tourStopApi = {
+  async list(tourId: number): Promise<{ success: boolean; data?: ApiTourStopDto[]; error?: string }> {
+    try {
+      const response = await apiClient.getTourStops(tourId);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async create(data: CreateTourStopPayload): Promise<{ success: boolean; data?: ApiTourStopDto; error?: string }> {
+    try {
+      const response = await apiClient.createTourStop(data);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async update(id: number, data: UpdateTourStopPayload): Promise<{ success: boolean; data?: ApiTourStopDto; error?: string }> {
+    try {
+      const response = await apiClient.updateTourStop(id, data);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async delete(id: number): Promise<{ success: boolean; error?: string }> {
+    try {
+      await apiClient.deleteTourStop(id);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+};
+
+// ============================================
 // VKN (Vergi Kimlik Numarası) Doğrulama
 // ============================================
 
@@ -3523,6 +4360,58 @@ export interface VknVerifyResult {
   companyName?: string;
   error?: string;
 }
+
+// ============================================
+// Organization Pre-Reservation API Functions (Real API)
+// ============================================
+
+export interface PreReservationDto {
+  id: number;
+  tourId: number;
+  organizationId: number;
+  status: 'pending' | 'approved' | 'rejected';
+  headcount?: number;
+  note?: string;
+  responseNote?: string;
+  createdAt: string;
+  updatedAt: string;
+  tour?: {
+    id: number;
+    title?: string;
+    tourDate?: string;
+  };
+}
+
+export const preReservationOrgApi = {
+  async getAll(page = 1, limit = 100): Promise<{ success: boolean; data?: PreReservationDto[]; meta?: { total: number }; error?: string }> {
+    try {
+      const response = await apiClient.getOrgPreReservations(page, limit);
+      const data = Array.isArray(response) ? response : (response as any).data ?? [];
+      const meta = (response as any).meta;
+      return { success: true, data, meta };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async approve(id: number): Promise<{ success: boolean; error?: string }> {
+    try {
+      await apiClient.approveOrgPreReservation(id);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async reject(id: number): Promise<{ success: boolean; error?: string }> {
+    try {
+      await apiClient.rejectOrgPreReservation(id);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+};
 
 export async function verifyVKN(taxNumber: string): Promise<VknVerifyResult> {
   try {

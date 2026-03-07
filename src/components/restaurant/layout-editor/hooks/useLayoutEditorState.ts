@@ -150,6 +150,26 @@ function editorReducer(state: EditorState, action: EditorAction): EditorState {
         isDirty: true,
       };
 
+    case 'MOVE_ROOM_WITH_CHILDREN': {
+      const room = state.rooms.find((r) => r.id === action.id);
+      if (!room) return state;
+      const dx = action.x - room.x;
+      const dy = action.y - room.y;
+      return {
+        ...state,
+        rooms: state.rooms.map((r) =>
+          r.id === action.id ? { ...r, x: action.x, y: action.y, dirty: true } : r,
+        ),
+        tables: state.tables.map((t) =>
+          t.roomId === action.id ? { ...t, x: t.x + dx, y: t.y + dy, dirty: true } : t,
+        ),
+        objects: state.objects.map((o) =>
+          o.roomId === action.id ? { ...o, x: o.x + dx, y: o.y + dy, dirty: true } : o,
+        ),
+        isDirty: true,
+      };
+    }
+
     case 'RESIZE_ROOM': {
       let rooms = state.rooms.map((r) =>
         r.id === action.id
@@ -308,6 +328,17 @@ function editorReducer(state: EditorState, action: EditorAction): EditorState {
 
     case 'SET_COLLISION':
       return { ...state, collisionTableId: action.tableId };
+
+    case 'RESTORE_SNAPSHOT':
+      return {
+        ...state,
+        rooms: action.snapshot.rooms,
+        tables: action.snapshot.tables,
+        objects: action.snapshot.objects,
+        selectedItem: null,
+        collisionTableId: null,
+        isDirty: true,
+      };
 
     default:
       return state;

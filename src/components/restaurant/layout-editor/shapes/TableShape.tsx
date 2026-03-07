@@ -97,6 +97,18 @@ export function TableShape({
 }: TableShapeProps) {
   const groupRef = useRef<Konva.Group>(null);
   const trRef = useRef<Konva.Transformer>(null);
+  const isDraggingRef = useRef(false);
+
+  // Sync Konva node position from React props (needed for undo/restore)
+  useEffect(() => {
+    const node = groupRef.current;
+    if (node && !isDraggingRef.current) {
+      node.x(table.x);
+      node.y(table.y);
+      node.rotation(table.r);
+      node.getLayer()?.batchDraw();
+    }
+  }, [table.x, table.y, table.r]);
 
   useEffect(() => {
     if (isSelected && trRef.current && groupRef.current) {
@@ -115,6 +127,7 @@ export function TableShape({
   const positions = reorderChairPositions(rawPositions, hasDbChairs ? dbChairs.length : 0);
 
   const handleDragMove = () => {
+    isDraggingRef.current = true;
     const node = groupRef.current;
     if (!node) return;
 
@@ -135,6 +148,7 @@ export function TableShape({
   };
 
   const handleDragEnd = () => {
+    isDraggingRef.current = false;
     const node = groupRef.current;
     if (!node) return;
     const x = snapToGrid(node.x());
