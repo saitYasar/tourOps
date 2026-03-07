@@ -61,7 +61,7 @@ import { LoadingState, EmptyState, ErrorState, ConfirmDialog, ImageCropper } fro
 
 interface CategoryFormData {
   name: string;
-  order: number;
+  displayOrder: number;
 }
 
 interface ServiceFormData {
@@ -76,7 +76,7 @@ interface ServiceFormData {
 
 const initialCategoryForm: CategoryFormData = {
   name: '',
-  order: 0,
+  displayOrder: 0,
 };
 
 const initialServiceForm: ServiceFormData = {
@@ -369,7 +369,7 @@ export default function MenuPage() {
     setEditingCategory(category);
     setCategoryForm({
       name: category.name,
-      order: category.order ?? 0,
+      displayOrder: category.displayOrder ?? 0,
     });
     setIsCategoryFormOpen(true);
   };
@@ -392,14 +392,14 @@ export default function MenuPage() {
         id: editingCategory.id,
         data: {
           name: categoryForm.name,
-          order: categoryForm.order,
+          displayOrder: categoryForm.displayOrder,
         },
       });
     } else {
       createCategoryMutation.mutate({
         data: {
           name: categoryForm.name,
-          order: categoryForm.order,
+          displayOrder: categoryForm.displayOrder,
         },
       });
     }
@@ -539,12 +539,12 @@ export default function MenuPage() {
 
     try {
       const updates = list
-        .map((cat, i) => ({ id: cat.id, newOrder: i, oldOrder: cat.order ?? 0 }))
+        .map((cat, i) => ({ id: cat.id, newOrder: i, oldOrder: cat.displayOrder ?? 0 }))
         .filter(({ newOrder, oldOrder }) => newOrder !== oldOrder);
 
       await Promise.all(
         updates.map(({ id, newOrder }) =>
-          serviceCategoryApi.update(id, { order: newOrder })
+          serviceCategoryApi.update(id, { displayOrder: newOrder })
         )
       );
 
@@ -825,17 +825,17 @@ export default function MenuPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="order">{t.menu.displayOrder}</Label>
+                <Label htmlFor="displayOrder">{t.menu.displayOrder}</Label>
                 <Input
-                  id="order"
+                  id="displayOrder"
                   type="number"
                   min={0}
-                  value={categoryForm.order || ''}
+                  value={categoryForm.displayOrder || ''}
                   onFocus={(e) => e.target.select()}
                   onChange={(e) =>
                     setCategoryForm((prev) => ({
                       ...prev,
-                      order: parseInt(e.target.value) || 0,
+                      displayOrder: parseInt(e.target.value) || 0,
                     }))
                   }
                 />

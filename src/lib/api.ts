@@ -506,20 +506,29 @@ export type PriceType = 'fixed' | 'per_person' | 'per_hour' | 'per_day';
 
 export interface ServiceCategoryDto {
   id: number;
+  organizationId?: number;
   name: string;
-  order?: number;
+  description?: string | null;
+  displayOrder: number;
+  imageKey?: string | null;
+  imageUrl?: string | null;
+  active?: boolean;
   createdAt?: string;
   updatedAt?: string;
+  child_service_categories?: ServiceCategoryDto[];
 }
 
 export interface CreateServiceCategoryDto {
   name: string;
-  order?: number;
+  description?: string;
+  displayOrder?: number;
+  parentId?: number;
 }
 
 export interface UpdateServiceCategoryDto {
   name?: string;
-  order?: number;
+  description?: string;
+  displayOrder?: number;
 }
 
 export interface ServiceDto {
@@ -2239,34 +2248,34 @@ class ApiClient {
   // Service Categories
   // ============================================
 
-  async getServiceCategories(lang: 'tr' | 'en' | 'de' | 'ar' = 'tr') {
-    return this.request<ServiceCategoryDto[]>(`/service-categories/tree?lang=${lang}`, {
-      method: 'GET',
-    }, lang as 'tr' | 'en', true);
-  }
-
-  async getServiceCategory(id: number, lang: 'tr' | 'en' | 'de' | 'ar' = 'tr') {
-    return this.request<ServiceCategoryDto>(`/service-categories/${id}?lang=${lang}`, {
+  async getServiceCategories() {
+    return this.request<ServiceCategoryDto[]>('/service-categories/tree', {
       method: 'GET',
     }, 'tr', true);
   }
 
-  async createServiceCategory(data: CreateServiceCategoryDto, lang: 'tr' | 'en' | 'de' | 'ar' = 'tr') {
-    return this.request<ServiceCategoryDto>(`/service-categories?lang=${lang}`, {
+  async getServiceCategory(id: number) {
+    return this.request<ServiceCategoryDto>(`/service-categories/${id}`, {
+      method: 'GET',
+    }, 'tr', true);
+  }
+
+  async createServiceCategory(data: CreateServiceCategoryDto) {
+    return this.request<ServiceCategoryDto>('/service-categories', {
       method: 'POST',
       body: JSON.stringify(data),
     }, 'tr', true);
   }
 
-  async updateServiceCategory(id: number, data: UpdateServiceCategoryDto, lang: 'tr' | 'en' | 'de' | 'ar' = 'tr') {
-    return this.request<ServiceCategoryDto>(`/service-categories/${id}?lang=${lang}`, {
+  async updateServiceCategory(id: number, data: UpdateServiceCategoryDto) {
+    return this.request<ServiceCategoryDto>(`/service-categories/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     }, 'tr', true);
   }
 
-  async deleteServiceCategory(id: number, lang: 'tr' | 'en' | 'de' | 'ar' = 'tr') {
-    return this.request<{ message: string }>(`/service-categories/${id}?lang=${lang}`, {
+  async deleteServiceCategory(id: number) {
+    return this.request<{ message: string }>(`/service-categories/${id}`, {
       method: 'DELETE',
     }, 'tr', true);
   }
@@ -2275,13 +2284,13 @@ class ApiClient {
   // Services
   // ============================================
 
-  async getService(id: number, lang: 'tr' | 'en' | 'de' | 'ar' = 'tr') {
-    return this.request<ServiceDto>(`/services/${id}?lang=${lang}`, {
+  async getService(id: number) {
+    return this.request<ServiceDto>(`/services/${id}`, {
       method: 'GET',
     }, 'tr', true);
   }
 
-  async createService(data: CreateServiceDto, image?: File, lang: 'tr' | 'en' | 'de' | 'ar' = 'tr') {
+  async createService(data: CreateServiceDto, image?: File) {
     const formData = new FormData();
     formData.append('serviceCategoryId', String(data.serviceCategoryId));
     formData.append('title', data.title);
@@ -2294,7 +2303,7 @@ class ApiClient {
     }
     if (image) formData.append('image', image);
 
-    const url = `${this.baseUrl}/services?lang=${lang}`;
+    const url = `${this.baseUrl}/services`;
     const headers: HeadersInit = {};
     const token = this.resolveToken();
     if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -2311,7 +2320,7 @@ class ApiClient {
     return (jsonResponse.data !== undefined ? jsonResponse.data : jsonResponse) as ServiceDto;
   }
 
-  async updateService(id: number, data: UpdateServiceDto, image?: File, lang: 'tr' | 'en' | 'de' | 'ar' = 'tr') {
+  async updateService(id: number, data: UpdateServiceDto, image?: File) {
     const formData = new FormData();
     if (data.title !== undefined) formData.append('title', data.title);
     if (data.subTitle !== undefined) formData.append('subTitle', data.subTitle);
@@ -2326,7 +2335,7 @@ class ApiClient {
     }
     if (image) formData.append('image', image);
 
-    const url = `${this.baseUrl}/services/${id}?lang=${lang}`;
+    const url = `${this.baseUrl}/services/${id}`;
     const headers: HeadersInit = {};
     const token = this.resolveToken();
     if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -2343,26 +2352,26 @@ class ApiClient {
     return (jsonResponse.data !== undefined ? jsonResponse.data : jsonResponse) as ServiceDto;
   }
 
-  async deleteService(id: number, lang: 'tr' | 'en' | 'de' | 'ar' = 'tr') {
-    return this.request<{ message: string }>(`/services/${id}?lang=${lang}`, {
+  async deleteService(id: number) {
+    return this.request<{ message: string }>(`/services/${id}`, {
       method: 'DELETE',
     }, 'tr', true);
   }
 
-  async getServicesByCategory(categoryId: number, page = 1, limit = 100, lang: 'tr' | 'en' | 'de' | 'ar' = 'tr') {
-    return this.request<PaginatedResponse<ServiceDto>>(`/services/category/${categoryId}?page=${page}&limit=${limit}&lang=${lang}`, {
+  async getServicesByCategory(categoryId: number, page = 1, limit = 100) {
+    return this.request<PaginatedResponse<ServiceDto>>(`/services/category/${categoryId}?page=${page}&limit=${limit}`, {
       method: 'GET',
     }, 'tr', true);
   }
 
-  async getServicesByOrganization(orgId: number, page = 1, limit = 100, lang: 'tr' | 'en' | 'de' | 'ar' = 'tr') {
-    return this.request<PaginatedResponse<ServiceDto>>(`/services/organization/${orgId}?page=${page}&limit=${limit}&lang=${lang}`, {
+  async getServicesByOrganization(orgId: number, page = 1, limit = 100) {
+    return this.request<PaginatedResponse<ServiceDto>>(`/services/organization/${orgId}?page=${page}&limit=${limit}`, {
       method: 'GET',
     }, 'tr', true);
   }
 
-  async getActiveServicesByOrganization(orgId: number, page = 1, limit = 100, lang: 'tr' | 'en' | 'de' | 'ar' = 'tr') {
-    return this.request<PaginatedResponse<ServiceDto>>(`/services/organization/${orgId}/active?page=${page}&limit=${limit}&lang=${lang}`, {
+  async getActiveServicesByOrganization(orgId: number, page = 1, limit = 100) {
+    return this.request<PaginatedResponse<ServiceDto>>(`/services/organization/${orgId}/active?page=${page}&limit=${limit}`, {
       method: 'GET',
     }, 'tr', true);
   }
