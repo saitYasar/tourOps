@@ -31,13 +31,19 @@ import {
   MapPin,
   Loader2,
   Percent,
+  ClipboardList,
+  DollarSign,
+  User as UserIcon,
+  ChevronDown,
+  ChevronUp,
+  LayoutGrid,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import dynamic from 'next/dynamic';
 
 import { tourApi, tourStopApi, apiClient, agencyApi } from '@/lib/api';
-import type { ApiTourDto, ApiTourStopDto, CreateTourStopPayload, UpdateTourPayload, ServiceRequestDto, OrganizationPublicDto, TourClientDto, AgencyClientDto } from '@/lib/api';
+import type { ApiTourDto, ApiTourStopDto, CreateTourStopPayload, UpdateTourPayload, ServiceRequestDto, OrganizationPublicDto, TourClientDto, AgencyClientDto, AgencyStopChoicesDto, AgencyStopServiceSummaryDto, ResourceDto } from '@/lib/api';
 import { formatDate } from '@/lib/dateUtils';
 import { useLanguage } from '@/contexts/LanguageContext';
 
@@ -105,6 +111,8 @@ export default function TourDetailPage() {
   const [orgSearch, setOrgSearch] = useState('');
   const [orgSearchDebounced, setOrgSearchDebounced] = useState('');
   const [selectedOrgDetail, setSelectedOrgDetail] = useState<OrganizationPublicDto | null>(null);
+  const [choicesStopId, setChoicesStopId] = useState<number | null>(null);
+  const [expandedClientId, setExpandedClientId] = useState<number | null>(null);
 
   // Edit form state
   const [editForm, setEditForm] = useState({
@@ -166,9 +174,9 @@ export default function TourDetailPage() {
 
   // Query: Service requests for tour
   const { data: serviceRequests } = useQuery({
-    queryKey: ['tour-service-requests', tourId],
+    queryKey: ['tour-service-requests', tourId, apiLang],
     queryFn: async () => {
-      const response = await apiClient.getServiceRequestsByTour(tourId, 1, 100);
+      const response = await apiClient.getServiceRequestsByTour(tourId, 1, 100, apiLang);
       return response.data;
     },
     enabled: !!tourId,
@@ -187,9 +195,9 @@ export default function TourDetailPage() {
 
   // Query: Agency clients (for add participant)
   const { data: agencyClients } = useQuery({
-    queryKey: ['agency-clients-all'],
+    queryKey: ['agency-clients-all', apiLang],
     queryFn: async () => {
-      const response = await apiClient.getAgencyClients(1, 200);
+      const response = await apiClient.getAgencyClients(1, 100, apiLang);
       return response.data;
     },
     enabled: isAddParticipantOpen,
@@ -207,6 +215,36 @@ export default function TourDetailPage() {
 
   // organizations list for both map and stop form
   const organizations = allOrganizations;
+
+  // Query: Stop choices (all customer choices for selected stop)
+  const { data: stopChoices, isLoading: choicesLoading } = useQuery({
+    queryKey: ['agency-stop-choices', choicesStopId, apiLang],
+    queryFn: async () => {
+      const response = await apiClient.getAgencyStopChoices(choicesStopId!, apiLang);
+      return Array.isArray(response) ? response : (response as any).data ?? [];
+    },
+    enabled: !!choicesStopId,
+  });
+
+  // Query: Stop service summary
+  const { data: serviceSummary, isLoading: summaryLoading } = useQuery({
+    queryKey: ['agency-stop-service-summary', choicesStopId, apiLang],
+    queryFn: async () => {
+      const response = await apiClient.getAgencyStopServiceSummary(choicesStopId!, apiLang);
+      return response;
+    },
+    enabled: !!choicesStopId,
+  });
+
+  // Query: Stop layout (organization layout for selected stop)
+  const { data: stopLayout, isLoading: layoutLoading } = useQuery({
+    queryKey: ['stop-layout', choicesStopId, apiLang],
+    queryFn: async () => {
+      const response = await apiClient.getStopLayout(choicesStopId!, apiLang);
+      return Array.isArray(response) ? response : (response as any).data ?? [];
+    },
+    enabled: !!choicesStopId,
+  });
 
   // Debounced organization search for stop form
   useEffect(() => {
@@ -603,6 +641,7 @@ export default function TourDetailPage() {
             <TabsTrigger value="stops">{t.tours.stops} ({stops?.length || 0})</TabsTrigger>
             <TabsTrigger value="requests">{t.tours.requests} ({serviceRequests?.length || 0})</TabsTrigger>
             <TabsTrigger value="clients">{t.tours.clients} ({tourClients?.length || 0})</TabsTrigger>
+            <TabsTrigger value="choices">{t.tours.customerChoices}</TabsTrigger>
           </TabsList>
 
           {/* Info Tab */}
@@ -1130,6 +1169,324 @@ export default function TourDetailPage() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Choices Tab */}
+          <TabsContent value="choices" className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              {/* Stop selector */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg">{t.tours.stops}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {!stops?.length ? (
+                    <p className="text-sm text-slate-500">{t.tours.noStops}</p>
+                  ) : (
+                    <div className="space-y-1">
+                      {stops.map((stop, index) => (
+                        <button
+                          key={stop.id}
+                          type="button"
+                          className={`w-full flex items-center gap-2 p-2.5 rounded-lg text-left transition-colors ${
+                            choicesStopId === stop.id
+                              ? 'bg-blue-50 border border-blue-300'
+                              : 'hover:bg-slate-50 border border-transparent'
+                          }`}
+                          onClick={() => {
+                            setChoicesStopId(stop.id);
+                            setExpandedClientId(null);
+                          }}
+                        >
+                          <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
+                            {index + 1}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{stop.organization?.name || `#${stop.organizationId}`}</p>
+                            <p className="text-xs text-slate-500">
+                              {stop.scheduledStartTime ? new Date(stop.scheduledStartTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                              {stop.scheduledStartTime && stop.scheduledEndTime ? ' - ' : ''}
+                              {stop.scheduledEndTime ? new Date(stop.scheduledEndTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                            </p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Choices + Summary */}
+              <div className="lg:col-span-2 space-y-4">
+                {!choicesStopId ? (
+                  <Card>
+                    <CardContent className="py-12">
+                      <EmptyState
+                        icon={ClipboardList}
+                        title={t.tours.customerChoices}
+                        description={t.tours.selectStop}
+                      />
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <>
+                    {/* Service Summary */}
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          <DollarSign className="h-5 w-5" />
+                          {t.tours.serviceSummary}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {summaryLoading ? (
+                          <LoadingState message={t.common.loading} />
+                        ) : !serviceSummary?.services?.length ? (
+                          <p className="text-sm text-slate-500 text-center py-4">{t.tours.noChoices}</p>
+                        ) : (
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="border-b text-slate-500">
+                                  <th className="text-left py-2 font-medium">{t.tours.service}</th>
+                                  <th className="text-center py-2 font-medium">{t.tours.quantity}</th>
+                                  <th className="text-right py-2 font-medium">{t.tours.unitPrice}</th>
+                                  <th className="text-right py-2 font-medium">{t.tours.totalPrice}</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {serviceSummary.services.map((item) => (
+                                  <tr key={item.serviceId} className="border-b last:border-b-0">
+                                    <td className="py-2">{item.serviceName}</td>
+                                    <td className="py-2 text-center">{item.totalQuantity}</td>
+                                    <td className="py-2 text-right">{Number(item.unitPrice).toFixed(2)} ₺</td>
+                                    <td className="py-2 text-right font-medium">{Number(item.totalPrice).toFixed(2)} ₺</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                              <tfoot>
+                                <tr className="border-t-2">
+                                  <td colSpan={3} className="py-2 font-semibold text-right">{t.tours.grandTotal}</td>
+                                  <td className="py-2 text-right font-bold text-lg">{Number(serviceSummary.grandTotal).toFixed(2)} ₺</td>
+                                </tr>
+                              </tfoot>
+                            </table>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    {/* Stop Layout */}
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          <LayoutGrid className="h-5 w-5" />
+                          {t.tours.stopLayout}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {layoutLoading ? (
+                          <LoadingState message={t.common.loading} />
+                        ) : !stopLayout?.length ? (
+                          <p className="text-sm text-slate-500 text-center py-4">{t.tours.noLayout}</p>
+                        ) : (
+                          <div className="space-y-3">
+                            {stopLayout.map((floor: ResourceDto) => (
+                              <div key={floor.id} className="border rounded-lg overflow-hidden">
+                                <div className="bg-slate-100 px-3 py-2 font-medium text-sm flex items-center gap-2">
+                                  <span>{floor.name}</span>
+                                  {floor.capacity > 0 && (
+                                    <Badge variant="outline" className="text-xs">{floor.capacity} {t.tours.capacity || 'kişi'}</Badge>
+                                  )}
+                                </div>
+                                {floor.children && floor.children.length > 0 && (
+                                  <div className="p-2">
+                                    {floor.children.map((room: ResourceDto) => (
+                                      <div key={room.id} className="mb-2 last:mb-0">
+                                        {/* Show room name if it has children (tables) */}
+                                        {room.children && room.children.length > 0 ? (
+                                          <>
+                                            <p className="text-xs font-medium text-slate-500 px-1 mb-1">{room.name}</p>
+                                            <div className="flex flex-wrap gap-1.5">
+                                              {room.children.map((table: ResourceDto) => {
+                                                const occupant = stopChoices?.find(
+                                                  (c: AgencyStopChoicesDto) => c.resourceChoice?.resourceId === table.id
+                                                );
+                                                const occupantName = occupant?.client
+                                                  ? `${occupant.client.firstName || ''} ${occupant.client.lastName || ''}`.trim()
+                                                  : occupant?.clientName;
+                                                return (
+                                                  <div
+                                                    key={table.id}
+                                                    className={`px-2.5 py-1.5 rounded-md text-xs border ${
+                                                      occupant
+                                                        ? 'bg-blue-50 border-blue-300 text-blue-700'
+                                                        : 'bg-white border-slate-200 text-slate-600'
+                                                    }`}
+                                                    title={occupantName ? `${table.name} - ${occupantName}` : table.name}
+                                                  >
+                                                    <span className="font-medium">{table.name}</span>
+                                                    {table.capacity > 0 && <span className="text-slate-400 ml-1">({table.capacity})</span>}
+                                                    {occupantName && (
+                                                      <span className="ml-1 text-blue-600">{occupantName}</span>
+                                                    )}
+                                                  </div>
+                                                );
+                                              })}
+                                            </div>
+                                          </>
+                                        ) : (
+                                          /* Room itself is a leaf (table-like) */
+                                          <div className="flex flex-wrap gap-1.5">
+                                            {(() => {
+                                              const occupant = stopChoices?.find(
+                                                (c: AgencyStopChoicesDto) => c.resourceChoice?.resourceId === room.id
+                                              );
+                                              const occupantName = occupant?.client
+                                                ? `${occupant.client.firstName || ''} ${occupant.client.lastName || ''}`.trim()
+                                                : occupant?.clientName;
+                                              return (
+                                                <div
+                                                  className={`px-2.5 py-1.5 rounded-md text-xs border ${
+                                                    occupant
+                                                      ? 'bg-blue-50 border-blue-300 text-blue-700'
+                                                      : 'bg-white border-slate-200 text-slate-600'
+                                                  }`}
+                                                >
+                                                  <span className="font-medium">{room.name}</span>
+                                                  {room.capacity > 0 && <span className="text-slate-400 ml-1">({room.capacity})</span>}
+                                                  {occupantName && (
+                                                    <span className="ml-1 text-blue-600">{occupantName}</span>
+                                                  )}
+                                                </div>
+                                              );
+                                            })()}
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                            {/* Legend */}
+                            <div className="flex items-center gap-4 text-xs text-slate-500 pt-1">
+                              <div className="flex items-center gap-1.5">
+                                <div className="w-3 h-3 rounded border border-slate-200 bg-white" />
+                                <span>{t.tours.available}</span>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <div className="w-3 h-3 rounded border border-blue-300 bg-blue-50" />
+                                <span>{t.tours.occupied}</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    {/* Customer Choices Detail */}
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          <ClipboardList className="h-5 w-5" />
+                          {t.tours.customerChoices}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {choicesLoading ? (
+                          <LoadingState message={t.common.loading} />
+                        ) : !stopChoices?.length ? (
+                          <p className="text-sm text-slate-500 text-center py-4">{t.tours.noChoices}</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {stopChoices.map((choice: AgencyStopChoicesDto) => {
+                              const clientName = choice.client
+                                ? `${choice.client.firstName || ''} ${choice.client.lastName || ''}`.trim()
+                                : choice.clientName || `#${choice.clientId}`;
+                              const isExpanded = expandedClientId === choice.clientId;
+
+                              return (
+                                <div key={choice.clientId} className="border rounded-lg overflow-hidden">
+                                  <button
+                                    type="button"
+                                    className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 transition-colors"
+                                    onClick={() => setExpandedClientId(isExpanded ? null : choice.clientId)}
+                                  >
+                                    <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center shrink-0 overflow-hidden">
+                                      {choice.client?.profilePhoto ? (
+                                        <img src={choice.client.profilePhoto} alt="" className="w-full h-full object-cover" />
+                                      ) : (
+                                        <UserIcon className="h-4 w-4 text-slate-400" />
+                                      )}
+                                    </div>
+                                    <div className="flex-1 min-w-0 text-left">
+                                      <p className="text-sm font-medium truncate">{clientName}</p>
+                                      {choice.client?.email && (
+                                        <p className="text-xs text-slate-500">{choice.client.email}</p>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      {choice.resourceChoice && (
+                                        <Badge variant="outline" className="text-xs">{t.tours.resource}</Badge>
+                                      )}
+                                      {choice.serviceChoices && choice.serviceChoices.length > 0 && (
+                                        <Badge variant="secondary" className="text-xs">
+                                          {choice.serviceChoices.length} {t.tours.service.toLowerCase()}
+                                        </Badge>
+                                      )}
+                                      {isExpanded ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
+                                    </div>
+                                  </button>
+
+                                  {isExpanded && (
+                                    <div className="border-t px-3 py-3 bg-slate-50 space-y-3">
+                                      {/* Resource choice */}
+                                      {choice.resourceChoice && (
+                                        <div>
+                                          <p className="text-xs font-medium text-slate-500 mb-1">{t.tours.resource}</p>
+                                          <div className="text-sm bg-white rounded p-2 border">
+                                            {choice.resourceChoice.resource?.name || `#${choice.resourceChoice.resourceId}`}
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      {/* Service choices */}
+                                      {choice.serviceChoices && choice.serviceChoices.length > 0 && (
+                                        <div>
+                                          <p className="text-xs font-medium text-slate-500 mb-1">{t.tours.service}</p>
+                                          <div className="space-y-1">
+                                            {choice.serviceChoices.map((sc) => (
+                                              <div key={sc.id} className="flex items-center justify-between text-sm bg-white rounded p-2 border">
+                                                <span>{sc.service?.title || `#${sc.serviceId}`}</span>
+                                                <div className="flex items-center gap-3 text-slate-600">
+                                                  <span>x{sc.quantity}</span>
+                                                  {sc.service?.basePrice != null && (
+                                                    <span className="font-medium">{(Number(sc.service.basePrice) * sc.quantity).toFixed(2)} ₺</span>
+                                                  )}
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      {!choice.resourceChoice && (!choice.serviceChoices || choice.serviceChoices.length === 0) && (
+                                        <p className="text-sm text-slate-400 text-center">{t.tours.noChoices}</p>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </>
+                )}
+              </div>
+            </div>
           </TabsContent>
         </Tabs>
       </div>

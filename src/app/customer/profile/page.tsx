@@ -20,7 +20,8 @@ import { Label } from '@/components/ui/label';
 import { LoadingState, ErrorState } from '@/components/shared';
 
 export default function CustomerProfilePage() {
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
+  const apiLang = (locale === 'de' ? 'en' : locale) as 'tr' | 'en';
   const router = useRouter();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -35,8 +36,8 @@ export default function CustomerProfilePage() {
   const [successMsg, setSuccessMsg] = useState('');
 
   const { data: profile, isLoading, error, refetch } = useQuery({
-    queryKey: ['client-profile'],
-    queryFn: () => apiClient.getClientProfile(),
+    queryKey: ['client-profile', apiLang],
+    queryFn: () => apiClient.getClientProfile(apiLang),
   });
 
   // Initialize form with profile data

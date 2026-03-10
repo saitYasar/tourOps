@@ -44,35 +44,36 @@ const AUTH_TOKEN_KEY = 'tourops_access_token';
 const AUTH_USER_DATA_KEY = 'tourops_user_data';
 
 export default function CustomerDashboard() {
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
+  const apiLang = (locale === 'de' ? 'en' : locale) as 'tr' | 'en';
   const router = useRouter();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'dashboard' | 'reservations' | 'serviceRequests' | 'profile'>('dashboard');
 
   // Client Profile
   const { data: profile, isLoading: profileLoading, error: profileError, refetch: refetchProfile } = useQuery({
-    queryKey: ['client-profile'],
-    queryFn: () => apiClient.getClientProfile(),
+    queryKey: ['client-profile', apiLang],
+    queryFn: () => apiClient.getClientProfile(apiLang),
   });
 
   // Reservations
   const { data: reservationsData, isLoading: reservationsLoading } = useQuery({
-    queryKey: ['client-reservations', profile?.id],
-    queryFn: () => apiClient.getClientReservations(String(profile!.id), 1, 50),
+    queryKey: ['client-reservations', profile?.id, apiLang],
+    queryFn: () => apiClient.getClientReservations(String(profile!.id), 1, 50, apiLang),
     enabled: !!profile?.id,
   });
 
   // Tours - new client API
   const { data: toursData, isLoading: toursLoading } = useQuery({
-    queryKey: ['client-my-tours'],
-    queryFn: () => apiClient.getMyTours(1, 50),
+    queryKey: ['client-my-tours', apiLang],
+    queryFn: () => apiClient.getMyTours(1, 50, apiLang),
     enabled: !!profile,
   });
 
   // Service Requests
   const { data: serviceRequestsData, isLoading: serviceRequestsLoading } = useQuery({
-    queryKey: ['client-service-requests', profile?.id],
-    queryFn: () => apiClient.getServiceRequestsByClient(profile!.id, 1, 50),
+    queryKey: ['client-service-requests', profile?.id, apiLang],
+    queryFn: () => apiClient.getServiceRequestsByClient(profile!.id, 1, 50, apiLang),
     enabled: !!profile?.id,
   });
 

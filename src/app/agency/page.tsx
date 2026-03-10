@@ -38,6 +38,7 @@ import { LoadingState, SprinterLoading, ImageCropper } from '@/components/shared
 export default function AgencyDashboard() {
   const { user } = useAuth();
   const { t, locale } = useLanguage();
+  const apiLang = (locale === 'de' ? 'en' : locale) as 'tr' | 'en';
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -70,8 +71,8 @@ export default function AgencyDashboard() {
 
   // Query: Tours
   const { data: toursResult, isLoading: toursLoading } = useQuery({
-    queryKey: ['agency-tours'],
-    queryFn: () => tourApi.list(1, 100),
+    queryKey: ['agency-tours', apiLang],
+    queryFn: () => tourApi.list(1, 100, apiLang),
   });
 
   const tours = toursResult?.success ? toursResult.data || [] : [];
@@ -87,8 +88,8 @@ export default function AgencyDashboard() {
 
   // Query: Clients
   const { data: clientsResult } = useQuery({
-    queryKey: ['agency-clients'],
-    queryFn: () => agencyApi.getClients(1, 1),
+    queryKey: ['agency-clients', apiLang],
+    queryFn: () => agencyApi.getClients(1, 1, apiLang),
   });
 
   const isLoading = agencyLoading || toursLoading;

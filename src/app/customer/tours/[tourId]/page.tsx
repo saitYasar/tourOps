@@ -58,7 +58,8 @@ type MenuSelections = Record<number, number>; // serviceId -> quantity
 export default function CustomerTourDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
+  const apiLang = (locale === 'de' ? 'en' : locale) as 'tr' | 'en';
   const tourId = Number(params.tourId);
 
   const queryClient = useQueryClient();
@@ -91,23 +92,23 @@ export default function CustomerTourDetailPage() {
     error,
     refetch,
   } = useQuery({
-    queryKey: ['client-tour-detail', tourId],
-    queryFn: () => apiClient.getMyTourDetail(tourId),
+    queryKey: ['client-tour-detail', tourId, apiLang],
+    queryFn: () => apiClient.getMyTourDetail(tourId, apiLang),
     enabled: !!tourId,
   });
 
   // Stop menu
   const { data: menuData, isLoading: menuLoading, error: menuError } = useQuery({
-    queryKey: ['client-stop-menu', menuStopId],
-    queryFn: () => apiClient.getStopMenu(menuStopId!),
+    queryKey: ['client-stop-menu', menuStopId, apiLang],
+    queryFn: () => apiClient.getStopMenu(menuStopId!, apiLang),
     enabled: !!menuStopId,
     retry: false,
   });
 
   // Stop layout for table selection
   const { data: layoutData, isLoading: layoutLoading, error: layoutError } = useQuery({
-    queryKey: ['client-stop-layout', tableStopId],
-    queryFn: () => apiClient.getStopLayout(tableStopId!),
+    queryKey: ['client-stop-layout', tableStopId, apiLang],
+    queryFn: () => apiClient.getStopLayout(tableStopId!, apiLang),
     enabled: !!tableStopId,
     retry: false,
   });
@@ -115,7 +116,7 @@ export default function CustomerTourDetailPage() {
   // Load existing choices for a stop
   const loadStopChoices = useCallback(async (stopId: number) => {
     try {
-      const choicesData = await apiClient.getStopChoices(stopId);
+      const choicesData = await apiClient.getStopChoices(stopId, apiLang);
       const choices: ClientStopChoicesDto = (choicesData && typeof choicesData === 'object' && 'data' in choicesData)
         ? (choicesData as unknown as { data: ClientStopChoicesDto }).data
         : choicesData;
@@ -154,7 +155,7 @@ export default function CustomerTourDetailPage() {
     } catch {
       // Choices may not exist yet, that's ok
     }
-  }, []);
+  }, [apiLang]);
 
   // Fetch children for a resource (rooms for floor, tables for room, chairs for table)
   const fetchChildren = useCallback(async (parentId: number, force = false) => {

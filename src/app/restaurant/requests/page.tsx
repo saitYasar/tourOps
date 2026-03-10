@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Calendar, Users, CheckCircle, XCircle, MessageSquare, Building2, Clock, ChevronDown, ChevronUp, FileText } from 'lucide-react';
+import { Calendar, Users, CheckCircle, XCircle, MessageSquare, Building2, Clock, ChevronDown, ChevronUp, FileText, Timer } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { preReservationOrgApi, organizationApi, type PreReservationDto } from '@/lib/api';
@@ -28,6 +28,7 @@ import {
   DialogFooter,
   DialogDescription,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { LoadingState, EmptyState, ErrorState, RequestStatusBadge } from '@/components/shared';
@@ -38,6 +39,7 @@ export default function RestaurantRequestsPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { t, locale } = useLanguage();
+  const apiLang = (locale === 'de' ? 'en' : locale) as 'tr' | 'en';
 
   const { data: orgResult } = useQuery({
     queryKey: ['my-organization'],
@@ -50,6 +52,7 @@ export default function RestaurantRequestsPage() {
   const [responseNote, setResponseNote] = useState('');
   const [actionType, setActionType] = useState<'approve' | 'reject' | null>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [choiceDeadline, setChoiceDeadline] = useState<string>('');
 
   // Query: Pre-reservation requests — pass status filter to API
   const {
@@ -58,15 +61,16 @@ export default function RestaurantRequestsPage() {
     error,
     refetch,
   } = useQuery({
-    queryKey: ['org-pre-reservations', statusFilter],
-    queryFn: () => preReservationOrgApi.getAll(statusFilter === 'all' ? undefined : statusFilter),
+    queryKey: ['org-pre-reservations', statusFilter, apiLang],
+    queryFn: () => preReservationOrgApi.getAll(statusFilter === 'all' ? undefined : statusFilter, apiLang),
   });
 
   const requests = requestsResult?.success ? requestsResult.data || [] : [];
 
   // Mutation: Approve
   const approveMutation = useMutation({
-    mutationFn: (id: number) => preReservationOrgApi.approve(id),
+    mutationFn: ({ id, choiceDeadline: deadline }: { id: number; choiceDeadline?: number }) =>
+      preReservationOrgApi.approve(id, deadline, apiLang),
     onSuccess: (result) => {
       if (!result.success) {
         toast.error(result.error || t.common.error);
@@ -84,7 +88,7 @@ export default function RestaurantRequestsPage() {
   // Mutation: Reject — now sends rejectionReason
   const rejectMutation = useMutation({
     mutationFn: ({ id, reason }: { id: number; reason: string }) =>
-      preReservationOrgApi.reject(id, reason),
+      preReservationOrgApi.reject(id, reason, apiLang),
     onSuccess: (result) => {
       if (!result.success) {
         toast.error(result.error || t.common.error);
@@ -103,25 +107,29 @@ export default function RestaurantRequestsPage() {
     setSelectedRequest(request);
     setActionType('approve');
     setResponseNote('');
+    setChoiceDeadline('');
   };
 
   const openRejectDialog = (request: PreReservationDto) => {
     setSelectedRequest(request);
     setActionType('reject');
     setResponseNote('');
+    setChoiceDeadline('');
   };
 
   const closeDialog = () => {
     setSelectedRequest(null);
     setActionType(null);
     setResponseNote('');
+    setChoiceDeadline('');
   };
 
   const handleConfirmAction = () => {
     if (!selectedRequest || !actionType) return;
 
     if (actionType === 'approve') {
-      approveMutation.mutate(selectedRequest.id);
+      const deadline = choiceDeadline ? Number(choiceDeadline) : undefined;
+      approveMutation.mutate({ id: selectedRequest.id, choiceDeadline: deadline });
     } else {
       if (!responseNote.trim()) {
         toast.error(t.requests.rejectionReasonRequired);
@@ -358,6 +366,29 @@ export default function RestaurantRequestsPage() {
                   </p>
                 )}
               </div>
+
+              {/* Choice Deadline - only for approve */}
+              {actionType === 'approve' && (
+                <div className="space-y-2">
+                  <Label htmlFor="choiceDeadline" className="flex items-center gap-1.5">
+                    <Timer className="h-3.5 w-3.5" />
+                    {t.requests.choiceDeadline}
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="choiceDeadline"
+                      type="number"
+                      min={1}
+                      value={choiceDeadline}
+                      onChange={(e) => setChoiceDeadline(e.target.value)}
+                      placeholder="24"
+                      className="w-24"
+                    />
+                    <span className="text-sm text-slate-500">{t.requests.choiceDeadlineUnit}</span>
+                  </div>
+                  <p className="text-xs text-slate-400">{t.requests.choiceDeadlineDesc}</p>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor="responseNote">

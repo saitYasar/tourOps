@@ -910,6 +910,32 @@ export interface ClientStopChoicesDto {
   [key: string]: unknown;
 }
 
+// Agency Stop Choices (all customers' choices for a stop)
+export interface AgencyStopChoicesDto {
+  clientId: number;
+  clientName?: string;
+  client?: { id: number; firstName?: string; lastName?: string; email?: string; profilePhoto?: string | null };
+  resourceChoice?: ClientResourceChoiceDto | null;
+  serviceChoices?: ClientServiceChoiceDto[];
+  [key: string]: unknown;
+}
+
+// Agency Stop Service Summary
+export interface AgencyStopServiceSummaryItemDto {
+  serviceId: number;
+  serviceName: string;
+  totalQuantity: number;
+  unitPrice: number;
+  totalPrice: number;
+  [key: string]: unknown;
+}
+
+export interface AgencyStopServiceSummaryDto {
+  services: AgencyStopServiceSummaryItemDto[];
+  grandTotal: number;
+  [key: string]: unknown;
+}
+
 export interface ClientReservationDto {
   id: number;
   tourId: number;
@@ -1503,16 +1529,16 @@ class ApiClient {
     }, lang);
   }
 
-  async getServiceRequestsByTour(tourId: number, page = 1, limit = 10) {
+  async getServiceRequestsByTour(tourId: number, page = 1, limit = 10, lang: 'tr' | 'en' = 'tr') {
     return this.request<PaginatedResponse<ServiceRequestDto>>(`/service-requests/tour/${tourId}?page=${page}&limit=${limit}`, {
       method: 'GET',
-    }, 'tr', true);
+    }, lang);
   }
 
-  async cancelServiceRequest(id: number) {
+  async cancelServiceRequest(id: number, lang: 'tr' | 'en' = 'tr') {
     return this.request<ServiceRequestDto>(`/service-requests/${id}/cancel`, {
       method: 'PUT',
-    }, 'tr', true);
+    }, lang);
   }
 
   async retryServiceRequest(id: number, lang: 'tr' | 'en' = 'tr') {
@@ -1926,11 +1952,11 @@ class ApiClient {
   // Agencies - Clients
   // ============================================
 
-  async getAgencyClients(page = 1, limit = 10) {
+  async getAgencyClients(page = 1, limit = 10, lang: 'tr' | 'en' = 'tr') {
     const url = `/agencies/clients?page=${page}&limit=${limit}`;
     return this.request<PaginatedResponse<AgencyClientDto>>(url, {
       method: 'GET',
-    }, 'tr', true);
+    }, lang);
   }
 
   // Note: GET /agencies/clients/{clientId} returns 404 - backend only supports list and delete
@@ -2537,8 +2563,15 @@ class ApiClient {
     return this.request<any>(`/organization/pre-reservations/${id}`, { method: 'GET' }, lang);
   }
 
-  async approveOrgPreReservation(id: number, lang: 'tr' | 'en' = 'tr') {
-    return this.request<any>(`/organization/pre-reservations/${id}/approve`, { method: 'PUT' }, lang);
+  async approveOrgPreReservation(id: number, choiceDeadline?: number, lang: 'tr' | 'en' = 'tr') {
+    const body: Record<string, unknown> = {};
+    if (choiceDeadline !== undefined && choiceDeadline !== null) {
+      body.choiceDeadline = choiceDeadline;
+    }
+    return this.request<any>(`/organization/pre-reservations/${id}/approve`, {
+      method: 'PUT',
+      ...(Object.keys(body).length > 0 ? { body: JSON.stringify(body) } : {}),
+    }, lang);
   }
 
   async rejectOrgPreReservation(id: number, rejectionReason: string, lang: 'tr' | 'en' = 'tr') {
@@ -3090,6 +3123,22 @@ class ApiClient {
   // Get all choices for a stop
   async getStopChoices(stopId: number, lang: 'tr' | 'en' = 'tr') {
     return this.request<ClientStopChoicesDto>(`/client/tours/stops/${stopId}/choices`, {
+      method: 'GET',
+    }, lang);
+  }
+
+  // ============================================
+  // Agency - Tour Stop Choices & Summary
+  // ============================================
+
+  async getAgencyStopChoices(stopId: number, lang: 'tr' | 'en' = 'tr') {
+    return this.request<AgencyStopChoicesDto[]>(`/agency/tours/stops/${stopId}/choices`, {
+      method: 'GET',
+    }, lang);
+  }
+
+  async getAgencyStopServiceSummary(stopId: number, lang: 'tr' | 'en' = 'tr') {
+    return this.request<AgencyStopServiceSummaryDto>(`/agency/tours/stops/${stopId}/service-summary`, {
       method: 'GET',
     }, lang);
   }
@@ -3776,9 +3825,9 @@ export const agencyApi = {
   },
 
   // Get clients
-  async getClients(page = 1, limit = 10) {
+  async getClients(page = 1, limit = 10, lang: 'tr' | 'en' = 'tr') {
     try {
-      const response = await apiClient.getAgencyClients(page, limit);
+      const response = await apiClient.getAgencyClients(page, limit, lang);
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
@@ -4706,10 +4755,9 @@ export interface PreReservationDto {
 }
 
 export const preReservationOrgApi = {
-  async getAll(status?: string): Promise<{ success: boolean; data?: PreReservationDto[]; error?: string }> {
+  async getAll(status?: string, lang: 'tr' | 'en' = 'tr'): Promise<{ success: boolean; data?: PreReservationDto[]; error?: string }> {
     try {
-      const response = await apiClient.getOrgPreReservations(status);
-      console.log('[PreReservation] Raw API response:', JSON.stringify(response, null, 2));
+      const response = await apiClient.getOrgPreReservations(status, lang);
       const raw = Array.isArray(response) ? response : (response as any).data ?? [];
       // Normalize: backend may return preReservationStatus instead of status
       const data = raw.map((item: any) => ({
@@ -4722,18 +4770,18 @@ export const preReservationOrgApi = {
     }
   },
 
-  async approve(id: number): Promise<{ success: boolean; error?: string }> {
+  async approve(id: number, choiceDeadline?: number, lang: 'tr' | 'en' = 'tr'): Promise<{ success: boolean; error?: string }> {
     try {
-      await apiClient.approveOrgPreReservation(id);
+      await apiClient.approveOrgPreReservation(id, choiceDeadline, lang);
       return { success: true };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
   },
 
-  async reject(id: number, rejectionReason: string): Promise<{ success: boolean; error?: string }> {
+  async reject(id: number, rejectionReason: string, lang: 'tr' | 'en' = 'tr'): Promise<{ success: boolean; error?: string }> {
     try {
-      await apiClient.rejectOrgPreReservation(id, rejectionReason);
+      await apiClient.rejectOrgPreReservation(id, rejectionReason, lang);
       return { success: true };
     } catch (error) {
       return { success: false, error: (error as Error).message };

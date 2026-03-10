@@ -53,6 +53,7 @@ const RestaurantMap = dynamic(
 export default function RestaurantDashboard() {
   const { user } = useAuth();
   const { t, locale } = useLanguage();
+  const apiLang = (locale === 'de' ? 'en' : locale) as 'tr' | 'en';
   const router = useRouter();
   const queryClient = useQueryClient();
   // Dialog states
@@ -252,8 +253,8 @@ export default function RestaurantDashboard() {
 
   // Query: Pre-reservation requests (real API)
   const { data: requestsResult, isLoading: requestsLoading } = useQuery({
-    queryKey: ['org-pre-reservations'],
-    queryFn: () => preReservationOrgApi.getAll(),
+    queryKey: ['org-pre-reservations', apiLang],
+    queryFn: () => preReservationOrgApi.getAll(undefined, apiLang),
     enabled: !!organization,
   });
 
