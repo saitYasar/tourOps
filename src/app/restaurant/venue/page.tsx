@@ -75,7 +75,7 @@ const initialForm: FormState = {
 };
 
 // Icon mapping for resource types
-const typeIcons: Record<string, React.ElementType> = {
+const typeIcons: Record<string, React.ComponentType<{ className?: string }>> = {
   floor: Layers,
   room: Square,
   table: Circle,
@@ -777,25 +777,41 @@ export default function VenuePage() {
     const floors: Array<{ id: string; name: string; order: number; restaurantId: string; createdAt: string; updatedAt: string }> = [];
     const rooms: Array<{ id: string; name: string; floorId: string; order: number; restaurantId: string; createdAt: string; updatedAt: string; x?: number; y?: number; width?: number; height?: number }> = [];
     const tables: Array<{ id: string; name: string; roomId: string; capacity: number; order: number; restaurantId: string; createdAt: string; updatedAt: string; x?: number; y?: number; w?: number; h?: number; rotation?: number }> = [];
+    const objects: Array<{ id: string; name: string; kind: 'window' | 'wall' | 'column' | 'free'; color?: string; roomId: string; x?: number; y?: number; w?: number; h?: number; rotation?: number }> = [];
+
+    const detectKind = (name: string): 'window' | 'wall' | 'column' | 'free' => {
+      const lower = name.toLowerCase();
+      if (lower.startsWith('cam kenar') || lower.startsWith('cam_kenar') || lower.startsWith('window')) return 'window';
+      if (lower.startsWith('kolon') || lower.startsWith('column')) return 'column';
+      if (lower.startsWith('duvar') || lower.startsWith('wall')) return 'wall';
+      return 'free';
+    };
+
+    const seen = new Set<string>();
 
     const processResource = (resource: ResourceDto, parentFloorId?: string, parentRoomId?: string) => {
+      const rid = String(resource.id);
+      if (seen.has(rid)) return;
+      seen.add(rid);
+
       const type = resource.resourceType || getTypeById(resource.resourceTypeId);
-      const children = childrenCache[resource.id] || resource.children || [];
+      // Prefer explicit cache over embedded children to avoid double-traversal
+      const children = childrenCache[resource.id] ?? resource.children ?? [];
 
       if (type?.code === 'floor') {
         floors.push({
-          id: String(resource.id),
+          id: rid,
           name: resource.name,
           order: resource.order,
           restaurantId: '1',
           createdAt: resource.createdAt || now,
           updatedAt: resource.updatedAt || now,
         });
-        children.forEach(child => processResource(child, String(resource.id)));
+        children.forEach(child => processResource(child, rid));
       } else if (type?.code === 'room' && parentFloorId) {
         const roomCoords = parseCoordinates(resource.coordinates);
         rooms.push({
-          id: String(resource.id),
+          id: rid,
           name: resource.name,
           floorId: parentFloorId,
           order: resource.order,
@@ -807,11 +823,11 @@ export default function VenuePage() {
           width: resource.width,
           height: resource.height,
         });
-        children.forEach(child => processResource(child, parentFloorId, String(resource.id)));
+        children.forEach(child => processResource(child, parentFloorId, rid));
       } else if (type?.code === 'table' && parentRoomId) {
         const tableCoords = parseCoordinates(resource.coordinates);
         tables.push({
-          id: String(resource.id),
+          id: rid,
           name: resource.name,
           roomId: parentRoomId,
           capacity: resource.capacity,
@@ -825,12 +841,26 @@ export default function VenuePage() {
           h: resource.height,
           rotation: resource.rotation,
         });
+      } else if (type?.code === 'object' && parentRoomId) {
+        const objCoords = parseCoordinates(resource.coordinates);
+        objects.push({
+          id: rid,
+          name: resource.name,
+          kind: detectKind(resource.name),
+          color: resource.color || undefined,
+          roomId: parentRoomId,
+          x: objCoords.x,
+          y: objCoords.y,
+          w: resource.width,
+          h: resource.height,
+          rotation: resource.rotation,
+        });
       }
     };
 
     sortedResources.forEach(r => processResource(r));
-    console.log('[3D] convertToLegacyFormat:', { floors: floors.length, rooms: rooms.length, tables: tables.length, cacheKeys: Object.keys(childrenCache) });
-    return { floors, rooms, tables };
+    console.log('[3D] convertToLegacyFormat:', { floors: floors.length, rooms: rooms.length, tables: tables.length, objects: objects.length, cacheKeys: Object.keys(childrenCache) });
+    return { floors, rooms, tables, objects };
   };
 
   const legacyData = convertToLegacyFormat();
@@ -1030,6 +1060,7 @@ export default function VenuePage() {
                     floors={legacyData.floors}
                     rooms={legacyData.rooms}
                     tables={legacyData.tables}
+                    objects={legacyData.objects}
                     onTableClick={(table) => {
                       // Find table in childrenCache
                       for (const floor of resources) {

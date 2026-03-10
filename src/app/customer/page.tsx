@@ -32,6 +32,7 @@ import {
   type ClientProfileDto,
   type ClientReservationDto,
   type ServiceRequestDto,
+  type ClientParticipantTourDto,
 } from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { LanguageSwitcher } from '@/components/shared';
@@ -61,11 +62,11 @@ export default function CustomerDashboard() {
     enabled: !!profile?.id,
   });
 
-  // Tours for this agency
+  // Tours - new client API
   const { data: toursData, isLoading: toursLoading } = useQuery({
-    queryKey: ['client-tours', profile?.agencyId],
-    queryFn: () => apiClient.getClientTours(profile!.agencyId, 1, 50),
-    enabled: !!profile?.agencyId,
+    queryKey: ['client-my-tours'],
+    queryFn: () => apiClient.getMyTours(1, 50),
+    enabled: !!profile,
   });
 
   // Service Requests
@@ -100,7 +101,7 @@ export default function CustomerDashboard() {
 
   const reservations = (reservationsData as unknown as { data?: ClientReservationDto[] })?.data ??
                        (Array.isArray(reservationsData) ? reservationsData : []);
-  const tours = (toursData as unknown as { data?: unknown[] })?.data ??
+  const tours: ClientParticipantTourDto[] = (toursData as unknown as { data?: ClientParticipantTourDto[] })?.data ??
                 (Array.isArray(toursData) ? toursData : []);
   const serviceRequests = (serviceRequestsData as unknown as { data?: ServiceRequestDto[] })?.data ??
                           (Array.isArray(serviceRequestsData) ? serviceRequestsData : []);
@@ -242,7 +243,7 @@ function DashboardView({
   t,
 }: {
   profile: ClientProfileDto;
-  tours: unknown[];
+  tours: ClientParticipantTourDto[];
   reservations: ClientReservationDto[];
   toursLoading: boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -250,6 +251,12 @@ function DashboardView({
 }) {
   const pendingCount = reservations.filter(r => r.status === 'pending').length;
   const approvedCount = reservations.filter(r => r.status === 'approved').length;
+
+  const participantStatusConfig: Record<string, { color: string; label: string }> = {
+    confirmed: { color: 'bg-emerald-50 text-emerald-700', label: t.customer.participantConfirmed },
+    pending: { color: 'bg-amber-50 text-amber-700', label: t.customer.participantPending },
+    cancelled: { color: 'bg-red-50 text-red-700', label: t.customer.participantCancelled },
+  };
 
   return (
     <div className="space-y-6">
@@ -355,36 +362,54 @@ function DashboardView({
           </Card>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2">
-            {(tours as { id: number; name: string; description?: string; startDate?: string; endDate?: string; status?: string }[]).map((tour, index) => (
-              <Card key={tour.id} className="overflow-hidden border-0 shadow-md hover:shadow-lg transition-all bg-white">
-                <div className={`h-2 bg-gradient-to-r ${
-                  ['from-sky-400 to-blue-500', 'from-orange-400 to-amber-500', 'from-emerald-400 to-teal-500', 'from-rose-400 to-pink-500'][index % 4]
-                }`} />
-                <CardContent className="p-4">
-                  <h4 className="font-bold text-slate-800 mb-2">{tour.name}</h4>
-                  {tour.description && (
-                    <p className="text-sm text-slate-500 line-clamp-2 mb-3">{tour.description}</p>
-                  )}
-                  <div className="flex flex-wrap gap-2 text-xs">
-                    {tour.startDate && (
-                      <span className="flex items-center gap-1 bg-sky-50 text-sky-700 px-2 py-1 rounded-full">
-                        <Calendar className="h-3 w-3" />
-                        {new Date(tour.startDate).toLocaleDateString('tr-TR')}
-                      </span>
+            {tours.map((item, index) => {
+              const tour = item.tour;
+              const statusCfg = participantStatusConfig[item.status] || participantStatusConfig.pending;
+              return (
+                <Link key={item.participantId} href={`/customer/tours/${tour.id}`}>
+                  <Card className="overflow-hidden border-0 shadow-md hover:shadow-lg transition-all bg-white cursor-pointer">
+                    {tour.coverImageUrl ? (
+                      <div className="h-32 bg-slate-100 overflow-hidden">
+                        <img src={tour.coverImageUrl} alt={tour.tourName} className="w-full h-full object-cover" />
+                      </div>
+                    ) : (
+                      <div className={`h-2 bg-gradient-to-r ${
+                        ['from-sky-400 to-blue-500', 'from-orange-400 to-amber-500', 'from-emerald-400 to-teal-500', 'from-rose-400 to-pink-500'][index % 4]
+                      }`} />
                     )}
-                    {tour.status && (
-                      <span className={`px-2 py-1 rounded-full ${
-                        tour.status === 'active' ? 'bg-emerald-50 text-emerald-700' :
-                        tour.status === 'draft' ? 'bg-slate-50 text-slate-600' :
-                        'bg-amber-50 text-amber-700'
-                      }`}>
-                        {tour.status}
-                      </span>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <h4 className="font-bold text-slate-800">{tour.tourName}</h4>
+                        <span className={`text-xs font-medium px-2 py-1 rounded-full whitespace-nowrap ${statusCfg.color}`}>
+                          {statusCfg.label}
+                        </span>
+                      </div>
+                      {tour.description && (
+                        <p className="text-sm text-slate-500 line-clamp-2 mb-3">{tour.description}</p>
+                      )}
+                      <div className="flex flex-wrap gap-2 text-xs">
+                        {tour.tourCode && (
+                          <span className="flex items-center gap-1 bg-violet-50 text-violet-700 px-2 py-1 rounded-full">
+                            <Ticket className="h-3 w-3" />
+                            {tour.tourCode}
+                          </span>
+                        )}
+                        {tour.startDate && (
+                          <span className="flex items-center gap-1 bg-sky-50 text-sky-700 px-2 py-1 rounded-full">
+                            <Calendar className="h-3 w-3" />
+                            {new Date(tour.startDate).toLocaleDateString('tr-TR')}
+                          </span>
+                        )}
+                        <span className="flex items-center gap-1 bg-slate-50 text-slate-600 px-2 py-1 rounded-full">
+                          <User className="h-3 w-3" />
+                          {tour.currentParticipants}/{tour.maxParticipants}
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              );
+            })}
           </div>
         )}
       </div>
@@ -505,7 +530,7 @@ function ServiceRequestsView({
 
   if (loading) return <LoadingState message={t.common.loading} />;
 
-  const statusConfig: Record<string, { icon: React.ElementType; color: string; label: string }> = {
+  const statusConfig: Record<string, { icon: React.ComponentType<{ className?: string }>; color: string; label: string }> = {
     pending: { icon: Clock, color: 'text-amber-600 bg-amber-50', label: t.requests.pending },
     approved: { icon: CheckCircle2, color: 'text-emerald-600 bg-emerald-50', label: t.requests.approved },
     rejected: { icon: XCircle, color: 'text-red-600 bg-red-50', label: t.requests.rejected },
@@ -678,7 +703,7 @@ function ProfileView({
 function NavTab({ active, onClick, icon: Icon, label, badge }: {
   active: boolean;
   onClick: () => void;
-  icon: React.ElementType;
+  icon: React.ComponentType<{ className?: string }>;
   label: string;
   badge?: number;
 }) {
@@ -707,7 +732,7 @@ function NavTab({ active, onClick, icon: Icon, label, badge }: {
 function MobileNavTab({ active, onClick, icon: Icon, label }: {
   active: boolean;
   onClick: () => void;
-  icon: React.ElementType;
+  icon: React.ComponentType<{ className?: string }>;
   label: string;
 }) {
   return (
@@ -724,7 +749,7 @@ function MobileNavTab({ active, onClick, icon: Icon, label }: {
 }
 
 function StatCard({ icon: Icon, label, value, color }: {
-  icon: React.ElementType;
+  icon: React.ComponentType<{ className?: string }>;
   label: string;
   value: number;
   color: string;

@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
+import { ConfirmDialog } from '@/components/shared';
 import type { EditorRoom, EditorTable, EditorObject, EditorAction } from './types';
 import { OBJECT_KIND_LABELS, OBJECT_KIND_CONFIG } from './types';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -35,10 +37,34 @@ export function LayoutInspector({
 }: LayoutInspectorProps) {
   const { t } = useLanguage();
   const le = t.layoutEditor;
+  const [deleteTarget, setDeleteTarget] = useState<{ type: 'room' | 'table' | 'object'; id: number } | null>(null);
+
+  const deleteConfirmMessages: Record<string, { title: string; desc: string }> = {
+    room: { title: le?.deleteRoom ?? 'Odayı Sil', desc: le?.deleteRoomConfirm ?? 'Bu odayı silmek istediğinize emin misiniz?' },
+    table: { title: le?.deleteTable ?? 'Masayı Sil', desc: le?.deleteTableConfirm ?? 'Bu masayı silmek istediğinize emin misiniz?' },
+    object: { title: le?.deleteObject ?? 'Nesneyi Sil', desc: le?.deleteObjectConfirm ?? 'Bu nesneyi silmek istediğinize emin misiniz?' },
+  };
+
+  const confirmMsg = deleteTarget ? deleteConfirmMessages[deleteTarget.type] : null;
+  const confirmDialog = (
+    <ConfirmDialog
+      open={!!deleteTarget}
+      onOpenChange={(open) => !open && setDeleteTarget(null)}
+      title={confirmMsg?.title ?? ''}
+      description={confirmMsg?.desc ?? ''}
+      confirmLabel={t.common.delete}
+      onConfirm={() => {
+        if (deleteTarget) onDelete(deleteTarget.type, deleteTarget.id);
+        setDeleteTarget(null);
+      }}
+      variant="destructive"
+    />
+  );
 
   if (!selectedRoom && !selectedTable && !selectedObject) {
     return (
       <div className="w-64 border-l bg-slate-50 p-4 flex items-center justify-center">
+        {confirmDialog}
         <p className="text-sm text-slate-400 text-center">
           {le?.selectItem ?? 'Düzenlemek için bir oda veya masa seçin'}
         </p>
@@ -138,11 +164,12 @@ export function LayoutInspector({
           variant="destructive"
           size="sm"
           className="w-full"
-          onClick={() => onDelete('room', selectedRoom.id)}
+          onClick={() => setDeleteTarget({ type: 'room', id: selectedRoom.id })}
         >
           <Trash2 className="h-4 w-4 mr-1" />
           {le?.deleteRoom ?? 'Odayı Sil'}
         </Button>
+        {confirmDialog}
       </div>
     );
   }
@@ -249,11 +276,12 @@ export function LayoutInspector({
           variant="destructive"
           size="sm"
           className="w-full"
-          onClick={() => onDelete('table', selectedTable.id)}
+          onClick={() => setDeleteTarget({ type: 'table', id: selectedTable.id })}
         >
           <Trash2 className="h-4 w-4 mr-1" />
           {le?.deleteTable ?? 'Masayı Sil'}
         </Button>
+        {confirmDialog}
       </div>
     );
   }
@@ -425,11 +453,12 @@ export function LayoutInspector({
           variant="destructive"
           size="sm"
           className="w-full"
-          onClick={() => onDelete('object', selectedObject.id)}
+          onClick={() => setDeleteTarget({ type: 'object', id: selectedObject.id })}
         >
           <Trash2 className="h-4 w-4 mr-1" />
           {le?.deleteObject ?? 'Nesneyi Sil'}
         </Button>
+        {confirmDialog}
       </div>
     );
   }

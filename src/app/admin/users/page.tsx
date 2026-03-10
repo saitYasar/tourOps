@@ -40,7 +40,7 @@ import { LoadingState, ConfirmDialog } from '@/components/shared';
 
 // Map backend roles to display info
 const getRoleInfo = (role: string) => {
-  const roleMap: Record<string, { icon: React.ElementType; color: string; label: string; avatarBg: string; avatarText: string }> = {
+  const roleMap: Record<string, { icon: React.ComponentType<{ className?: string }>; color: string; label: string; avatarBg: string; avatarText: string }> = {
     system_admin: { icon: Shield, color: 'bg-red-500', label: 'roleSystemAdmin', avatarBg: 'bg-red-100', avatarText: 'text-red-600' },
     organization_owner: { icon: Building2, color: 'bg-emerald-500', label: 'roleOrgOwner', avatarBg: 'bg-emerald-100', avatarText: 'text-emerald-600' },
     agency_owner: { icon: MapPin, color: 'bg-blue-500', label: 'roleAgencyOwner', avatarBg: 'bg-blue-100', avatarText: 'text-blue-600' },

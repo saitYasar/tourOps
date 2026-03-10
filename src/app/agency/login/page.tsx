@@ -53,7 +53,7 @@ export default function AgencyClientLoginPage() {
 }
 
 function AgencyClientLoginContent() {
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
   const searchParams = useSearchParams();
   const uuid = searchParams.get('uuid') || searchParams.get('agencyUuid');
   const tourUuid = searchParams.get('tourUuid');
@@ -80,15 +80,16 @@ function AgencyClientLoginContent() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
 
-  // Fetch agency info by UUID
+  // Fetch agency info by UUID (re-fetch on language change for translated description)
+  const apiLang = locale === 'de' ? 'en' : locale;
   useEffect(() => {
     if (!uuid) return;
     setAgencyLoading(true);
-    apiClient.getAgencyPublic(uuid)
+    apiClient.getAgencyPublic(uuid, apiLang)
       .then((data) => setAgency(data))
       .catch(() => {/* ignore */})
       .finally(() => setAgencyLoading(false));
-  }, [uuid]);
+  }, [uuid, apiLang]);
 
   const switchMode = (newMode: PageMode) => {
     setMode(newMode);
@@ -794,7 +795,7 @@ function FeatureCard({
   icon: Icon,
   title,
 }: {
-  icon: React.ElementType;
+  icon: React.ComponentType<{ className?: string }>;
   title: string;
 }) {
   return (

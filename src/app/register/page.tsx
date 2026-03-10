@@ -598,7 +598,7 @@ function FeatureItem({
   icon: Icon,
   text,
 }: {
-  icon: React.ElementType;
+  icon: React.ComponentType<{ className?: string }>;
   text: string;
 }) {
   return (

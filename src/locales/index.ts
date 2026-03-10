@@ -9,7 +9,7 @@ export const locales = { tr, en, de };
 export type Translations = typeof tr;
 
 export const localeNames: Record<Locale, string> = {
-  tr: 'Turkce',
+  tr: 'Türkçe',
   en: 'English',
   de: 'Deutsch',
 };

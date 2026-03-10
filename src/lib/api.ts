@@ -105,6 +105,7 @@ export interface OrganizationRegisterDto {
   description?: string;
   lat?: number;
   lng?: number;
+  agencyCommissionRate?: number;
 }
 
 // Organization Registration Response (includes auth tokens)
@@ -177,6 +178,7 @@ export interface OrganizationDto {
   averageRating?: string;
   uuid?: string;
   relatedAgencyId?: number | null;
+  agencyCommissionRate?: number | null;
   createdAt: string;
   updatedAt: string;
   category?: CategoryDto;
@@ -194,14 +196,19 @@ export interface TourClientDto {
   tourId: number;
   clientId: number;
   status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'no_show';
+  pricePaid?: string;
+  paidAt?: string | null;
+  notes?: string | null;
   client: {
     id: number;
     firstName: string;
     lastName: string;
-    username: string;
+    username: string | null;
     email: string | null;
+    phoneCountryCode: string | null;
     phone: string | null;
     profilePhoto: string | null;
+    active?: boolean;
   };
   createdAt?: string;
   updatedAt?: string;
@@ -277,6 +284,7 @@ export interface OrganizationUpdateDto {
     pinterest?: string | null;
     twitter?: string | null;
   };
+  agencyCommissionRate?: number;
 }
 
 // Photo DTO
@@ -603,6 +611,7 @@ export interface CompanyDto {
   description?: string;
   totalReviews?: number;
   averageRating?: string;
+  agencyCommissionRate?: number | null;
   createdAt: string;
   updatedAt: string;
   // Authorized person info
@@ -669,6 +678,7 @@ export interface AdminUpdateOrganizationDto {
   taxNumber?: string;
   taxOffice?: string;
   status?: CompanyStatus;
+  agencyCommissionRate?: number;
 }
 
 // Admin Login DTO
@@ -766,6 +776,137 @@ export interface ClientTourDto {
   agencyId: number;
   regionId?: number;
   capacity?: number;
+  [key: string]: unknown;
+}
+
+// ============================================
+// Client Panel - New API DTOs
+// ============================================
+
+export interface ClientParticipantTourDto {
+  participantId: number;
+  status: string;
+  joinedAt: string;
+  tour: {
+    id: number;
+    agencyId: number;
+    uuid: string;
+    tourCode: string;
+    tourName: string;
+    description: string | null;
+    startDate: string;
+    endDate: string;
+    maxParticipants: number;
+    minParticipants: number;
+    currentParticipants: number;
+    status: string;
+    photos: PhotoDto[];
+    coverImageUrl: string | null;
+  };
+}
+
+export interface ClientTourDetailDto {
+  participantStatus: string;
+  tour: {
+    id: number;
+    agencyId: number;
+    uuid: string;
+    tourCode: string;
+    tourName: string;
+    description: string | null;
+    startDate: string;
+    endDate: string;
+    maxParticipants: number;
+    minParticipants: number;
+    currentParticipants: number;
+    status: string;
+    agency: {
+      id: number;
+      name: string;
+      description?: string | null;
+      coverImageUrl?: string | null;
+    };
+    photos: PhotoDto[];
+    stops: ClientTourStopDto[];
+    coverImageUrl: string | null;
+  };
+}
+
+export interface ClientTourStopDto {
+  id: number;
+  organizationId: number;
+  description: string | null;
+  scheduledStartTime: string | null;
+  scheduledEndTime: string | null;
+  preReservationStatus: string | null;
+  showPriceToCustomer: boolean;
+  organization: {
+    name: string;
+    categoryId: number;
+    address: string;
+    photos: PhotoDto[];
+    category: CategoryDto | null;
+    coverImageUrl: string | null;
+    averageRating: string | null;
+    totalReviews: number;
+  };
+}
+
+export interface ClientStopMenuCategoryDto {
+  id: number;
+  name: string;
+  displayOrder: number;
+  imageUrl: string | null;
+  child_service_categories: ClientStopMenuCategoryDto[];
+  services: ClientStopMenuServiceDto[];
+}
+
+export interface ClientStopMenuServiceDto {
+  id: number;
+  title: string;
+  subTitle: string | null;
+  description: string | null;
+  basePrice: string | number;
+  priceType: string;
+  imageUrl: string | null;
+}
+
+// Client choice DTOs
+export interface CreateResourceChoiceDto {
+  resourceId: number;
+}
+
+export interface CreateServiceChoiceDto {
+  serviceId: number;
+  note?: string;
+}
+
+export interface UpdateServiceChoiceDto {
+  quantity?: number;
+  note?: string;
+}
+
+export interface ClientResourceChoiceDto {
+  id: number;
+  stopId: number;
+  resourceId: number;
+  resource?: ResourceDto;
+  [key: string]: unknown;
+}
+
+export interface ClientServiceChoiceDto {
+  id: number;
+  stopId: number;
+  serviceId: number;
+  quantity: number;
+  note?: string;
+  service?: ClientStopMenuServiceDto;
+  [key: string]: unknown;
+}
+
+export interface ClientStopChoicesDto {
+  resourceChoice?: ClientResourceChoiceDto | null;
+  serviceChoices?: ClientServiceChoiceDto[];
   [key: string]: unknown;
 }
 
@@ -1071,7 +1212,7 @@ class ApiClient {
     });
 
     const jsonResponse = await response.json().catch(() => ({
-      message: 'Bir hata olustu',
+      message: 'Bir hata oluştu',
       statusCode: response.status,
     }));
 
@@ -1084,7 +1225,7 @@ class ApiClient {
         jsonResponse.errorMessage?.client ||
         jsonResponse.errorMessage?.system ||
         jsonResponse.message ||
-        'API istegi basarisiz';
+        'API isteği başarısız';
       throw new Error(errorMessage);
     }
 
@@ -1245,7 +1386,7 @@ class ApiClient {
     });
 
     const jsonResponse = await response.json().catch(() => ({
-      message: 'Bir hata olustu',
+      message: 'Bir hata oluştu',
       statusCode: response.status,
     }));
 
@@ -1257,7 +1398,7 @@ class ApiClient {
         jsonResponse.errorMessage?.client ||
         jsonResponse.errorMessage?.system ||
         jsonResponse.message ||
-        'API istegi basarisiz';
+        'API isteği başarısız';
       throw new Error(errorMessage);
     }
 
@@ -1563,7 +1704,7 @@ class ApiClient {
     });
 
     const jsonResponse = await response.json().catch(() => ({
-      message: 'Bir hata olustu',
+      message: 'Bir hata oluştu',
       statusCode: response.status,
     }));
 
@@ -1575,7 +1716,7 @@ class ApiClient {
         jsonResponse.errorMessage?.client ||
         jsonResponse.errorMessage?.system ||
         jsonResponse.message ||
-        'API istegi basarisiz';
+        'API isteği başarısız';
       throw new Error(errorMessage);
     }
 
@@ -1634,7 +1775,7 @@ class ApiClient {
     });
 
     const jsonResponse = await response.json().catch(() => ({
-      message: 'Bir hata olustu',
+      message: 'Bir hata oluştu',
       statusCode: response.status,
     }));
 
@@ -1646,7 +1787,7 @@ class ApiClient {
         jsonResponse.errorMessage?.client ||
         jsonResponse.errorMessage?.system ||
         jsonResponse.message ||
-        'API istegi basarisiz';
+        'API isteği başarısız';
       throw new Error(errorMessage);
     }
 
@@ -1705,7 +1846,7 @@ class ApiClient {
     });
 
     const jsonResponse = await response.json().catch(() => ({
-      message: 'Bir hata olustu',
+      message: 'Bir hata oluştu',
       statusCode: response.status,
     }));
 
@@ -1863,7 +2004,7 @@ class ApiClient {
     });
 
     const jsonResponse = await response.json().catch(() => ({
-      message: 'Bir hata olustu',
+      message: 'Bir hata oluştu',
       statusCode: response.status,
     }));
 
@@ -1875,7 +2016,7 @@ class ApiClient {
         jsonResponse.errorMessage?.client ||
         jsonResponse.errorMessage?.system ||
         jsonResponse.message ||
-        'API istegi basarisiz';
+        'API isteği başarısız';
       throw new Error(errorMessage);
     }
 
@@ -1911,7 +2052,7 @@ class ApiClient {
     });
 
     const jsonResponse = await response.json().catch(() => ({
-      message: 'Bir hata olustu',
+      message: 'Bir hata oluştu',
       statusCode: response.status,
     }));
 
@@ -1923,7 +2064,7 @@ class ApiClient {
         jsonResponse.errorMessage?.client ||
         jsonResponse.errorMessage?.system ||
         jsonResponse.message ||
-        'API istegi basarisiz';
+        'API isteği başarısız';
       throw new Error(errorMessage);
     }
 
@@ -2254,6 +2395,12 @@ class ApiClient {
     }, 'tr', true);
   }
 
+  async getServiceCategoriesMenu(lang: string = 'tr') {
+    return this.request<ClientStopMenuCategoryDto[]>(`/service-categories/menu?lang=${lang}`, {
+      method: 'GET',
+    }, 'tr', true);
+  }
+
   async getServiceCategory(id: number) {
     return this.request<ServiceCategoryDto>(`/service-categories/${id}`, {
       method: 'GET',
@@ -2380,22 +2527,25 @@ class ApiClient {
   // Organization Pre-Reservations
   // ============================================
 
-  async getOrgPreReservations(page = 1, limit = 100) {
-    return this.request<PaginatedResponse<any>>(`/organization/pre-reservations?page=${page}&limit=${limit}`, {
-      method: 'GET',
-    }, 'tr', true);
+  async getOrgPreReservations(status?: string, lang: 'tr' | 'en' = 'tr') {
+    let url = `/organization/pre-reservations`;
+    if (status) url += `?status=${status}`;
+    return this.request<any>(url, { method: 'GET' }, lang);
   }
 
-  async approveOrgPreReservation(id: number) {
-    return this.request<any>(`/organization/pre-reservations/${id}/approve`, {
-      method: 'PUT',
-    }, 'tr', true);
+  async getOrgPreReservationDetail(id: number, lang: 'tr' | 'en' = 'tr') {
+    return this.request<any>(`/organization/pre-reservations/${id}`, { method: 'GET' }, lang);
   }
 
-  async rejectOrgPreReservation(id: number) {
+  async approveOrgPreReservation(id: number, lang: 'tr' | 'en' = 'tr') {
+    return this.request<any>(`/organization/pre-reservations/${id}/approve`, { method: 'PUT' }, lang);
+  }
+
+  async rejectOrgPreReservation(id: number, rejectionReason: string, lang: 'tr' | 'en' = 'tr') {
     return this.request<any>(`/organization/pre-reservations/${id}/reject`, {
       method: 'PUT',
-    }, 'tr', true);
+      body: JSON.stringify({ rejectionReason }),
+    }, lang);
   }
 
   // ============================================
@@ -2440,12 +2590,12 @@ class ApiClient {
     }, filters.lang || 'tr', true); // skipLang since we add it manually
   }
 
-  async getAgencyById(id: number) {
-    return this.request<AgencyResponseDto & { coverImageKey?: string | null; coverImageUrl?: string | null }>(`/agencies/${id}`);
+  async getAgencyById(id: number, lang: 'tr' | 'en' = 'tr') {
+    return this.request<AgencyResponseDto & { coverImageKey?: string | null; coverImageUrl?: string | null }>(`/agencies/${id}`, {}, lang);
   }
 
-  async getOrganizationByIdAdmin(id: number) {
-    return this.request<OrganizationDto>(`/organizations/${id}`);
+  async getOrganizationByIdAdmin(id: number, lang: 'tr' | 'en' = 'tr') {
+    return this.request<OrganizationDto>(`/organizations/${id}`, {}, lang);
   }
 
   async updateCompanyStatus(data: UpdateCompanyStatusDto, lang: 'tr' | 'en' = 'tr') {
@@ -2455,30 +2605,30 @@ class ApiClient {
     }, lang);
   }
 
-  async adminUpdateAgency(id: number, data: AdminUpdateAgencyDto) {
+  async adminUpdateAgency(id: number, data: AdminUpdateAgencyDto, lang: 'tr' | 'en' = 'tr') {
     return this.request<AgencyResponseDto>(`/agencies/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
-    });
+    }, lang);
   }
 
-  async adminUpdateOrganization(id: number, data: AdminUpdateOrganizationDto) {
+  async adminUpdateOrganization(id: number, data: AdminUpdateOrganizationDto, lang: 'tr' | 'en' = 'tr') {
     return this.request<OrganizationDto>(`/organizations/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
-    });
+    }, lang);
   }
 
-  async adminDeleteAgency(id: number) {
+  async adminDeleteAgency(id: number, lang: 'tr' | 'en' = 'tr') {
     return this.request<{ message: string }>(`/agencies/${id}`, {
       method: 'DELETE',
-    });
+    }, lang);
   }
 
-  async adminDeleteOrganization(id: number) {
+  async adminDeleteOrganization(id: number, lang: 'tr' | 'en' = 'tr') {
     return this.request<{ message: string }>(`/organizations/${id}`, {
       method: 'DELETE',
-    });
+    }, lang);
   }
 
   // ============================================
@@ -2665,30 +2815,31 @@ class ApiClient {
   // Admin - Tours
   // ============================================
 
-  async getAdminTours(page = 1, limit = 10) {
-    return this.request<PaginatedResponse<ApiTourDto>>(`/admin/tours?page=${page}&limit=${limit}`);
+  async getAdminTours(page = 1, limit = 10, lang: 'tr' | 'en' = 'tr') {
+    return this.request<PaginatedResponse<ApiTourDto>>(`/admin/tours?page=${page}&limit=${limit}`, {}, lang);
   }
 
-  async getAdminTourById(id: number) {
-    return this.request<ApiTourDto>(`/admin/tours/${id}`);
+  async getAdminTourById(id: number, lang: 'tr' | 'en' = 'tr') {
+    return this.request<ApiTourDto>(`/admin/tours/${id}`, {}, lang);
   }
 
   // ============================================
   // Agency Tours
   // ============================================
 
-  async getAgencyTours(page = 1, limit = 10) {
-    return this.request<PaginatedResponse<ApiTourDto>>(`/agency/tours?page=${page}&limit=${limit}`);
+  async getAgencyTours(page = 1, limit = 10, lang: 'tr' | 'en' = 'tr') {
+    return this.request<PaginatedResponse<ApiTourDto>>(`/agency/tours?page=${page}&limit=${limit}`, {}, lang);
   }
 
-  async getAgencyTourById(id: number) {
-    return this.request<ApiTourDto>(`/agency/tours/${id}`);
+  async getAgencyTourById(id: number, lang: 'tr' | 'en' = 'tr') {
+    return this.request<ApiTourDto>(`/agency/tours/${id}`, {}, lang);
   }
 
   async createAgencyTour(
     data: CreateTourPayload,
     coverImage?: File,
-    galleryImages?: File[]
+    galleryImages?: File[],
+    lang: 'tr' | 'en' = 'tr'
   ) {
     const formData = new FormData();
     Object.entries(data).forEach(([key, value]) => {
@@ -2705,7 +2856,7 @@ class ApiClient {
       });
     }
 
-    const url = `${this.baseUrl}/agency/tours?lang=tr`;
+    const url = `${this.baseUrl}/agency/tours?lang=${lang}`;
     const headers: HeadersInit = {};
     const token = this.resolveToken();
     if (token) {
@@ -2719,7 +2870,7 @@ class ApiClient {
     });
 
     const jsonResponse = await response.json().catch(() => ({
-      message: 'Bir hata olustu',
+      message: 'Bir hata oluştu',
       statusCode: response.status,
     }));
 
@@ -2731,7 +2882,7 @@ class ApiClient {
         jsonResponse.errorMessage?.client ||
         jsonResponse.errorMessage?.system ||
         jsonResponse.message ||
-        'API istegi basarisiz';
+        'API isteği başarısız';
       throw new Error(errorMessage);
     }
 
@@ -2742,7 +2893,8 @@ class ApiClient {
     id: number,
     data: UpdateTourPayload,
     coverImage?: File,
-    galleryImages?: File[]
+    galleryImages?: File[],
+    lang: 'tr' | 'en' = 'tr'
   ) {
     const formData = new FormData();
     Object.entries(data).forEach(([key, value]) => {
@@ -2759,7 +2911,7 @@ class ApiClient {
       });
     }
 
-    const url = `${this.baseUrl}/agency/tours/${id}?lang=tr`;
+    const url = `${this.baseUrl}/agency/tours/${id}?lang=${lang}`;
     const headers: HeadersInit = {};
     const token = this.resolveToken();
     if (token) {
@@ -2773,7 +2925,7 @@ class ApiClient {
     });
 
     const jsonResponse = await response.json().catch(() => ({
-      message: 'Bir hata olustu',
+      message: 'Bir hata oluştu',
       statusCode: response.status,
     }));
 
@@ -2785,7 +2937,7 @@ class ApiClient {
         jsonResponse.errorMessage?.client ||
         jsonResponse.errorMessage?.system ||
         jsonResponse.message ||
-        'API istegi basarisiz';
+        'API isteği başarısız';
       throw new Error(errorMessage);
     }
 
@@ -2827,7 +2979,15 @@ class ApiClient {
   // ============================================
 
   async getTourClients(tourId: number) {
-    return this.request<TourClientDto[]>(`/agency/tours/${tourId}/participants`, {}, 'tr', true);
+    const response = await this.request<{ data: TourClientDto[]; meta: unknown }>(`/agency/tours/${tourId}/participants`, {}, 'tr', true);
+    return response.data;
+  }
+
+  async addTourParticipant(tourId: number, clientId: number, notes?: string) {
+    return this.request<TourClientDto>(`/agency/tours/${tourId}/participants`, {
+      method: 'POST',
+      body: JSON.stringify({ clientId, ...(notes ? { notes } : {}) }),
+    }, 'tr', true);
   }
 
   async updateTourClientStatus(tourId: number, clientId: number, status: string) {
@@ -2841,28 +3001,97 @@ class ApiClient {
   // Tour Stops
   // ============================================
 
-  async getTourStops(tourId: number) {
-    return this.request<ApiTourStopDto[]>(`/tour-stops/tour/${tourId}`);
+  async getTourStops(tourId: number, lang: 'tr' | 'en' = 'tr') {
+    return this.request<ApiTourStopDto[]>(`/tour-stops/tour/${tourId}`, {}, lang);
   }
 
-  async createTourStop(data: CreateTourStopPayload) {
+  async createTourStop(data: CreateTourStopPayload, lang: 'tr' | 'en' = 'tr') {
     return this.request<ApiTourStopDto>('/tour-stops', {
       method: 'POST',
       body: JSON.stringify(data),
-    });
+    }, lang);
   }
 
-  async updateTourStop(id: number, data: UpdateTourStopPayload) {
+  async updateTourStop(id: number, data: UpdateTourStopPayload, lang: 'tr' | 'en' = 'tr') {
     return this.request<ApiTourStopDto>(`/tour-stops/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
-    });
+    }, lang);
   }
 
-  async deleteTourStop(id: number) {
+  async deleteTourStop(id: number, lang: 'tr' | 'en' = 'tr') {
     return this.request<{ message: string }>(`/tour-stops/${id}`, {
       method: 'DELETE',
-    });
+    }, lang);
+  }
+
+  // ============================================
+  // Client Panel - New Endpoints
+  // ============================================
+
+  async getMyTours(page = 1, limit = 50, lang: 'tr' | 'en' = 'tr') {
+    return this.request<PaginatedResponse<ClientParticipantTourDto>>(`/client/tours?page=${page}&limit=${limit}`, {
+      method: 'GET',
+    }, lang);
+  }
+
+  async getMyTourDetail(tourId: number, lang: 'tr' | 'en' = 'tr') {
+    return this.request<ClientTourDetailDto>(`/client/tours/${tourId}`, {
+      method: 'GET',
+    }, lang);
+  }
+
+  async getStopMenu(stopId: number, lang: 'tr' | 'en' = 'tr') {
+    return this.request<ClientStopMenuCategoryDto[]>(`/client/tours/stops/${stopId}/menu`, {
+      method: 'GET',
+    }, lang);
+  }
+
+  async getStopLayout(stopId: number, lang: 'tr' | 'en' = 'tr') {
+    return this.request<ResourceDto[]>(`/client/tours/stops/${stopId}/layout`, {
+      method: 'GET',
+    }, lang);
+  }
+
+  // Resource choice (table/seat selection)
+  async createResourceChoice(stopId: number, data: CreateResourceChoiceDto, lang: 'tr' | 'en' = 'tr') {
+    return this.request<ClientResourceChoiceDto>(`/client/tours/stops/${stopId}/resource-choice`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }, lang);
+  }
+
+  async updateResourceChoice(stopId: number, data: CreateResourceChoiceDto, lang: 'tr' | 'en' = 'tr') {
+    return this.request<ClientResourceChoiceDto>(`/client/tours/stops/${stopId}/resource-choice`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }, lang);
+  }
+
+  // Service choice (menu selection)
+  async createServiceChoice(stopId: number, data: CreateServiceChoiceDto, lang: 'tr' | 'en' = 'tr') {
+    return this.request<ClientServiceChoiceDto>(`/client/tours/stops/${stopId}/service-choice`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }, lang);
+  }
+
+  async updateServiceChoice(serviceChoiceId: number, data: UpdateServiceChoiceDto, lang: 'tr' | 'en' = 'tr') {
+    return this.request<ClientServiceChoiceDto>(`/client/tours/service-choices/${serviceChoiceId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }, lang);
+  }
+
+  // Get all choices for a stop
+  async getStopChoices(stopId: number, lang: 'tr' | 'en' = 'tr') {
+    return this.request<ClientStopChoicesDto>(`/client/tours/stops/${stopId}/choices`, {
+      method: 'GET',
+    }, lang);
   }
 }
 
@@ -2879,29 +3108,29 @@ export const realAuthApi = {
   // ============================================
 
   // Login - sadece email ile OTP gonder
-  async organizationLoginSendOtp(email: string) {
+  async organizationLoginSendOtp(email: string, lang: 'tr' | 'en' = 'tr') {
     try {
-      await apiClient.organizationLogin(email);
-      return { success: true, message: 'OTP gonderildi' };
+      await apiClient.organizationLogin(email, lang);
+      return { success: true, message: 'OTP gönderildi' };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
   },
 
   // Register - tum bilgilerle OTP gonder
-  async organizationSendOtp(data: OrganizationLoginRegisterDto) {
+  async organizationSendOtp(data: OrganizationLoginRegisterDto, lang: 'tr' | 'en' = 'tr') {
     try {
-      await apiClient.organizationRegister(data);
-      return { success: true, message: 'OTP gonderildi' };
+      await apiClient.organizationRegister(data, lang);
+      return { success: true, message: 'OTP gönderildi' };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
   },
 
   // OTP dogrula
-  async organizationVerify(email: string, otp: string) {
+  async organizationVerify(email: string, otp: string, lang: 'tr' | 'en' = 'tr') {
     try {
-      const response = await apiClient.organizationVerifyOtp({ email, otp });
+      const response = await apiClient.organizationVerifyOtp({ email, otp }, lang);
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
@@ -2913,29 +3142,29 @@ export const realAuthApi = {
   // ============================================
 
   // Login - sadece email ile OTP gonder
-  async agencyLoginSendOtp(email: string) {
+  async agencyLoginSendOtp(email: string, lang: 'tr' | 'en' = 'tr') {
     try {
-      await apiClient.agencyLogin(email);
-      return { success: true, message: 'OTP gonderildi' };
+      await apiClient.agencyLogin(email, lang);
+      return { success: true, message: 'OTP gönderildi' };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
   },
 
   // Register - tum bilgilerle OTP gonder
-  async agencySendOtp(data: AgencyLoginRegisterDto) {
+  async agencySendOtp(data: AgencyLoginRegisterDto, lang: 'tr' | 'en' = 'tr') {
     try {
-      await apiClient.agencyRegister(data);
-      return { success: true, message: 'OTP gonderildi' };
+      await apiClient.agencyRegister(data, lang);
+      return { success: true, message: 'OTP gönderildi' };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
   },
 
   // OTP dogrula
-  async agencyVerify(email: string, otp: string) {
+  async agencyVerify(email: string, otp: string, lang: 'tr' | 'en' = 'tr') {
     try {
-      const response = await apiClient.agencyVerifyOtp({ email, otp });
+      const response = await apiClient.agencyVerifyOtp({ email, otp }, lang);
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
@@ -2946,90 +3175,117 @@ export const realAuthApi = {
   // Client (Acente Müşterisi) - Username/Password Login
   // ============================================
 
-  async clientLogin(username: string, password: string) {
+  async clientLogin(username: string, password: string, lang: 'tr' | 'en' = 'tr') {
     try {
-      const response = await apiClient.clientLoginUsername(username, password);
+      const response = await apiClient.clientLoginUsername(username, password, lang);
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
   },
 
-  async clientLoginRegister(email: string, firstName?: string, lastName?: string, agencyUuid?: string, tourUuid?: string) {
+  async clientLoginRegister(email: string, firstName?: string, lastName?: string, agencyUuid?: string, tourUuid?: string, lang: 'tr' | 'en' = 'tr') {
     try {
-      const response = await apiClient.clientLoginRegister(email, firstName, lastName, agencyUuid, tourUuid);
+      const response = await apiClient.clientLoginRegister(email, firstName, lastName, agencyUuid, tourUuid, lang);
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
   },
 
-  async clientLoginRegisterVerify(email: string, otp: string) {
+  async clientLoginRegisterVerify(email: string, otp: string, lang: 'tr' | 'en' = 'tr') {
     try {
-      const response = await apiClient.clientLoginRegisterVerify(email, otp);
+      const response = await apiClient.clientLoginRegisterVerify(email, otp, lang);
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
   },
 
-  async getClientProfile() {
+  async getClientProfile(lang: 'tr' | 'en' = 'tr') {
     try {
-      const response = await apiClient.getClientProfile();
+      const response = await apiClient.getClientProfile(lang);
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
   },
 
-  async updateClientProfile(data: UpdateClientProfileDto, profilePhoto?: File) {
+  async updateClientProfile(data: UpdateClientProfileDto, profilePhoto?: File, lang: 'tr' | 'en' = 'tr') {
     try {
-      const response = await apiClient.updateClientProfile(data, profilePhoto);
+      const response = await apiClient.updateClientProfile(data, profilePhoto, lang);
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
   },
 
-  async getClientTours(agencyId: number, page = 1, limit = 10) {
+  async getClientTours(agencyId: number, page = 1, limit = 10, lang: 'tr' | 'en' = 'tr') {
     try {
-      const response = await apiClient.getClientTours(agencyId, page, limit);
+      const response = await apiClient.getClientTours(agencyId, page, limit, lang);
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
   },
 
-  async getClientReservations(clientId: string, page = 1, limit = 10) {
+  async getMyTours(page = 1, limit = 50, lang: 'tr' | 'en' = 'tr') {
     try {
-      const response = await apiClient.getClientReservations(clientId, page, limit);
+      const response = await apiClient.getMyTours(page, limit, lang);
+      return response;
+    } catch (error) {
+      return { data: [], meta: { total: 0, page: 1, limit: 50, totalPages: 0 } } as PaginatedResponse<ClientParticipantTourDto>;
+    }
+  },
+
+  async getMyTourDetail(tourId: number, lang: 'tr' | 'en' = 'tr') {
+    try {
+      const response = await apiClient.getMyTourDetail(tourId, lang);
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  async getStopMenu(stopId: number, lang: 'tr' | 'en' = 'tr') {
+    try {
+      const response = await apiClient.getStopMenu(stopId, lang);
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  async getClientReservations(clientId: string, page = 1, limit = 10, lang: 'tr' | 'en' = 'tr') {
+    try {
+      const response = await apiClient.getClientReservations(clientId, page, limit, lang);
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
   },
 
-  async cancelReservation(reservationId: string) {
+  async cancelReservation(reservationId: string, lang: 'tr' | 'en' = 'tr') {
     try {
-      const response = await apiClient.cancelReservation(reservationId);
+      const response = await apiClient.cancelReservation(reservationId, lang);
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
   },
 
-  async getReservationById(reservationId: string) {
+  async getReservationById(reservationId: string, lang: 'tr' | 'en' = 'tr') {
     try {
-      const response = await apiClient.getReservationById(reservationId);
+      const response = await apiClient.getReservationById(reservationId, lang);
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
   },
 
-  async getUpcomingReservations(page = 1, limit = 10, days?: number) {
+  async getUpcomingReservations(page = 1, limit = 10, days?: number, lang: 'tr' | 'en' = 'tr') {
     try {
-      const response = await apiClient.getUpcomingReservations(page, limit, days);
+      const response = await apiClient.getUpcomingReservations(page, limit, days, lang);
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
@@ -3040,27 +3296,27 @@ export const realAuthApi = {
   // Client - Service Requests
   // ============================================
 
-  async createServiceRequest(data: CreateServiceRequestDto) {
+  async createServiceRequest(data: CreateServiceRequestDto, lang: 'tr' | 'en' = 'tr') {
     try {
-      const response = await apiClient.createServiceRequest(data);
+      const response = await apiClient.createServiceRequest(data, lang);
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
   },
 
-  async getServiceRequestsByClient(clientId: number, page = 1, limit = 10) {
+  async getServiceRequestsByClient(clientId: number, page = 1, limit = 10, lang: 'tr' | 'en' = 'tr') {
     try {
-      const response = await apiClient.getServiceRequestsByClient(clientId, page, limit);
+      const response = await apiClient.getServiceRequestsByClient(clientId, page, limit, lang);
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
   },
 
-  async getServiceRequestById(id: number) {
+  async getServiceRequestById(id: number, lang: 'tr' | 'en' = 'tr') {
     try {
-      const response = await apiClient.getServiceRequestById(id);
+      const response = await apiClient.getServiceRequestById(id, lang);
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
@@ -3089,18 +3345,18 @@ export const realAuthApi = {
   // Organizations - Public
   // ============================================
 
-  async getOrganizationsPublic(page = 1, limit = 10, name?: string) {
+  async getOrganizationsPublic(page = 1, limit = 10, name?: string, lang: 'tr' | 'en' = 'tr') {
     try {
-      const response = await apiClient.getOrganizationsPublic(page, limit, name);
+      const response = await apiClient.getOrganizationsPublic(page, limit, name, lang);
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
   },
 
-  async getOrganizationPublicById(id: number) {
+  async getOrganizationPublicById(id: number, lang: 'tr' | 'en' = 'tr') {
     try {
-      const response = await apiClient.getOrganizationById(id);
+      const response = await apiClient.getOrganizationById(id, lang);
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
@@ -3111,18 +3367,18 @@ export const realAuthApi = {
   // Organizations - Reviews
   // ============================================
 
-  async createOrganizationReview(organizationId: number, data: CreateOrganizationReviewDto) {
+  async createOrganizationReview(organizationId: number, data: CreateOrganizationReviewDto, lang: 'tr' | 'en' = 'tr') {
     try {
-      const response = await apiClient.createOrganizationReview(organizationId, data);
+      const response = await apiClient.createOrganizationReview(organizationId, data, lang);
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
   },
 
-  async getOrganizationReviews(organizationId: number, page = 1, limit = 10) {
+  async getOrganizationReviews(organizationId: number, page = 1, limit = 10, lang: 'tr' | 'en' = 'tr') {
     try {
-      const response = await apiClient.getOrganizationReviews(organizationId, page, limit);
+      const response = await apiClient.getOrganizationReviews(organizationId, page, limit, lang);
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
@@ -3789,54 +4045,54 @@ export const adminApi = {
   // Agency & Organization Detail
   // ============================================
 
-  async getAgencyById(id: number) {
+  async getAgencyById(id: number, lang: 'tr' | 'en' = 'tr') {
     try {
-      const response = await apiClient.getAgencyById(id);
+      const response = await apiClient.getAgencyById(id, lang);
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
   },
 
-  async getOrganizationById(id: number) {
+  async getOrganizationById(id: number, lang: 'tr' | 'en' = 'tr') {
     try {
-      const response = await apiClient.getOrganizationByIdAdmin(id);
+      const response = await apiClient.getOrganizationByIdAdmin(id, lang);
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
   },
 
-  async updateAgency(id: number, data: AdminUpdateAgencyDto) {
+  async updateAgency(id: number, data: AdminUpdateAgencyDto, lang: 'tr' | 'en' = 'tr') {
     try {
-      const response = await apiClient.adminUpdateAgency(id, data);
+      const response = await apiClient.adminUpdateAgency(id, data, lang);
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
   },
 
-  async updateOrganization(id: number, data: AdminUpdateOrganizationDto) {
+  async updateOrganization(id: number, data: AdminUpdateOrganizationDto, lang: 'tr' | 'en' = 'tr') {
     try {
-      const response = await apiClient.adminUpdateOrganization(id, data);
+      const response = await apiClient.adminUpdateOrganization(id, data, lang);
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
   },
 
-  async deleteAgency(id: number) {
+  async deleteAgency(id: number, lang: 'tr' | 'en' = 'tr') {
     try {
-      const response = await apiClient.adminDeleteAgency(id);
+      const response = await apiClient.adminDeleteAgency(id, lang);
       return { success: true, message: response.message };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
   },
 
-  async deleteOrganization(id: number) {
+  async deleteOrganization(id: number, lang: 'tr' | 'en' = 'tr') {
     try {
-      const response = await apiClient.adminDeleteOrganization(id);
+      const response = await apiClient.adminDeleteOrganization(id, lang);
       return { success: true, message: response.message };
     } catch (error) {
       return { success: false, error: (error as Error).message };
@@ -4073,19 +4329,36 @@ export const adminApi = {
   // Tours
   // ============================================
 
-  async getTours(page = 1, limit = 50) {
+  async getTours(page = 1, limit = 50, lang: 'tr' | 'en' = 'tr') {
     try {
-      const response = await apiClient.getAdminTours(page, limit);
-      return { success: true, data: response.data, meta: response.meta };
+      const response = await apiClient.getAdminTours(page, limit, lang);
+      // Normalize: backend may return tourPhotos instead of galleryImages
+      const data = (response.data || []).map((tour: any) => {
+        if (!tour.galleryImages && tour.tourPhotos) {
+          tour.galleryImages = tour.tourPhotos.map((p: any) => ({
+            id: p.id,
+            imageUrl: p.imageUrl || p.url || p.photoUrl,
+          }));
+        }
+        return tour;
+      });
+      return { success: true, data, meta: response.meta };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
   },
 
-  async getTourById(id: number) {
+  async getTourById(id: number, lang: 'tr' | 'en' = 'tr') {
     try {
-      const response = await apiClient.getAdminTourById(id);
-      return { success: true, data: response };
+      const response = await apiClient.getAdminTourById(id, lang) as any;
+      // Normalize: backend may return tourPhotos instead of galleryImages
+      if (!response.galleryImages && response.tourPhotos) {
+        response.galleryImages = response.tourPhotos.map((p: any) => ({
+          id: p.id,
+          imageUrl: p.imageUrl || p.url || p.photoUrl,
+        }));
+      }
+      return { success: true, data: response as ApiTourDto };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
@@ -4100,6 +4373,16 @@ export const serviceCategoryApi = {
   async getAll(): Promise<{ success: boolean; data?: ServiceCategoryDto[]; error?: string }> {
     try {
       const response = await apiClient.getServiceCategories();
+      const data = Array.isArray(response) ? response : (response as any).data ?? [];
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async getMenu(lang: 'tr' | 'en' | 'de' = 'tr'): Promise<{ success: boolean; data?: ClientStopMenuCategoryDto[]; error?: string }> {
+    try {
+      const response = await apiClient.getServiceCategoriesMenu(lang);
       const data = Array.isArray(response) ? response : (response as any).data ?? [];
       return { success: true, data };
     } catch (error) {
@@ -4218,36 +4501,53 @@ export const serviceApi = {
 // ============================================
 
 export const tourApi = {
-  async list(page = 1, limit = 10): Promise<{ success: boolean; data?: ApiTourDto[]; meta?: { total: number; page: number; limit: number; totalPages: number }; error?: string }> {
+  async list(page = 1, limit = 10, lang: 'tr' | 'en' = 'tr'): Promise<{ success: boolean; data?: ApiTourDto[]; meta?: { total: number; page: number; limit: number; totalPages: number }; error?: string }> {
     try {
-      const response = await apiClient.getAgencyTours(page, limit);
-      return { success: true, data: response.data, meta: response.meta };
+      const response = await apiClient.getAgencyTours(page, limit, lang);
+      // Normalize: backend may return tourPhotos instead of galleryImages
+      const data = (response.data || []).map((tour: any) => {
+        if (!tour.galleryImages && tour.tourPhotos) {
+          tour.galleryImages = tour.tourPhotos.map((p: any) => ({
+            id: p.id,
+            imageUrl: p.imageUrl || p.url || p.photoUrl,
+          }));
+        }
+        return tour;
+      });
+      return { success: true, data, meta: response.meta };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
   },
 
-  async getById(id: number): Promise<{ success: boolean; data?: ApiTourDto; error?: string }> {
+  async getById(id: number, lang: 'tr' | 'en' = 'tr'): Promise<{ success: boolean; data?: ApiTourDto; error?: string }> {
     try {
-      const response = await apiClient.getAgencyTourById(id);
+      const response = await apiClient.getAgencyTourById(id, lang) as any;
+      // Normalize: backend may return tourPhotos instead of galleryImages
+      if (!response.galleryImages && response.tourPhotos) {
+        response.galleryImages = response.tourPhotos.map((p: any) => ({
+          id: p.id,
+          imageUrl: p.imageUrl || p.url || p.photoUrl,
+        }));
+      }
+      return { success: true, data: response as ApiTourDto };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async create(data: CreateTourPayload, coverImage?: File, galleryImages?: File[], lang: 'tr' | 'en' = 'tr'): Promise<{ success: boolean; data?: ApiTourDto; error?: string }> {
+    try {
+      const response = await apiClient.createAgencyTour(data, coverImage, galleryImages, lang);
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
   },
 
-  async create(data: CreateTourPayload, coverImage?: File, galleryImages?: File[]): Promise<{ success: boolean; data?: ApiTourDto; error?: string }> {
+  async update(id: number, data: UpdateTourPayload, coverImage?: File, galleryImages?: File[], lang: 'tr' | 'en' = 'tr'): Promise<{ success: boolean; data?: ApiTourDto; error?: string }> {
     try {
-      const response = await apiClient.createAgencyTour(data, coverImage, galleryImages);
-      return { success: true, data: response };
-    } catch (error) {
-      return { success: false, error: (error as Error).message };
-    }
-  },
-
-  async update(id: number, data: UpdateTourPayload, coverImage?: File, galleryImages?: File[]): Promise<{ success: boolean; data?: ApiTourDto; error?: string }> {
-    try {
-      const response = await apiClient.updateAgencyTour(id, data, coverImage, galleryImages);
+      const response = await apiClient.updateAgencyTour(id, data, coverImage, galleryImages, lang);
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
@@ -4308,6 +4608,15 @@ export const tourApi = {
     }
   },
 
+  async addParticipant(tourId: number, clientId: number, notes?: string): Promise<{ success: boolean; data?: TourClientDto; error?: string }> {
+    try {
+      const response = await apiClient.addTourParticipant(tourId, clientId, notes);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
   async updateClientStatus(tourId: number, clientId: number, status: string): Promise<{ success: boolean; data?: TourClientDto; error?: string }> {
     try {
       const response = await apiClient.updateTourClientStatus(tourId, clientId, status);
@@ -4323,36 +4632,36 @@ export const tourApi = {
 // ============================================
 
 export const tourStopApi = {
-  async list(tourId: number): Promise<{ success: boolean; data?: ApiTourStopDto[]; error?: string }> {
+  async list(tourId: number, lang: 'tr' | 'en' = 'tr'): Promise<{ success: boolean; data?: ApiTourStopDto[]; error?: string }> {
     try {
-      const response = await apiClient.getTourStops(tourId);
+      const response = await apiClient.getTourStops(tourId, lang);
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
   },
 
-  async create(data: CreateTourStopPayload): Promise<{ success: boolean; data?: ApiTourStopDto; error?: string }> {
+  async create(data: CreateTourStopPayload, lang: 'tr' | 'en' = 'tr'): Promise<{ success: boolean; data?: ApiTourStopDto; error?: string }> {
     try {
-      const response = await apiClient.createTourStop(data);
+      const response = await apiClient.createTourStop(data, lang);
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
   },
 
-  async update(id: number, data: UpdateTourStopPayload): Promise<{ success: boolean; data?: ApiTourStopDto; error?: string }> {
+  async update(id: number, data: UpdateTourStopPayload, lang: 'tr' | 'en' = 'tr'): Promise<{ success: boolean; data?: ApiTourStopDto; error?: string }> {
     try {
-      const response = await apiClient.updateTourStop(id, data);
+      const response = await apiClient.updateTourStop(id, data, lang);
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
   },
 
-  async delete(id: number): Promise<{ success: boolean; error?: string }> {
+  async delete(id: number, lang: 'tr' | 'en' = 'tr'): Promise<{ success: boolean; error?: string }> {
     try {
-      await apiClient.deleteTourStop(id);
+      await apiClient.deleteTourStop(id, lang);
       return { success: true };
     } catch (error) {
       return { success: false, error: (error as Error).message };
@@ -4382,22 +4691,32 @@ export interface PreReservationDto {
   headcount?: number;
   note?: string;
   responseNote?: string;
+  rejectionReason?: string;
   createdAt: string;
   updatedAt: string;
   tour?: {
     id: number;
-    title?: string;
-    tourDate?: string;
+    tourName?: string;
+    tourCode?: string;
+    startDate?: string;
+    endDate?: string;
+    description?: string;
+    agency?: { id: number; name: string };
   };
 }
 
 export const preReservationOrgApi = {
-  async getAll(page = 1, limit = 100): Promise<{ success: boolean; data?: PreReservationDto[]; meta?: { total: number }; error?: string }> {
+  async getAll(status?: string): Promise<{ success: boolean; data?: PreReservationDto[]; error?: string }> {
     try {
-      const response = await apiClient.getOrgPreReservations(page, limit);
-      const data = Array.isArray(response) ? response : (response as any).data ?? [];
-      const meta = (response as any).meta;
-      return { success: true, data, meta };
+      const response = await apiClient.getOrgPreReservations(status);
+      console.log('[PreReservation] Raw API response:', JSON.stringify(response, null, 2));
+      const raw = Array.isArray(response) ? response : (response as any).data ?? [];
+      // Normalize: backend may return preReservationStatus instead of status
+      const data = raw.map((item: any) => ({
+        ...item,
+        status: item.status || item.preReservationStatus || 'pending',
+      }));
+      return { success: true, data };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
@@ -4412,9 +4731,9 @@ export const preReservationOrgApi = {
     }
   },
 
-  async reject(id: number): Promise<{ success: boolean; error?: string }> {
+  async reject(id: number, rejectionReason: string): Promise<{ success: boolean; error?: string }> {
     try {
-      await apiClient.rejectOrgPreReservation(id);
+      await apiClient.rejectOrgPreReservation(id, rejectionReason);
       return { success: true };
     } catch (error) {
       return { success: false, error: (error as Error).message };

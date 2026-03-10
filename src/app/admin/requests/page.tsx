@@ -37,7 +37,7 @@ import {
 import { LoadingState, ErrorState } from '@/components/shared';
 import type { RequestStatus } from '@/types';
 
-const statusColors: Record<RequestStatus, { bg: string; text: string; icon: React.ElementType }> = {
+const statusColors: Record<RequestStatus, { bg: string; text: string; icon: React.ComponentType<{ className?: string }> }> = {
   Pending: { bg: 'bg-amber-100', text: 'text-amber-700', icon: Clock },
   Approved: { bg: 'bg-green-100', text: 'text-green-700', icon: CheckCircle2 },
   Rejected: { bg: 'bg-red-100', text: 'text-red-700', icon: XCircle },

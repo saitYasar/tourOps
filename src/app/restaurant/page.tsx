@@ -69,6 +69,7 @@ export default function RestaurantDashboard() {
   const [editPhone, setEditPhone] = useState('');
   const [editPhoneCountryCode, setEditPhoneCountryCode] = useState(90);
   const [editAddress, setEditAddress] = useState('');
+  const [editAgencyCommissionRate, setEditAgencyCommissionRate] = useState<number | undefined>(undefined);
 
   // Cover image edit state
   const [editCoverImage, setEditCoverImage] = useState<File | null>(null);
@@ -176,6 +177,7 @@ export default function RestaurantDashboard() {
       phone: parseInt(cleanPhoneNumber(editPhone)),
       phoneCountryCode: editPhoneCountryCode,
       address: editAddress,
+      agencyCommissionRate: editAgencyCommissionRate,
     }, editCoverImage || undefined),
     onSuccess: (result) => {
       if (result.success) {
@@ -199,6 +201,7 @@ export default function RestaurantDashboard() {
       setEditPhone(organization.phone ? formatPhoneNumber(String(organization.phone)) : '');
       setEditPhoneCountryCode(organization.phoneCountryCode || 90);
       setEditAddress(organization.address || '');
+      setEditAgencyCommissionRate(organization.agencyCommissionRate ?? undefined);
       setEditCoverImage(null);
       setEditCoverPreview(null);
     }
@@ -316,7 +319,7 @@ export default function RestaurantDashboard() {
 
   return (
     <div className="flex flex-col h-full">
-      <Header title={organization?.name || t.restaurant.title} description={t.restaurant.description} organizationStatus={organization?.status} lang={locale} />
+      <Header title={organization?.name || t.restaurant.title} organizationStatus={organization?.status} lang={locale} />
 
       <div className="flex-1 p-6 overflow-auto">
         {/* Ozet Kartlari */}
@@ -448,6 +451,14 @@ export default function RestaurantDashboard() {
               <div className="space-y-1">
                 <p className="text-sm text-slate-500 font-medium">{t.admin.taxNumber}</p>
                 <p className="text-base font-medium text-slate-900 font-mono">{organization?.taxNumber || '-'}</p>
+              </div>
+
+              {/* Acente Komisyon Oranı */}
+              <div className="space-y-1">
+                <p className="text-sm text-slate-500 font-medium">{t.restaurant.agencyCommissionRate}</p>
+                <p className="text-base font-medium text-slate-900">
+                  {organization?.agencyCommissionRate != null ? `%${organization.agencyCommissionRate}` : '-'}
+                </p>
               </div>
 
               {/* Adres - Tam Genişlik */}
@@ -887,6 +898,29 @@ export default function RestaurantDashboard() {
                 placeholder={t.restaurant.orgDescPlaceholder}
                 rows={3}
               />
+            </div>
+
+            {/* Acente Komisyon Oranı */}
+            <div className="space-y-2">
+              <Label htmlFor="editAgencyCommissionRate">{t.restaurant.agencyCommissionRate}</Label>
+              <p className="text-xs text-slate-500">{t.restaurant.agencyCommissionRateDesc}</p>
+              <div className="relative">
+                <Input
+                  id="editAgencyCommissionRate"
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={100}
+                  placeholder={t.restaurant.agencyCommissionRatePlaceholder}
+                  value={editAgencyCommissionRate ?? ''}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setEditAgencyCommissionRate(val ? Number(val) : undefined);
+                  }}
+                  className="pr-8"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">%</span>
+              </div>
             </div>
           </div>
 

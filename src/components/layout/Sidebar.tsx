@@ -29,7 +29,7 @@ import type { UserRole } from '@/types';
 interface NavItem {
   labelKey: keyof ReturnType<typeof useLanguage>['t']['nav'];
   href: string;
-  icon: React.ElementType;
+  icon: React.ComponentType<{ className?: string }>;
 }
 
 const agencyNavItems: NavItem[] = [
@@ -56,7 +56,7 @@ const customerNavItems: NavItem[] = [
 interface AdminNavItem {
   label: string;
   href: string;
-  icon: React.ElementType;
+  icon: React.ComponentType<{ className?: string }>;
 }
 
 const adminNavItems: AdminNavItem[] = [

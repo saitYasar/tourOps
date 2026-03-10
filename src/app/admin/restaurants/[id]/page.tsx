@@ -225,6 +225,7 @@ export default function OrganizationDetailPage() {
       legalName: org.legalName || '',
       taxNumber: org.taxNumber || '',
       taxOffice: org.taxOffice || '',
+      agencyCommissionRate: org.agencyCommissionRate ?? undefined,
       socialMediaUrls: {
         instagram: org.socialMediaUrls?.instagram || '',
         facebook: org.socialMediaUrls?.facebook || '',
@@ -693,12 +694,31 @@ export default function OrganizationDetailPage() {
                     onChange={(e) => setForm({ ...form, taxOffice: e.target.value })}
                   />
                 </div>
+                <div>
+                  <label className="text-xs text-slate-500 mb-1 block">{a.agencyCommissionRateLabel}</label>
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      max={100}
+                      value={form.agencyCommissionRate ?? ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setForm({ ...form, agencyCommissionRate: val ? Number(val) : undefined });
+                      }}
+                      className="pr-8"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">%</span>
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="space-y-3">
                 <InfoRow label={a.legalNameLabel} value={org.legalName} icon={FileText} />
                 <InfoRow label={a.taxNumberLabel} value={org.taxNumber} icon={Hash} />
                 <InfoRow label={a.taxOfficeLabel} value={org.taxOffice} icon={Landmark} />
+                <InfoRow label={a.agencyCommissionRateLabel} value={org.agencyCommissionRate != null ? `%${org.agencyCommissionRate}` : null} />
               </div>
             )}
           </CardContent>

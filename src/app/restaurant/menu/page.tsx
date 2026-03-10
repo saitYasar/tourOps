@@ -13,6 +13,9 @@ import {
   X,
   Eye,
   GripVertical,
+  ChevronRight,
+  ChevronDown,
+  Globe,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -24,6 +27,8 @@ import {
 import type {
   ServiceCategoryDto,
   ServiceDto,
+  ClientStopMenuCategoryDto,
+  ClientStopMenuServiceDto,
   CreateServiceCategoryDto,
   UpdateServiceCategoryDto,
   CreateServiceDto,
@@ -62,6 +67,7 @@ import { LoadingState, EmptyState, ErrorState, ConfirmDialog, ImageCropper } fro
 interface CategoryFormData {
   name: string;
   displayOrder: number;
+  parentId?: number;
 }
 
 interface ServiceFormData {
@@ -120,12 +126,12 @@ function PreviewServiceList({
   services,
   t,
 }: {
-  services: ServiceDto[];
+  services: ClientStopMenuServiceDto[];
   t: ReturnType<typeof useLanguage>['t'];
 }) {
   if (!services.length) return null;
 
-  const priceLabel = (type: PriceType) => {
+  const priceLabel = (type: string) => {
     if (type === 'fixed') return '';
     if (type === 'per_person') return `/ ${t.menu.perPerson}`;
     if (type === 'per_hour') return `/ ${t.menu.perHour}`;
@@ -169,6 +175,168 @@ function PreviewServiceList({
   );
 }
 
+// Recursively render menu categories with their services
+function PreviewCategoryTree({
+  categories,
+  depth,
+  t,
+}: {
+  categories: ClientStopMenuCategoryDto[];
+  depth: number;
+  t: ReturnType<typeof useLanguage>['t'];
+}) {
+  return (
+    <>
+      {categories.map((cat) => (
+        <div key={cat.id}>
+          {cat.services?.length > 0 && (
+            <>
+              {depth === 0 ? (
+                <div className="bg-gradient-to-r from-stone-800 to-stone-700 px-4 py-3 rounded-xl mb-3">
+                  <h3 className="text-lg font-bold text-white">{cat.name}</h3>
+                </div>
+              ) : (
+                <div className="px-4 py-2 mb-2">
+                  <h4 className="text-sm font-semibold text-stone-600 border-b border-stone-200 pb-1">{cat.name}</h4>
+                </div>
+              )}
+              <PreviewServiceList services={cat.services} t={t} />
+            </>
+          )}
+          {cat.child_service_categories?.length > 0 && (
+            <PreviewCategoryTree categories={cat.child_service_categories} depth={depth + 1} t={t} />
+          )}
+        </div>
+      ))}
+    </>
+  );
+}
+
+// ============================================
+// Category Tree Item Component
+// ============================================
+function CategoryTreeItem({
+  cat,
+  depth,
+  selectedCategory,
+  setSelectedCategory,
+  expandedCategories,
+  setExpandedCategories,
+  draggedId,
+  setDraggedId,
+  dragOverId,
+  setDragOverId,
+  handleCategoryReorder,
+}: {
+  cat: ServiceCategoryDto;
+  depth: number;
+  selectedCategory: ServiceCategoryDto | null;
+  setSelectedCategory: (c: ServiceCategoryDto) => void;
+  expandedCategories: Set<number>;
+  setExpandedCategories: React.Dispatch<React.SetStateAction<Set<number>>>;
+  draggedId: number | null;
+  setDraggedId: (id: number | null) => void;
+  dragOverId: number | null;
+  setDragOverId: (id: number | null) => void;
+  handleCategoryReorder: (fromId: number, toId: number) => void;
+}) {
+  const isSelected = selectedCategory?.id === cat.id;
+  const isDragging = draggedId === cat.id;
+  const isDragOver = dragOverId === cat.id;
+  const children = cat.child_service_categories || [];
+  const hasChildren = children.length > 0;
+  const isExpanded = expandedCategories.has(cat.id);
+
+  const toggleExpand = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpandedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(cat.id)) next.delete(cat.id);
+      else next.add(cat.id);
+      return next;
+    });
+  };
+
+  return (
+    <>
+      <div
+        draggable
+        onDragStart={(e) => {
+          e.dataTransfer.setData('text/plain', String(cat.id));
+          e.dataTransfer.effectAllowed = 'move';
+          setDraggedId(cat.id);
+        }}
+        onDragEnd={() => setDraggedId(null)}
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          setDragOverId(cat.id);
+        }}
+        onDragLeave={() => setDragOverId(null)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragOverId(null);
+          const fromId = parseInt(e.dataTransfer.getData('text/plain'));
+          if (fromId && fromId !== cat.id) {
+            handleCategoryReorder(fromId, cat.id);
+          }
+        }}
+        className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
+          isSelected
+            ? 'bg-primary/10 text-primary border border-primary/20'
+            : 'hover:bg-slate-50 border border-transparent'
+        } ${isDragging ? 'opacity-40' : ''} ${isDragOver ? 'border-b-2 !border-primary bg-primary/5' : ''}`}
+        style={{ paddingLeft: `${12 + depth * 20}px` }}
+        onClick={() => setSelectedCategory(cat)}
+      >
+        <div
+          className="cursor-grab active:cursor-grabbing p-0.5 hover:bg-slate-200 rounded flex-shrink-0"
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <GripVertical className="h-3.5 w-3.5 text-slate-300" />
+        </div>
+        {hasChildren ? (
+          <button
+            className="p-0.5 hover:bg-slate-200 rounded flex-shrink-0"
+            onClick={toggleExpand}
+          >
+            {isExpanded ? (
+              <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+            ) : (
+              <ChevronRight className="h-3.5 w-3.5 text-slate-400" />
+            )}
+          </button>
+        ) : (
+          <div className="w-5 flex-shrink-0" />
+        )}
+        <div className={`w-6 h-6 rounded flex items-center justify-center flex-shrink-0 ${depth > 0 ? 'bg-primary/10' : 'bg-slate-100'}`}>
+          <FolderTree className={`h-3 w-3 ${depth > 0 ? 'text-primary/50' : 'text-slate-400'}`} />
+        </div>
+        <span className="text-sm font-medium truncate flex-1">{cat.name}</span>
+        {hasChildren && (
+          <span className="text-[10px] text-slate-400">{children.length}</span>
+        )}
+      </div>
+      {hasChildren && isExpanded && children.map((child) => (
+        <CategoryTreeItem
+          key={child.id}
+          cat={child}
+          depth={depth + 1}
+          selectedCategory={selectedCategory}
+          setSelectedCategory={setSelectedCategory}
+          expandedCategories={expandedCategories}
+          setExpandedCategories={setExpandedCategories}
+          draggedId={draggedId}
+          setDraggedId={setDraggedId}
+          dragOverId={dragOverId}
+          setDragOverId={setDragOverId}
+          handleCategoryReorder={handleCategoryReorder}
+        />
+      ))}
+    </>
+  );
+}
+
 // ============================================
 // Main Page Component
 // ============================================
@@ -200,6 +368,7 @@ export default function MenuPage() {
   const [serviceImageFile, setServiceImageFile] = useState<File | null>(null);
   const [serviceImagePreview, setServiceImagePreview] = useState<string | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [previewLang, setPreviewLang] = useState<'tr' | 'en' | 'de'>('tr');
   const [cropperOpen, setCropperOpen] = useState(false);
   const [cropperSrc, setCropperSrc] = useState('');
   const serviceFileInputRef = useRef<HTMLInputElement>(null);
@@ -207,6 +376,9 @@ export default function MenuPage() {
   // Drag state
   const [draggedId, setDraggedId] = useState<number | null>(null);
   const [dragOverId, setDragOverId] = useState<number | null>(null);
+
+  // Expanded categories (for tree view)
+  const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set());
 
   // ============================================
   // Queries
@@ -241,22 +413,17 @@ export default function MenuPage() {
     enabled: !!selectedCategory,
   });
 
-  // Load all services for preview
+  // Load full menu for preview via single API call (with lang)
   const {
-    data: previewData,
+    data: previewMenu,
   } = useQuery({
-    queryKey: ['allServicesForPreview', categories?.map(c => c.id).join(',')],
+    queryKey: ['menuPreview', previewLang],
     queryFn: async () => {
-      if (!categories?.length) return [];
-      const results = await Promise.all(
-        categories.map(async (cat) => {
-          const res = await serviceApi.getByCategory(cat.id);
-          return { category: cat, services: res.success ? res.data! : [] };
-        })
-      );
-      return results;
+      const res = await serviceCategoryApi.getMenu(previewLang);
+      if (!res.success) throw new Error(res.error);
+      return res.data!;
     },
-    enabled: !!categories?.length && isPreviewOpen,
+    enabled: isPreviewOpen,
   });
 
   // ============================================
@@ -269,9 +436,12 @@ export default function MenuPage() {
       if (!res.success) throw new Error(res.error);
       return res.data!;
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['serviceCategories'] });
       toast.success(`${t.menu.categories} ${t.menu.created}`);
+      if (variables.data.parentId) {
+        setExpandedCategories((prev) => new Set([...prev, variables.data.parentId!]));
+      }
       closeCategoryForm();
     },
     onError: (error: Error) => toast.error(error.message),
@@ -359,9 +529,9 @@ export default function MenuPage() {
   // Category Form Handlers
   // ============================================
 
-  const openCreateCategoryForm = () => {
+  const openCreateCategoryForm = (parentId?: number) => {
     setEditingCategory(null);
-    setCategoryForm(initialCategoryForm);
+    setCategoryForm({ ...initialCategoryForm, parentId });
     setIsCategoryFormOpen(true);
   };
 
@@ -400,6 +570,7 @@ export default function MenuPage() {
         data: {
           name: categoryForm.name,
           displayOrder: categoryForm.displayOrder,
+          parentId: categoryForm.parentId,
         },
       });
     }
@@ -448,11 +619,11 @@ export default function MenuPage() {
   const handleServiceSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!serviceForm.title.trim()) {
-      toast.error(t.common.required);
+      toast.error(`${t.menu.serviceTitle} ${t.common.required.toLowerCase()}`);
       return;
     }
     if (!serviceForm.basePrice) {
-      toast.error(t.common.required);
+      toast.error(`${t.menu.basePrice} ${t.common.required.toLowerCase()}`);
       return;
     }
 
@@ -554,8 +725,18 @@ export default function MenuPage() {
     }
   };
 
+  // Helper: find category by id in tree
+  const findCategoryInTree = (id: number, list?: ServiceCategoryDto[]): ServiceCategoryDto | null => {
+    for (const cat of list || []) {
+      if (cat.id === id) return cat;
+      const found = findCategoryInTree(id, cat.child_service_categories);
+      if (found) return found;
+    }
+    return null;
+  };
+
   const currentCategory = selectedCategory && categories
-    ? categories.find((c) => c.id === selectedCategory.id) || null
+    ? findCategoryInTree(selectedCategory.id, categories) || null
     : null;
 
   const isCategoryPending = createCategoryMutation.isPending || updateCategoryMutation.isPending;
@@ -576,7 +757,7 @@ export default function MenuPage() {
           <Card className="lg:col-span-1 flex flex-col">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
               <CardTitle className="text-lg font-medium">{t.menu.categories}</CardTitle>
-              <Button size="sm" onClick={openCreateCategoryForm}>
+              <Button size="sm" onClick={() => openCreateCategoryForm()}>
                 <Plus className="h-4 w-4 mr-1" />
                 {t.common.create}
               </Button>
@@ -592,59 +773,26 @@ export default function MenuPage() {
                   title={t.menu.noCategories}
                   description={t.menu.noCategories}
                   actionLabel={t.menu.newCategory}
-                  onAction={openCreateCategoryForm}
+                  onAction={() => openCreateCategoryForm()}
                 />
               ) : (
                 <div className="space-y-0.5">
-                  {categories.map((cat) => {
-                    const isSelected = selectedCategory?.id === cat.id;
-                    const isDragging = draggedId === cat.id;
-                    const isDragOver = dragOverId === cat.id;
-
-                    return (
-                      <div
-                        key={cat.id}
-                        draggable
-                        onDragStart={(e) => {
-                          e.dataTransfer.setData('text/plain', String(cat.id));
-                          e.dataTransfer.effectAllowed = 'move';
-                          setDraggedId(cat.id);
-                        }}
-                        onDragEnd={() => setDraggedId(null)}
-                        onDragOver={(e) => {
-                          e.preventDefault();
-                          e.dataTransfer.dropEffect = 'move';
-                          setDragOverId(cat.id);
-                        }}
-                        onDragLeave={() => setDragOverId(null)}
-                        onDrop={(e) => {
-                          e.preventDefault();
-                          setDragOverId(null);
-                          const fromId = parseInt(e.dataTransfer.getData('text/plain'));
-                          if (fromId && fromId !== cat.id) {
-                            handleCategoryReorder(fromId, cat.id);
-                          }
-                        }}
-                        className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
-                          isSelected
-                            ? 'bg-primary/10 text-primary border border-primary/20'
-                            : 'hover:bg-slate-50 border border-transparent'
-                        } ${isDragging ? 'opacity-40' : ''} ${isDragOver ? 'border-b-2 !border-primary bg-primary/5' : ''}`}
-                        onClick={() => setSelectedCategory(cat)}
-                      >
-                        <div
-                          className="cursor-grab active:cursor-grabbing p-0.5 hover:bg-slate-200 rounded flex-shrink-0"
-                          onMouseDown={(e) => e.stopPropagation()}
-                        >
-                          <GripVertical className="h-3.5 w-3.5 text-slate-300" />
-                        </div>
-                        <div className="w-6 h-6 rounded bg-slate-100 flex items-center justify-center flex-shrink-0">
-                          <FolderTree className="h-3 w-3 text-slate-400" />
-                        </div>
-                        <span className="text-sm font-medium truncate flex-1">{cat.name}</span>
-                      </div>
-                    );
-                  })}
+                  {categories.map((cat) => (
+                    <CategoryTreeItem
+                      key={cat.id}
+                      cat={cat}
+                      depth={0}
+                      selectedCategory={selectedCategory}
+                      setSelectedCategory={setSelectedCategory}
+                      expandedCategories={expandedCategories}
+                      setExpandedCategories={setExpandedCategories}
+                      draggedId={draggedId}
+                      setDraggedId={setDraggedId}
+                      dragOverId={dragOverId}
+                      setDragOverId={setDragOverId}
+                      handleCategoryReorder={handleCategoryReorder}
+                    />
+                  ))}
                 </div>
               )}
             </CardContent>
@@ -675,6 +823,15 @@ export default function MenuPage() {
                     </div>
                     <div className="flex items-center gap-1">
                       <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs"
+                        onClick={() => openCreateCategoryForm(currentCategory.id)}
+                      >
+                        <Plus className="h-3 w-3 mr-1" />
+                        Alt Kategori
+                      </Button>
+                      <Button
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8"
@@ -702,14 +859,6 @@ export default function MenuPage() {
 
                 {/* Services Section */}
                 <CardContent className="flex-1 overflow-auto">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-medium text-slate-700">{t.menu.services}</h3>
-                    <Button size="sm" onClick={openCreateServiceForm}>
-                      <Plus className="h-4 w-4 mr-1" />
-                      {t.menu.newService}
-                    </Button>
-                  </div>
-
                   {servicesLoading ? (
                     <LoadingState message={t.common.loading} />
                   ) : !services?.length ? (
@@ -807,20 +956,34 @@ export default function MenuPage() {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              {editingCategory ? t.menu.editCategory : t.menu.newCategory}
+              {editingCategory
+                ? t.menu.editCategory
+                : categoryForm.parentId
+                ? 'Yeni Alt Kategori'
+                : t.menu.newCategory}
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleCategorySubmit}>
             <div className="space-y-4 py-4">
+              {categoryForm.parentId && (
+                <div className="bg-primary/5 border border-primary/20 rounded-lg px-3 py-2">
+                  <p className="text-xs text-slate-500">Üst Kategori</p>
+                  <p className="text-sm font-medium text-primary">
+                    {findCategoryInTree(categoryForm.parentId, categories ?? [])?.name}
+                  </p>
+                </div>
+              )}
               <div className="space-y-2">
-                <Label htmlFor="categoryName">{t.menu.categoryName} *</Label>
+                <Label htmlFor="categoryName">
+                  {categoryForm.parentId ? 'Alt Kategori Adı' : t.menu.categoryName} *
+                </Label>
                 <Input
                   id="categoryName"
                   value={categoryForm.name}
                   onChange={(e) =>
                     setCategoryForm((prev) => ({ ...prev, name: e.target.value }))
                   }
-                  placeholder={t.menu.categoryName}
+                  placeholder={categoryForm.parentId ? 'Örn: Izgaralar, Çorbalar...' : 'Örn: Ana Yemekler, Tatlılar, İçecekler...'}
                 />
               </div>
 
@@ -1065,22 +1228,29 @@ export default function MenuPage() {
                   <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
                   <div className="w-8 h-px bg-amber-500" />
                 </div>
+                {/* Language selector */}
+                <div className="flex items-center justify-center gap-1.5 mt-3">
+                  {(['tr', 'en', 'de'] as const).map((lang) => (
+                    <button
+                      key={lang}
+                      onClick={() => setPreviewLang(lang)}
+                      className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                        previewLang === lang
+                          ? 'bg-amber-500 text-white'
+                          : 'bg-white/10 text-stone-400 hover:bg-white/20'
+                      }`}
+                    >
+                      {lang.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* Menu content */}
               <div className="px-4 py-4 space-y-5">
-                {previewData?.map(({ category, services: catServices }) => (
-                  catServices.length > 0 && (
-                    <div key={category.id}>
-                      <div className="bg-gradient-to-r from-stone-800 to-stone-700 px-4 py-3 rounded-xl mb-3">
-                        <h3 className="text-lg font-bold text-white">{category.name}</h3>
-                      </div>
-                      <PreviewServiceList services={catServices} t={t} />
-                    </div>
-                  )
-                ))}
-
-                {(!previewData || previewData.every(d => d.services.length === 0)) && (
+                {previewMenu && previewMenu.length > 0 ? (
+                  <PreviewCategoryTree categories={previewMenu} depth={0} t={t} />
+                ) : (
                   <div className="py-16 text-center">
                     <FolderTree className="h-10 w-10 text-stone-300 mx-auto mb-3" />
                     <p className="text-sm text-stone-400">{t.menu.noCategories}</p>

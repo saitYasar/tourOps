@@ -700,7 +700,7 @@ export const customerSelectionApi = {
       updatedAt: now,
     };
     db.customerSelections.push(selection);
-    addAuditLog(db, 'CREATE', 'customerSelection', selection.id, `Musteri secimi kaydedildi`);
+    addAuditLog(db, 'CREATE', 'customerSelection', selection.id, `Müşteri seçimi kaydedildi`);
     saveDatabase(db);
     return simulateNetwork(selection);
   },
@@ -746,7 +746,7 @@ export const authApi = {
     );
 
     if (!user) {
-      return simulateNetwork({ success: false, error: 'Kullanıcı bulunamadi' });
+      return simulateNetwork({ success: false, error: 'Kullanıcı bulunamadı' });
     }
 
     if (user.password !== credentials.password) {

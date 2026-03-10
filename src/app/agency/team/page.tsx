@@ -9,7 +9,7 @@ import { agencyApi, invitationApi, type InviteUserDto, type InvitationDto, type 
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatPhoneNumber, cleanPhoneNumber } from '@/lib/utils';
-import { SprinterLoading } from '@/components/shared';
+import { SprinterLoading, ConfirmDialog } from '@/components/shared';
 
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
@@ -81,6 +81,7 @@ export default function AgencyTeamPage() {
   // Role management dialog state
   const [roleDialogOpen, setRoleDialogOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState<TeamMemberDto | null>(null);
+  const [removeMemberId, setRemoveMemberId] = useState<number | null>(null);
 
   // Fetch agency data for status badge
   const { data: agencyResult } = useQuery({
@@ -470,7 +471,7 @@ export default function AgencyTeamPage() {
                                   <DropdownMenuSeparator />
                                   <DropdownMenuItem
                                     className="text-red-600"
-                                    onClick={() => removeTeamMemberMutation.mutate(member.id)}
+                                    onClick={() => setRemoveMemberId(member.id)}
                                   >
                                     <UserMinus className="h-4 w-4 mr-2" />
                                     {t.team.removeFromTeam}
@@ -878,6 +879,19 @@ export default function AgencyTeamPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={!!removeMemberId}
+        onOpenChange={(open) => !open && setRemoveMemberId(null)}
+        title={t.team.removeFromTeam}
+        description={t.team.removeFromTeamConfirm}
+        confirmLabel={t.common.delete}
+        onConfirm={() => {
+          if (removeMemberId) removeTeamMemberMutation.mutate(removeMemberId);
+          setRemoveMemberId(null);
+        }}
+        variant="destructive"
+      />
     </div>
   );
 }

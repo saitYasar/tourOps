@@ -51,7 +51,7 @@ export function SprinterLoading({ message, size = 'md', className }: SprinterLoa
 
       {message && (
         <p className={`mt-5 text-neutral-500 ${text} flex items-center gap-1`}>
-          {message}
+          {message.endsWith('...') ? message.slice(0, -3) : message}
           <span className="inline-flex ml-1">
             <span className="animate-bounce" style={{ animationDelay: '0ms' }}>.</span>
             <span className="animate-bounce" style={{ animationDelay: '150ms' }}>.</span>

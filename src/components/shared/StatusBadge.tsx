@@ -5,19 +5,19 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import type { RequestStatus, TourStatus } from '@/types';
 
 interface RequestStatusBadgeProps {
-  status: RequestStatus;
+  status: RequestStatus | string;
 }
 
 export function RequestStatusBadge({ status }: RequestStatusBadgeProps) {
   const { t } = useLanguage();
 
-  const config: Record<RequestStatus, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-    Pending: { label: t.requests.pending, variant: 'secondary' },
-    Approved: { label: t.requests.approved, variant: 'default' },
-    Rejected: { label: t.requests.rejected, variant: 'destructive' },
+  const configMap: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
+    pending: { label: t.requests.pending, variant: 'secondary' },
+    approved: { label: t.requests.approved, variant: 'default' },
+    rejected: { label: t.requests.rejected, variant: 'destructive' },
   };
 
-  const statusConfig = config[status];
+  const statusConfig = configMap[(status || 'pending').toLowerCase()] ?? configMap.pending;
   return <Badge variant={statusConfig.variant}>{statusConfig.label}</Badge>;
 }
 

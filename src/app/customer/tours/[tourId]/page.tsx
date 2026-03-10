@@ -1,802 +1,943 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
-  Store,
   Calendar,
   Clock,
+  MapPin,
+  Users,
+  Star,
+  Ticket,
+  Building2,
+  Image as ImageIcon,
+  Check,
+  Minus,
+  Plus,
   Armchair,
   UtensilsCrossed,
-  Plus,
-  Minus,
-  Save,
-  CheckCircle,
-  Building2,
-  DoorOpen,
   MessageSquare,
-  Info,
-  X,
 } from 'lucide-react';
-import { toast } from 'sonner';
 
 import {
-  tourApi,
-  preReservationApi,
-  restaurantApi,
-  venueApi,
-  menuApi,
-  customerSelectionApi,
-} from '@/lib/mockApi';
-import { useAuth } from '@/contexts/AuthContext';
+  apiClient,
+  type ClientTourStopDto,
+  type ClientStopMenuCategoryDto,
+  type ClientStopMenuServiceDto,
+  type ResourceDto,
+  type ClientStopChoicesDto,
+  type ClientServiceChoiceDto,
+} from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
-import type { Restaurant, Table, Floor, Room, MenuCategory, MenuItem, OrderItem, CustomerSelection } from '@/types';
-import { formatDate } from '@/lib/dateUtils';
-
-import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
-  DialogFooter,
 } from '@/components/ui/dialog';
-import { LoadingState, EmptyState, ErrorState, RequestStatusBadge } from '@/components/shared';
-import { VenueSelector3D } from '@/components/customer/VenueSelector3D';
-import { AnimatedMenu } from '@/components/customer/AnimatedMenu';
+import { LoadingState, ErrorState, LanguageSwitcher } from '@/components/shared';
+import { CustomerVenueSelector } from '@/components/customer/CustomerVenueSelector';
 
-interface SelectionState {
-  floorId: string | null;
-  roomId: string | null;
-  tableId: string | null;
-  items: OrderItem[];
+// ============================================
+// Types
+// ============================================
+interface SelectedTableInfo {
+  resourceId: number;
+  floorName: string;
+  roomName: string;
+  tableName: string;
 }
+
+type MenuSelections = Record<number, number>; // serviceId -> quantity
 
 export default function CustomerTourDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const queryClient = useQueryClient();
-  const { user } = useAuth();
   const { t } = useLanguage();
-  const tourId = params.tourId as string;
-  const customerId = user?.customerId || '';
+  const tourId = Number(params.tourId);
 
-  const [activeRestaurant, setActiveRestaurant] = useState<string | null>(null);
-  const [selection, setSelection] = useState<SelectionState>({
-    floorId: null,
-    roomId: null,
-    tableId: null,
-    items: [],
-  });
+  const queryClient = useQueryClient();
 
-  // Menu item detail modal state
-  const [selectedMenuItem, setSelectedMenuItem] = useState<MenuItem | null>(null);
-  const [itemNote, setItemNote] = useState('');
-  const [itemQuantity, setItemQuantity] = useState(1);
-  const [excludeIngredients, setExcludeIngredients] = useState<string[]>([]);
+  // Table selection dialog
+  const [tableStopId, setTableStopId] = useState<number | null>(null);
+  // Menu selection dialog
+  const [menuStopId, setMenuStopId] = useState<number | null>(null);
 
-  // Query: Tur detayi
+  // Persisted selections across stops (synced from backend)
+  const [selectedTables, setSelectedTables] = useState<Record<number, SelectedTableInfo>>({});
+  const [selectedMenuItems, setSelectedMenuItems] = useState<Record<number, MenuSelections>>({});
+  // Track backend serviceChoice IDs: stopId -> { serviceId -> serviceChoiceId }
+  const [serviceChoiceIds, setServiceChoiceIds] = useState<Record<number, Record<number, number>>>({});
+  // Notes per menu item: stopId -> { serviceId -> note }
+  const [menuNotes, setMenuNotes] = useState<Record<number, Record<number, string>>>({});
+
+  // Children cache for layout hierarchy (floor -> rooms, room -> tables, table -> chairs)
+  const [childrenCache, setChildrenCache] = useState<Record<number, ResourceDto[]>>({});
+  const [loadingChildren, setLoadingChildren] = useState(false);
+
+  // Saving state
+  const [savingTable, setSavingTable] = useState(false);
+  const [savingMenu, setSavingMenu] = useState(false);
+
+  // Tour detail
   const {
-    data: tour,
-    isLoading: tourLoading,
-    error: tourError,
+    data: detail,
+    isLoading,
+    error,
+    refetch,
   } = useQuery({
-    queryKey: ['tour', tourId],
-    queryFn: () => tourApi.getById(tourId),
+    queryKey: ['client-tour-detail', tourId],
+    queryFn: () => apiClient.getMyTourDetail(tourId),
+    enabled: !!tourId,
   });
 
-  // Query: Tura ait on rezervasyon istekleri (onaylilar)
-  const { data: tourRequests } = useQuery({
-    queryKey: ['tourRequests', tourId],
-    queryFn: () => preReservationApi.listByTour(tourId),
+  // Stop menu
+  const { data: menuData, isLoading: menuLoading, error: menuError } = useQuery({
+    queryKey: ['client-stop-menu', menuStopId],
+    queryFn: () => apiClient.getStopMenu(menuStopId!),
+    enabled: !!menuStopId,
+    retry: false,
   });
 
-  // Query: Tum restoranlar
-  const { data: allRestaurants } = useQuery({
-    queryKey: ['restaurants'],
-    queryFn: restaurantApi.list,
+  // Stop layout for table selection
+  const { data: layoutData, isLoading: layoutLoading, error: layoutError } = useQuery({
+    queryKey: ['client-stop-layout', tableStopId],
+    queryFn: () => apiClient.getStopLayout(tableStopId!),
+    enabled: !!tableStopId,
+    retry: false,
   });
 
-  // Onaylanan restoranlari filtrele
-  const approvedRestaurants = useMemo(() => {
-    if (!tourRequests || !allRestaurants) return [];
-    const approvedIds = tourRequests
-      .filter((r) => r.status === 'Approved')
-      .map((r) => r.restaurantId);
-    return allRestaurants.filter((r) => approvedIds.includes(r.id));
-  }, [tourRequests, allRestaurants]);
+  // Load existing choices for a stop
+  const loadStopChoices = useCallback(async (stopId: number) => {
+    try {
+      const choicesData = await apiClient.getStopChoices(stopId);
+      const choices: ClientStopChoicesDto = (choicesData && typeof choicesData === 'object' && 'data' in choicesData)
+        ? (choicesData as unknown as { data: ClientStopChoicesDto }).data
+        : choicesData;
 
-  // Query: Aktif restoranin katlari
-  const { data: floors } = useQuery({
-    queryKey: ['floors', activeRestaurant],
-    queryFn: () => venueApi.listFloors(activeRestaurant || ''),
-    enabled: !!activeRestaurant,
-  });
-
-  // Query: Seçilen katın odaları
-  const { data: rooms } = useQuery({
-    queryKey: ['rooms', selection.floorId],
-    queryFn: () => venueApi.listRooms(selection.floorId || ''),
-    enabled: !!selection.floorId,
-  });
-
-  // Query: Seçilen odanın masaları
-  const { data: tables } = useQuery({
-    queryKey: ['tables', selection.roomId],
-    queryFn: () => venueApi.listTables(selection.roomId || ''),
-    enabled: !!selection.roomId,
-  });
-
-  // Query: Aktif restoranın kategorileri
-  const { data: categories } = useQuery({
-    queryKey: ['menuCategories', activeRestaurant],
-    queryFn: () => menuApi.listCategories(activeRestaurant || ''),
-    enabled: !!activeRestaurant,
-  });
-
-  // Query: Aktif restoranın ürünleri
-  const { data: menuItems } = useQuery({
-    queryKey: ['menuItems', activeRestaurant],
-    queryFn: () => menuApi.listItemsByRestaurant(activeRestaurant || ''),
-    enabled: !!activeRestaurant,
-  });
-
-  // Query: Mevcut secimler
-  const { data: existingSelections } = useQuery({
-    queryKey: ['customerSelections', tourId, customerId],
-    queryFn: () => customerSelectionApi.listByTourAndCustomer(tourId, customerId),
-    enabled: !!customerId,
-  });
-
-  // Mutation: Secimi kaydet
-  const saveSelectionMutation = useMutation({
-    mutationFn: (data: Omit<CustomerSelection, 'id' | 'createdAt' | 'updatedAt'>) =>
-      customerSelectionApi.upsert(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['customerSelections', tourId, customerId] });
-      toast.success(t.customer.saved);
-    },
-    onError: () => {
-      toast.error(t.common.error);
-    },
-  });
-
-  const getRequestForRestaurant = (restaurantId: string) => {
-    return tourRequests?.find((r) => r.restaurantId === restaurantId);
-  };
-
-  const getExistingSelection = (restaurantId: string) => {
-    return existingSelections?.find((s) => s.restaurantId === restaurantId);
-  };
-
-  const handleSelectRestaurant = (restaurantId: string) => {
-    const existingSelection = getExistingSelection(restaurantId);
-    setActiveRestaurant(restaurantId);
-    setSelection({
-      floorId: null,
-      roomId: null,
-      tableId: existingSelection?.tableId || null,
-      items: existingSelection?.items || [],
-    });
-  };
-
-  const handleSelectFloor = (floorId: string) => {
-    setSelection((prev) => ({
-      ...prev,
-      floorId: prev.floorId === floorId ? null : floorId,
-      roomId: null,
-      tableId: null,
-    }));
-  };
-
-  const handleSelectRoom = (roomId: string) => {
-    setSelection((prev) => ({
-      ...prev,
-      roomId: prev.roomId === roomId ? null : roomId,
-      tableId: null,
-    }));
-  };
-
-  const handleSelectTable = (tableId: string) => {
-    setSelection((prev) => ({
-      ...prev,
-      tableId: prev.tableId === tableId ? null : tableId,
-    }));
-  };
-
-  const handleOpenItemDetail = (item: MenuItem) => {
-    const existingItem = selection.items.find((i) => i.menuItemId === item.id);
-    setSelectedMenuItem(item);
-    setItemQuantity(existingItem?.quantity || 1);
-    setItemNote(existingItem?.note || '');
-    setExcludeIngredients(existingItem?.excludeIngredients || []);
-  };
-
-  const handleCloseItemDetail = () => {
-    setSelectedMenuItem(null);
-    setItemNote('');
-    setItemQuantity(1);
-    setExcludeIngredients([]);
-  };
-
-  const toggleExcludeIngredient = (ingredient: string) => {
-    setExcludeIngredients(prev =>
-      prev.includes(ingredient)
-        ? prev.filter(i => i !== ingredient)
-        : [...prev, ingredient]
-    );
-  };
-
-  const handleAddItemFromDetail = () => {
-    if (!selectedMenuItem) return;
-
-    setSelection((prev) => {
-      const existingIndex = prev.items.findIndex((i) => i.menuItemId === selectedMenuItem.id);
-      if (existingIndex >= 0) {
-        // Update existing item
-        const newItems = [...prev.items];
-        newItems[existingIndex] = {
-          menuItemId: selectedMenuItem.id,
-          quantity: itemQuantity,
-          note: itemNote || undefined,
-          excludeIngredients: excludeIngredients.length > 0 ? excludeIngredients : undefined,
-        };
-        return { ...prev, items: newItems };
-      }
-      // Add new item
-      return {
-        ...prev,
-        items: [
-          ...prev.items,
-          {
-            menuItemId: selectedMenuItem.id,
-            quantity: itemQuantity,
-            note: itemNote || undefined,
-            excludeIngredients: excludeIngredients.length > 0 ? excludeIngredients : undefined,
+      // Sync resource choice
+      if (choices?.resourceChoice) {
+        const rc = choices.resourceChoice;
+        // We store minimal info - the resource name comes from the resource
+        setSelectedTables(prev => ({
+          ...prev,
+          [stopId]: {
+            resourceId: rc.resourceId,
+            floorName: '',
+            roomName: '',
+            tableName: rc.resource?.name || `#${rc.resourceId}`,
           },
-        ],
-      };
-    });
+        }));
+      }
 
-    handleCloseItemDetail();
+      // Sync service choices
+      if (choices?.serviceChoices && choices.serviceChoices.length > 0) {
+        const menuItems: MenuSelections = {};
+        const choiceIdMap: Record<number, number> = {};
+        const noteMap: Record<number, string> = {};
+        for (const sc of choices.serviceChoices) {
+          menuItems[sc.serviceId] = sc.quantity;
+          choiceIdMap[sc.serviceId] = sc.id;
+          if (sc.note) noteMap[sc.serviceId] = sc.note;
+        }
+        setSelectedMenuItems(prev => ({ ...prev, [stopId]: menuItems }));
+        setServiceChoiceIds(prev => ({ ...prev, [stopId]: choiceIdMap }));
+        if (Object.keys(noteMap).length > 0) {
+          setMenuNotes(prev => ({ ...prev, [stopId]: noteMap }));
+        }
+      }
+    } catch {
+      // Choices may not exist yet, that's ok
+    }
+  }, []);
+
+  // Fetch children for a resource (rooms for floor, tables for room, chairs for table)
+  const fetchChildren = useCallback(async (parentId: number, force = false) => {
+    if (!force && childrenCache[parentId]) return;
+    setLoadingChildren(true);
+    try {
+      const result = await apiClient.getResourceChildren(parentId, 1, 100);
+      const children = result?.data ?? result ?? [];
+      const childArray = Array.isArray(children) ? children : [];
+      setChildrenCache(prev => ({ ...prev, [parentId]: childArray }));
+    } catch {
+      setChildrenCache(prev => ({ ...prev, [parentId]: [] }));
+    } finally {
+      setLoadingChildren(false);
+    }
+  }, [childrenCache]);
+
+  // Load choices for all approved stops on mount
+  useEffect(() => {
+    if (!detail?.tour?.stops) return;
+    const approvedStops = detail.tour.stops.filter(s => s.preReservationStatus === 'approved');
+    for (const stop of approvedStops) {
+      loadStopChoices(stop.id);
+    }
+  }, [detail, loadStopChoices]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-sky-50 via-orange-50 to-amber-50 flex items-center justify-center">
+        <LoadingState message={t.common.loading} />
+      </div>
+    );
+  }
+
+  if (error || !detail) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-sky-50 via-orange-50 to-amber-50 flex items-center justify-center">
+        <ErrorState message={t.tours.notFoundDesc} onRetry={refetch} />
+      </div>
+    );
+  }
+
+  const tour = detail.tour;
+  const participantStatus = detail.participantStatus;
+
+  const participantStatusConfig: Record<string, { color: string; label: string }> = {
+    confirmed: { color: 'bg-emerald-50 text-emerald-700 border-emerald-200', label: t.customer.participantConfirmed },
+    pending: { color: 'bg-amber-50 text-amber-700 border-amber-200', label: t.customer.participantPending },
+    cancelled: { color: 'bg-red-50 text-red-700 border-red-200', label: t.customer.participantCancelled },
   };
 
-  const handleRemoveItemFromDetail = () => {
-    if (!selectedMenuItem) return;
+  const preResStatusConfig: Record<string, { color: string; label: string }> = {
+    approved: { color: 'bg-emerald-50 text-emerald-700', label: t.customer.preReservationApproved },
+    pending: { color: 'bg-amber-50 text-amber-700', label: t.customer.preReservationPending },
+    rejected: { color: 'bg-red-50 text-red-700', label: t.customer.preReservationRejected },
+  };
 
-    setSelection((prev) => ({
+  const pStatusCfg = participantStatusConfig[participantStatus] || participantStatusConfig.pending;
+
+  // Menu data can be directly the array or wrapped in ApiResponse
+  const menuCategories: ClientStopMenuCategoryDto[] = Array.isArray(menuData)
+    ? menuData
+    : (menuData as unknown as { data?: ClientStopMenuCategoryDto[] })?.data ?? [];
+
+  // Layout data
+  const layoutResources: ResourceDto[] = Array.isArray(layoutData)
+    ? layoutData
+    : (layoutData as unknown as { data?: ResourceDto[] })?.data ?? [];
+
+  // Parse layout tree: floors are top-level from API
+  const floors = layoutResources.filter(r => !r.parentId);
+
+  // Open table dialog
+  const openTableDialog = (stopId: number) => {
+    setTableStopId(stopId);
+    setChildrenCache({});
+  };
+
+  // Close table dialog
+  const closeTableDialog = () => {
+    setTableStopId(null);
+  };
+
+  // Trace parent hierarchy for a chair through childrenCache
+  const findParentNames = (chairId: number): { floorName: string; roomName: string; tableName: string } => {
+    for (const floor of floors) {
+      const rooms = childrenCache[floor.id] ?? [];
+      for (const room of rooms) {
+        const tables = childrenCache[room.id] ?? [];
+        for (const table of tables) {
+          const chairs = childrenCache[table.id] ?? [];
+          if (chairs.some(c => c.id === chairId)) {
+            return { floorName: floor.name, roomName: room.name, tableName: `${table.name}` };
+          }
+        }
+      }
+    }
+    return { floorName: '', roomName: '', tableName: '' };
+  };
+
+  // Select a chair - save to backend, then auto-open menu
+  const handleSelectChair = async (chair: ResourceDto) => {
+    if (!tableStopId) return;
+    const currentStopId = tableStopId;
+    const parentNames = findParentNames(chair.id);
+    setSavingTable(true);
+    try {
+      const hasExisting = !!selectedTables[currentStopId];
+      if (hasExisting) {
+        await apiClient.updateResourceChoice(currentStopId, { resourceId: chair.id });
+      } else {
+        await apiClient.createResourceChoice(currentStopId, { resourceId: chair.id });
+      }
+      setSelectedTables(prev => ({
+        ...prev,
+        [currentStopId]: {
+          resourceId: chair.id,
+          floorName: parentNames.floorName,
+          roomName: parentNames.roomName,
+          tableName: `${parentNames.tableName} - ${chair.name}`,
+        },
+      }));
+      closeTableDialog();
+      // Auto-open menu dialog after selection
+      setMenuStopId(currentStopId);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : t.customer.tableSaveError);
+    } finally {
+      setSavingTable(false);
+    }
+  };
+
+  // Menu item quantity helpers
+  const getItemQty = (stopId: number, serviceId: number) =>
+    selectedMenuItems[stopId]?.[serviceId] ?? 0;
+
+  const setItemQty = async (stopId: number, serviceId: number, qty: number) => {
+    const existingChoiceId = serviceChoiceIds[stopId]?.[serviceId];
+
+    if (existingChoiceId) {
+      // Update existing choice (quantity 0 = remove)
+      try {
+        const result = await apiClient.updateServiceChoice(existingChoiceId, { quantity: Math.max(0, qty) });
+        setSelectedMenuItems(prev => {
+          const stopItems = { ...(prev[stopId] || {}) };
+          if (qty <= 0) {
+            delete stopItems[serviceId];
+          } else {
+            stopItems[serviceId] = qty;
+          }
+          return { ...prev, [stopId]: stopItems };
+        });
+        if (qty <= 0) {
+          setServiceChoiceIds(prev => {
+            const stopChoices = { ...(prev[stopId] || {}) };
+            delete stopChoices[serviceId];
+            return { ...prev, [stopId]: stopChoices };
+          });
+        }
+      } catch (err) {
+        console.error('Hizmet seçimi güncellenemedi:', err);
+      }
+    } else if (qty > 0) {
+      // Create new choice
+      try {
+        const note = menuNotes[stopId]?.[serviceId];
+        const result = await apiClient.createServiceChoice(stopId, { serviceId, ...(note ? { note } : {}) });
+        setSelectedMenuItems(prev => {
+          const stopItems = { ...(prev[stopId] || {}) };
+          stopItems[serviceId] = qty;
+          return { ...prev, [stopId]: stopItems };
+        });
+        // Store the returned choice ID
+        if (result && typeof result === 'object') {
+          const choiceData = ('data' in result) ? (result as unknown as { data: ClientServiceChoiceDto }).data : result as ClientServiceChoiceDto;
+          if (choiceData?.id) {
+            setServiceChoiceIds(prev => ({
+              ...prev,
+              [stopId]: { ...(prev[stopId] || {}), [serviceId]: choiceData.id },
+            }));
+          }
+        }
+      } catch (err) {
+        console.error('Hizmet seçimi oluşturulamadı:', err);
+      }
+    }
+  };
+
+  // Note helpers
+  const getItemNote = (stopId: number, serviceId: number) =>
+    menuNotes[stopId]?.[serviceId] ?? '';
+
+  const setItemNote = async (stopId: number, serviceId: number, note: string) => {
+    // Update local state immediately
+    setMenuNotes(prev => ({
       ...prev,
-      items: prev.items.filter((i) => i.menuItemId !== selectedMenuItem.id),
+      [stopId]: { ...(prev[stopId] || {}), [serviceId]: note },
     }));
-
-    handleCloseItemDetail();
-  };
-
-  const handleAddItem = (menuItemId: string) => {
-    setSelection((prev) => {
-      const existing = prev.items.find((i) => i.menuItemId === menuItemId);
-      if (existing) {
-        return {
-          ...prev,
-          items: prev.items.map((i) =>
-            i.menuItemId === menuItemId ? { ...i, quantity: i.quantity + 1 } : i
-          ),
-        };
+    // If a choice already exists, save to backend
+    const choiceId = serviceChoiceIds[stopId]?.[serviceId];
+    if (choiceId) {
+      try {
+        await apiClient.updateServiceChoice(choiceId, { note });
+      } catch (err) {
+        console.error('Not kaydedilemedi:', err);
       }
-      return {
-        ...prev,
-        items: [...prev.items, { menuItemId, quantity: 1 }],
-      };
-    });
+    }
   };
 
-  const handleRemoveItem = (menuItemId: string) => {
-    setSelection((prev) => {
-      const existing = prev.items.find((i) => i.menuItemId === menuItemId);
-      if (!existing) return prev;
-      if (existing.quantity <= 1) {
-        return {
-          ...prev,
-          items: prev.items.filter((i) => i.menuItemId !== menuItemId),
-        };
+  // Calculate total price for a stop's menu selections
+  const getMenuTotal = (stopId: number, categories: ClientStopMenuCategoryDto[]): number => {
+    const items = selectedMenuItems[stopId];
+    if (!items) return 0;
+    let total = 0;
+    const walkCategories = (cats: ClientStopMenuCategoryDto[]) => {
+      for (const cat of cats) {
+        for (const svc of cat.services || []) {
+          const qty = items[svc.id] || 0;
+          if (qty > 0) total += qty * Number(svc.basePrice);
+        }
+        if (cat.child_service_categories) walkCategories(cat.child_service_categories);
       }
-      return {
-        ...prev,
-        items: prev.items.map((i) =>
-          i.menuItemId === menuItemId ? { ...i, quantity: i.quantity - 1 } : i
-        ),
-      };
-    });
+    };
+    walkCategories(categories);
+    return total;
   };
 
-  const getItemQuantity = (menuItemId: string) => {
-    return selection.items.find((i) => i.menuItemId === menuItemId)?.quantity || 0;
+  const menuTotalItemCount = (stopId: number) => {
+    const items = selectedMenuItems[stopId];
+    if (!items) return 0;
+    return Object.values(items).reduce((sum, qty) => sum + qty, 0);
   };
-
-  const getItemNote = (menuItemId: string) => {
-    return selection.items.find((i) => i.menuItemId === menuItemId)?.note || '';
-  };
-
-  const getItemExcludeIngredients = (menuItemId: string) => {
-    return selection.items.find((i) => i.menuItemId === menuItemId)?.excludeIngredients || [];
-  };
-
-  const getItemById = (menuItemId: string) => {
-    return menuItems?.find((i) => i.id === menuItemId);
-  };
-
-  const calculateTotal = () => {
-    return selection.items.reduce((total, item) => {
-      const menuItem = getItemById(item.menuItemId);
-      return total + (menuItem?.price || 0) * item.quantity;
-    }, 0);
-  };
-
-  const handleSaveSelection = () => {
-    if (!activeRestaurant) return;
-
-    saveSelectionMutation.mutate({
-      tourId,
-      customerId,
-      restaurantId: activeRestaurant,
-      tableId: selection.tableId || undefined,
-      items: selection.items,
-    });
-  };
-
-  const getItemsForCategory = (categoryId: string) => {
-    return menuItems?.filter((i) => i.categoryId === categoryId && i.isActive) || [];
-  };
-
-  // Helper to get floor/room names
-  const getFloorName = (floorId: string | null) => {
-    return floors?.find((f) => f.id === floorId)?.name || '';
-  };
-
-  const getRoomName = (roomId: string | null) => {
-    return rooms?.find((r) => r.id === roomId)?.name || '';
-  };
-
-  const getTableInfo = (tableId: string | null) => {
-    return tables?.find((t) => t.id === tableId);
-  };
-
-  if (tourLoading) {
-    return (
-      <div className="flex flex-col h-full">
-        <Header title={t.tours.title} />
-        <div className="flex-1 p-6">
-          <LoadingState message={t.common.loading} />
-        </div>
-      </div>
-    );
-  }
-
-  if (tourError || !tour) {
-    return (
-      <div className="flex flex-col h-full">
-        <Header title={t.tours.title} />
-        <div className="flex-1 p-6">
-          <ErrorState
-            title={t.tours.notFound}
-            onRetry={() => router.push('/customer')}
-          />
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="flex flex-col h-full">
-      <Header title={tour.name} description={t.customer.selectTableAndMenu} />
-
-      <div className="flex-1 p-6 overflow-auto">
-        {/* Ust Bilgi */}
-        <div className="flex items-center gap-4 mb-6">
-          <Button variant="outline" size="icon" onClick={() => router.push('/customer')}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div className="flex-1">
-            <h2 className="text-2xl font-bold">{tour.name}</h2>
-            <div className="flex items-center gap-4 text-sm text-slate-500 mt-1">
-              <span className="flex items-center gap-1">
-                <Calendar className="h-4 w-4" />
-                {formatDate(tour.startDate)} - {formatDate(tour.endDate)}
-              </span>
+    <div className="min-h-screen bg-gradient-to-br from-sky-50 via-orange-50 to-amber-50">
+      {/* Top bar */}
+      <nav className="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6">
+          <div className="flex items-center gap-3 h-14">
+            <Button variant="ghost" size="icon" onClick={() => router.push('/customer')} className="shrink-0">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-lg font-bold text-slate-800 truncate">{tour.tourName}</h1>
+              <div className="flex items-center gap-2 text-xs text-slate-500">
+                <Calendar className="h-3 w-3" />
+                {new Date(tour.startDate).toLocaleDateString('tr-TR')} - {new Date(tour.endDate).toLocaleDateString('tr-TR')}
+              </div>
             </div>
+            <div className="shrink-0">
+              <LanguageSwitcher />
+            </div>
+            <Badge variant="outline" className={`shrink-0 ${pStatusCfg.color}`}>
+              {pStatusCfg.label}
+            </Badge>
           </div>
         </div>
+      </nav>
 
-        {/* Restoran Listesi ve Secim Alani */}
-        <div className="grid gap-6 lg:grid-cols-3">
-          {/* Sol: Restoran Listesi */}
-          <div className="lg:col-span-1">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">{t.tours.restaurants}</CardTitle>
-                <CardDescription>
-                  {t.requests.approved}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {!approvedRestaurants.length ? (
-                  <EmptyState
-                    icon={Store}
-                    title={t.common.noData}
-                    description={t.requests.noRequests}
-                  />
-                ) : (
-                  <div className="space-y-2">
-                    {approvedRestaurants.map((restaurant) => {
-                      const request = getRequestForRestaurant(restaurant.id);
-                      const existingSel = getExistingSelection(restaurant.id);
-                      const isActive = activeRestaurant === restaurant.id;
-
-                      return (
-                        <div
-                          key={restaurant.id}
-                          className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                            isActive
-                              ? 'border-primary bg-primary/5'
-                              : 'hover:bg-slate-50'
-                          }`}
-                          onClick={() => handleSelectRestaurant(restaurant.id)}
-                        >
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <h4 className="font-medium">{restaurant.name}</h4>
-                              {request && (
-                                <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
-                                  <Clock className="h-3 w-3" />
-                                  {request.timeStart} - {request.timeEnd}
-                                </div>
-                              )}
-                            </div>
-                            {existingSel && (
-                              <CheckCircle className="h-5 w-5 text-green-500" />
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+        {/* Cover Image */}
+        {tour.coverImageUrl && (
+          <div className="rounded-2xl overflow-hidden shadow-lg h-48 sm:h-64">
+            <img src={tour.coverImageUrl} alt={tour.tourName} className="w-full h-full object-cover" />
           </div>
+        )}
 
-          {/* Sag: Secim Alani */}
-          <div className="lg:col-span-2">
-            {!activeRestaurant ? (
-              <Card>
-                <CardContent className="py-12">
-                  <EmptyState
-                    icon={Store}
-                    title={t.restaurant.selectRestaurant}
-                    description={t.customer.selectTableAndMenu}
-                  />
-                </CardContent>
-              </Card>
-            ) : (
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-                  <div>
-                    <CardTitle className="text-lg">
-                      {allRestaurants?.find((r) => r.id === activeRestaurant)?.name}
-                    </CardTitle>
-                    <CardDescription>{t.customer.selectTableAndMenu}</CardDescription>
-                  </div>
-                  <Button
-                    onClick={handleSaveSelection}
-                    disabled={saveSelectionMutation.isPending}
-                  >
-                    <Save className="h-4 w-4 mr-2" />
-                    {saveSelectionMutation.isPending ? t.common.loading : t.common.save}
-                  </Button>
-                </CardHeader>
-                <CardContent>
-                  <Tabs defaultValue="tables">
-                    <TabsList className="mb-4">
-                      <TabsTrigger value="tables">
-                        <Armchair className="h-4 w-4 mr-2" />
-                        {t.customer.selectTable}
-                      </TabsTrigger>
-                      <TabsTrigger value="menu">
-                        <UtensilsCrossed className="h-4 w-4 mr-2" />
-                        {t.customer.selectMenu}
-                      </TabsTrigger>
-                      <TabsTrigger value="summary">
-                        {t.customer.summary} ({selection.items.reduce((sum, i) => sum + i.quantity, 0)})
-                      </TabsTrigger>
-                    </TabsList>
+        {/* Tour Info */}
+        <Card className="border-0 shadow-md">
+          <CardContent className="p-5 space-y-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Building2 className="h-5 w-5 text-orange-500" />
+              <h3 className="text-lg font-bold text-slate-800">{t.customer.tourInfo}</h3>
+            </div>
 
-                    {/* Masa Secimi - 3D Animasyonlu */}
-                    <TabsContent value="tables">
-                      <VenueSelector3D
-                        floors={floors || []}
-                        rooms={rooms || []}
-                        tables={tables || []}
-                        selectedFloorId={selection.floorId}
-                        selectedRoomId={selection.roomId}
-                        selectedTableId={selection.tableId}
-                        onSelectFloor={handleSelectFloor}
-                        onSelectRoom={handleSelectRoom}
-                        onSelectTable={handleSelectTable}
-                        translations={{
-                          selectFloor: t.customer.selectFloor,
-                          selectRoom: t.customer.selectRoom,
-                          selectTable: t.customer.selectTable,
-                          noFloors: t.venue.noFloors,
-                          noRooms: t.venue.noRooms,
-                          noTables: t.venue.noTables,
-                          persons: t.venue.persons,
-                        }}
-                      />
-
-                      {/* Seçilen masa bilgisi */}
-                      {selection.tableId && (
-                        <div className="mt-6 p-4 bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-200 rounded-xl shadow-sm animate-fade-in">
-                          <p className="text-sm text-emerald-700 flex items-center gap-2">
-                            <CheckCircle className="h-5 w-5 text-emerald-500" />
-                            <span className="font-semibold">
-                              {getFloorName(selection.floorId)} → {getRoomName(selection.roomId)} → {getTableInfo(selection.tableId)?.name}
-                            </span>
-                            <span className="text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full text-xs">
-                              {getTableInfo(selection.tableId)?.capacity} {t.venue.persons}
-                            </span>
-                          </p>
-                        </div>
-                      )}
-
-                    </TabsContent>
-
-                    {/* Menu - Animasyonlu */}
-                    <TabsContent value="menu">
-                      <AnimatedMenu
-                        categories={categories || []}
-                        menuItems={menuItems || []}
-                        selectedItems={selection.items}
-                        onAddItem={handleAddItem}
-                        onRemoveItem={handleRemoveItem}
-                        onOpenItemDetail={handleOpenItemDetail}
-                        getItemQuantity={getItemQuantity}
-                        getItemNote={getItemNote}
-                        getItemExcludeIngredients={getItemExcludeIngredients}
-                        translations={{
-                          noCategories: t.menu.noCategories,
-                        }}
-                      />
-                    </TabsContent>
-
-                    {/* Ozet */}
-                    <TabsContent value="summary">
-                      <div className="space-y-4">
-                        {/* Seçilen Masa */}
-                        <div>
-                          <h4 className="font-medium mb-2">{t.customer.selectedTable}</h4>
-                          {selection.tableId ? (
-                            <div className="flex items-center gap-2">
-                              <Badge variant="secondary">
-                                {getFloorName(selection.floorId)} &gt; {getRoomName(selection.roomId)} &gt; {getTableInfo(selection.tableId)?.name}
-                              </Badge>
-                              <span className="text-sm text-slate-500">
-                                ({getTableInfo(selection.tableId)?.capacity} {t.venue.persons})
-                              </span>
-                            </div>
-                          ) : (
-                            <p className="text-sm text-slate-500">{t.customer.noTableSelected}</p>
-                          )}
-                        </div>
-
-                        <Separator />
-
-                        {/* Seçilen Ürünler */}
-                        <div>
-                          <h4 className="font-medium mb-2">{t.customer.selectedItems}</h4>
-                          {selection.items.length === 0 ? (
-                            <p className="text-sm text-slate-500">{t.customer.noItemsSelected}</p>
-                          ) : (
-                            <div className="space-y-2">
-                              {selection.items.map((item) => {
-                                const menuItem = getItemById(item.menuItemId);
-                                if (!menuItem) return null;
-                                return (
-                                  <div
-                                    key={item.menuItemId}
-                                    className="py-2 border-b"
-                                  >
-                                    <div className="flex items-center justify-between">
-                                      <div className="flex items-center gap-2">
-                                        <span className="font-medium">{item.quantity}x</span>
-                                        <span>{menuItem.name}</span>
-                                      </div>
-                                      <span className="font-medium">
-                                        {(menuItem.price * item.quantity).toFixed(2)} TL
-                                      </span>
-                                    </div>
-                                    {item.excludeIngredients && item.excludeIngredients.length > 0 && (
-                                      <p className="text-xs text-red-600 flex items-center gap-1 mt-1 ml-6">
-                                        <X className="h-3 w-3" />
-                                        Çıkarılacak: {item.excludeIngredients.join(', ')}
-                                      </p>
-                                    )}
-                                    {item.note && (
-                                      <p className="text-xs text-amber-600 flex items-center gap-1 mt-1 ml-6">
-                                        <MessageSquare className="h-3 w-3" />
-                                        {item.note}
-                                      </p>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-
-                        <Separator />
-
-                        {/* Toplam */}
-                        <div className="flex items-center justify-between text-lg font-bold">
-                          <span>{t.customer.total}</span>
-                          <span>{calculateTotal().toFixed(2)} TL</span>
-                        </div>
-                      </div>
-                    </TabsContent>
-                  </Tabs>
-                </CardContent>
-              </Card>
+            {tour.description && (
+              <p className="text-sm text-slate-600">{tour.description}</p>
             )}
-          </div>
-        </div>
-      </div>
 
-      {/* Menu Item Detail Modal */}
-      <Dialog open={!!selectedMenuItem} onOpenChange={() => handleCloseItemDetail()}>
-        <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col">
-          <DialogHeader className="flex-shrink-0">
-            <DialogTitle>{selectedMenuItem?.name}</DialogTitle>
-            <DialogDescription>{t.customer.itemDetails}</DialogDescription>
-          </DialogHeader>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+              {tour.tourCode && (
+                <InfoBadge icon={Ticket} label={t.customer.tourCode} value={tour.tourCode} />
+              )}
+              <InfoBadge
+                icon={Users}
+                label={t.customer.participants}
+                value={`${tour.currentParticipants}/${tour.maxParticipants}`}
+              />
+              <InfoBadge
+                icon={Calendar}
+                label={t.tours.startDate}
+                value={new Date(tour.startDate).toLocaleDateString('tr-TR')}
+              />
+              <InfoBadge
+                icon={Calendar}
+                label={t.tours.endDate}
+                value={new Date(tour.endDate).toLocaleDateString('tr-TR')}
+              />
+              {tour.agency && (
+                <InfoBadge icon={Building2} label={t.customer.agency} value={tour.agency.name} />
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
-          {selectedMenuItem && (
-            <div className="space-y-4 overflow-y-auto flex-1 pr-2">
-              {/* Image */}
-              {selectedMenuItem.photoUrl && (
-                <div className="w-full h-40 bg-slate-100 rounded-lg overflow-hidden flex-shrink-0">
+        {/* Gallery */}
+        {tour.photos && tour.photos.length > 0 && (
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <ImageIcon className="h-5 w-5 text-orange-500" />
+              <h3 className="text-lg font-bold text-slate-800">{t.customer.gallery}</h3>
+            </div>
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+              {tour.photos.map((photo, i) => (
+                <div key={photo.id || i} className="aspect-square rounded-xl overflow-hidden bg-slate-100">
                   <img
-                    src={selectedMenuItem.photoUrl}
-                    alt={selectedMenuItem.name}
+                    src={photo.imageUrl || ''}
+                    alt=""
                     className="w-full h-full object-cover"
                   />
                 </div>
-              )}
+              ))}
+            </div>
+          </div>
+        )}
 
-              {/* Description */}
-              <div>
-                <h4 className="font-medium text-sm text-slate-600 mb-1">{t.menu.itemDescription}</h4>
-                <p className="text-sm">
-                  {selectedMenuItem.description || t.customer.noDescription}
-                </p>
-              </div>
+        {/* Stops */}
+        <div>
+          <div className="flex items-center gap-2 mb-4">
+            <MapPin className="h-5 w-5 text-orange-500" />
+            <h3 className="text-lg font-bold text-slate-800">{t.customer.stops}</h3>
+            <span className="text-sm text-slate-500">({tour.stops?.length || 0})</span>
+          </div>
 
-              {/* Ingredients - İçindekiler */}
-              {selectedMenuItem.ingredients && selectedMenuItem.ingredients.length > 0 && (
-                <div>
-                  <h4 className="font-medium text-sm text-slate-600 mb-2">
-                    🥗 İçindekiler
-                    <span className="text-xs text-slate-400 ml-2">(Çıkarılmasını istediğinize tıklayın)</span>
-                  </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedMenuItem.ingredients.map((ingredient) => {
-                      const isExcluded = excludeIngredients.includes(ingredient);
-                      return (
-                        <button
-                          key={ingredient}
-                          type="button"
-                          onClick={() => toggleExcludeIngredient(ingredient)}
-                          className={`
-                            px-3 py-1.5 rounded-full text-sm font-medium transition-all
-                            ${isExcluded
-                              ? 'bg-red-100 text-red-700 border-2 border-red-300 line-through'
-                              : 'bg-emerald-50 text-emerald-700 border-2 border-emerald-200 hover:border-red-300 hover:bg-red-50'
-                            }
-                          `}
-                        >
-                          {isExcluded && <span className="mr-1">✕</span>}
-                          {ingredient}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {excludeIngredients.length > 0 && (
-                    <p className="text-xs text-red-600 mt-2 flex items-center gap-1">
-                      <Info className="h-3 w-3" />
-                      {excludeIngredients.length} malzeme çıkarılacak
-                    </p>
-                  )}
-                </div>
-              )}
+          {!tour.stops || tour.stops.length === 0 ? (
+            <Card className="bg-white border-dashed border-2 border-orange-200">
+              <CardContent className="p-8 text-center">
+                <MapPin className="h-12 w-12 text-orange-300 mx-auto mb-3" />
+                <h4 className="text-lg font-semibold text-slate-700 mb-2">{t.customer.noStops}</h4>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {tour.stops.map((stop: ClientTourStopDto) => {
+                const org = stop.organization;
+                const preResCfg = stop.preReservationStatus
+                  ? preResStatusConfig[stop.preReservationStatus] || preResStatusConfig.pending
+                  : null;
+                const isApproved = stop.preReservationStatus === 'approved';
+                const tableInfo = selectedTables[stop.id];
+                const menuItemCount = menuTotalItemCount(stop.id);
 
-              {/* Price */}
-              <div className="flex items-center justify-between">
-                <span className="font-medium">{t.menu.price}</span>
-                <span className="text-lg font-bold text-primary">
-                  {selectedMenuItem.price.toFixed(2)} TL
-                </span>
-              </div>
+                return (
+                  <Card key={stop.id} className="border-0 shadow-sm hover:shadow-md transition-all bg-white">
+                    <CardContent className="p-4">
+                      <div className="flex gap-3">
+                        {/* Org photo */}
+                        <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-100 shrink-0">
+                          {org.coverImageUrl ? (
+                            <img src={org.coverImageUrl} alt={org.name} className="w-full h-full object-cover" />
+                          ) : org.photos?.[0] ? (
+                            <img src={org.photos[0].imageUrl || ''} alt={org.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <Building2 className="h-6 w-6 text-slate-300" />
+                            </div>
+                          )}
+                        </div>
 
-              <Separator />
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <h4 className="font-bold text-slate-800">{org.name}</h4>
+                              {org.category && (
+                                <span className="text-xs text-slate-500">{org.category.name}</span>
+                              )}
+                            </div>
+                            {preResCfg && (
+                              <Badge variant="outline" className={`text-xs shrink-0 ${preResCfg.color}`}>
+                                {preResCfg.label}
+                              </Badge>
+                            )}
+                          </div>
 
-              {/* Quantity */}
-              <div className="flex items-center justify-between">
-                <span className="font-medium">{t.requests.headcount}</span>
-                <div className="flex items-center gap-3">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => setItemQuantity(Math.max(1, itemQuantity - 1))}
-                  >
-                    <Minus className="h-4 w-4" />
-                  </Button>
-                  <span className="w-8 text-center font-medium text-lg">{itemQuantity}</span>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => setItemQuantity(itemQuantity + 1)}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
+                          {/* Time */}
+                          {(stop.scheduledStartTime || stop.scheduledEndTime) && (
+                            <div className="flex items-center gap-1 text-xs text-slate-500 mt-1">
+                              <Clock className="h-3 w-3" />
+                              {stop.scheduledStartTime && new Date(stop.scheduledStartTime).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                              {stop.scheduledStartTime && stop.scheduledEndTime && ' - '}
+                              {stop.scheduledEndTime && new Date(stop.scheduledEndTime).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                          )}
 
-              {/* Note */}
-              <div>
-                <label className="font-medium text-sm text-slate-600 mb-2 block">
-                  {t.customer.addNote}
-                </label>
-                <Textarea
-                  placeholder={t.customer.notePlaceholder}
-                  value={itemNote}
-                  onChange={(e) => setItemNote(e.target.value)}
-                  rows={2}
-                />
-              </div>
+                          {/* Rating */}
+                          {org.totalReviews > 0 && (
+                            <div className="flex items-center gap-1 text-xs text-slate-500 mt-1">
+                              <Star className="h-3 w-3 text-amber-400 fill-amber-400" />
+                              {org.averageRating} ({org.totalReviews})
+                            </div>
+                          )}
 
-              {/* Total for this item */}
-              <div className="p-3 bg-slate-50 rounded-lg flex items-center justify-between">
-                <span className="font-medium">{t.customer.total}</span>
-                <span className="text-lg font-bold">
-                  {(selectedMenuItem.price * itemQuantity).toFixed(2)} TL
-                </span>
-              </div>
+                          {/* Description */}
+                          {stop.description && (
+                            <p className="text-xs text-slate-500 mt-1 line-clamp-1">{stop.description}</p>
+                          )}
+
+                          {/* Selected table indicator */}
+                          {tableInfo && (
+                            <div className="flex items-center gap-1 text-xs text-emerald-600 mt-1.5 font-medium">
+                              <Check className="h-3 w-3" />
+                              {t.customer.table}: {tableInfo.roomName} - {tableInfo.tableName}
+                            </div>
+                          )}
+
+                          {/* Selected menu items indicator */}
+                          {menuItemCount > 0 && (
+                            <div className="flex items-center gap-1 text-xs text-emerald-600 mt-1 font-medium">
+                              <Check className="h-3 w-3" />
+                              {t.customer.selectedItems}: {menuItemCount} {t.customer.quantity}
+                            </div>
+                          )}
+
+                          {/* Action buttons */}
+                          <div className="flex gap-2 mt-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className={`text-xs ${isApproved
+                                ? 'text-orange-600 border-orange-200 hover:bg-orange-50'
+                                : 'text-slate-400 border-slate-200 cursor-not-allowed'
+                              }`}
+                              onClick={() => isApproved && openTableDialog(stop.id)}
+                              disabled={!isApproved}
+                              title={!isApproved ? t.customer.tableApprovalRequired : ''}
+                            >
+                              <Armchair className="h-3 w-3 mr-1" />
+                              {tableInfo ? t.customer.changeTable : t.customer.selectSeat}
+                            </Button>
+
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className={`text-xs ${isApproved && tableInfo
+                                ? 'text-orange-600 border-orange-200 hover:bg-orange-50'
+                                : 'text-slate-400 border-slate-200 cursor-not-allowed'
+                              }`}
+                              onClick={() => isApproved && tableInfo && setMenuStopId(stop.id)}
+                              disabled={!isApproved || !tableInfo}
+                              title={!isApproved ? t.customer.menuApprovalRequired : !tableInfo ? t.customer.selectTableFirst : ''}
+                            >
+                              <UtensilsCrossed className="h-3 w-3 mr-1" />
+                              {t.customer.selectMenuAction}
+                              {menuItemCount > 0 && (
+                                <span className="ml-1 bg-orange-100 text-orange-700 rounded-full px-1.5 text-[10px] font-bold">
+                                  {menuItemCount}
+                                </span>
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           )}
+        </div>
+      </div>
 
-          <DialogFooter className="flex gap-2 sm:gap-0 flex-shrink-0 pt-4 border-t">
-            {getItemQuantity(selectedMenuItem?.id || '') > 0 && (
-              <Button variant="destructive" onClick={handleRemoveItemFromDetail}>
-                <X className="h-4 w-4 mr-2" />
-                {t.common.delete}
-              </Button>
+      {/* ============================================ */}
+      {/* Table Selection Dialog */}
+      {/* ============================================ */}
+      <Dialog open={!!tableStopId} onOpenChange={() => closeTableDialog()}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle className="flex items-center gap-2">
+              <Armchair className="h-5 w-5 text-orange-500" />
+              {t.customer.selectSeat}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto pr-1">
+            {layoutLoading ? (
+              <LoadingState message={t.common.loading} />
+            ) : layoutError ? (
+              <div className="text-center py-8">
+                <p className="text-red-500">{(layoutError as Error).message}</p>
+              </div>
+            ) : floors.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-slate-500">{t.customer.noLayout}</p>
+              </div>
+            ) : (
+              <CustomerVenueSelector
+                floors={floors}
+                childrenCache={childrenCache}
+                loadingChildren={loadingChildren}
+                fetchChildren={fetchChildren}
+                onSelectChair={handleSelectChair}
+                savingTable={savingTable}
+                existingResourceId={tableStopId ? selectedTables[tableStopId]?.resourceId : undefined}
+              />
             )}
-            <Button onClick={handleAddItemFromDetail}>
-              <Plus className="h-4 w-4 mr-2" />
-              {getItemQuantity(selectedMenuItem?.id || '') > 0 ? t.common.update : t.common.create}
-            </Button>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
+
+      {/* ============================================ */}
+      {/* Menu Selection Dialog */}
+      {/* ============================================ */}
+      <Dialog open={!!menuStopId} onOpenChange={() => setMenuStopId(null)}>
+        <DialogContent className="sm:max-w-lg max-h-[85vh] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle className="flex items-center gap-2">
+              <UtensilsCrossed className="h-5 w-5 text-orange-500" />
+              {t.customer.selectMenuAction}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto pr-1">
+            {menuLoading ? (
+              <LoadingState message={t.common.loading} />
+            ) : menuError ? (
+              <div className="text-center py-8">
+                <p className="text-red-500">{(menuError as Error).message}</p>
+              </div>
+            ) : menuCategories.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-slate-500">{t.customer.noMenu}</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {menuCategories.map((cat) => (
+                  <InteractiveMenuCategory
+                    key={cat.id}
+                    category={cat}
+                    t={t}
+                    showPrice={tour.stops?.find(s => s.id === menuStopId)?.showPriceToCustomer ?? true}
+                    stopId={menuStopId!}
+                    getItemQty={getItemQty}
+                    setItemQty={setItemQty}
+                    getItemNote={getItemNote}
+                    setItemNote={setItemNote}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Bottom bar with total */}
+          {menuStopId && menuCategories.length > 0 && (
+            <MenuBottomBar
+              stopId={menuStopId}
+              categories={menuCategories}
+              showPrice={tour.stops?.find(s => s.id === menuStopId)?.showPriceToCustomer ?? true}
+              getMenuTotal={getMenuTotal}
+              menuTotalItemCount={menuTotalItemCount}
+              t={t}
+              onSave={() => setMenuStopId(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// ============================================
+// Helper Components
+// ============================================
+
+function InfoBadge({ icon: Icon, label, value }: { icon: React.ComponentType<{ className?: string }>; label: string; value: string }) {
+  return (
+    <div className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg">
+      <Icon className="h-4 w-4 text-slate-400 shrink-0" />
+      <div className="min-w-0">
+        <p className="text-xs text-slate-500">{label}</p>
+        <p className="font-medium text-slate-800 text-sm truncate">{value}</p>
+      </div>
+    </div>
+  );
+}
+
+function InteractiveMenuCategory({
+  category,
+  t,
+  depth = 0,
+  showPrice,
+  stopId,
+  getItemQty,
+  setItemQty,
+  getItemNote,
+  setItemNote,
+}: {
+  category: ClientStopMenuCategoryDto;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  t: any;
+  depth?: number;
+  showPrice: boolean;
+  stopId: number;
+  getItemQty: (stopId: number, serviceId: number) => number;
+  setItemQty: (stopId: number, serviceId: number, qty: number) => void;
+  getItemNote: (stopId: number, serviceId: number) => string;
+  setItemNote: (stopId: number, serviceId: number, note: string) => void;
+}) {
+  const priceLabel = (type: string) => {
+    if (type === 'fixed') return '';
+    if (type === 'per_person') return `/ ${t.menu?.perPerson ?? 'kişi'}`;
+    if (type === 'per_hour') return `/ ${t.menu?.perHour ?? 'saat'}`;
+    if (type === 'per_day') return `/ ${t.menu?.perDay ?? 'gün'}`;
+    return '';
+  };
+
+  return (
+    <div>
+      {/* Category header — matches restaurant preview */}
+      {(category.services?.length > 0 || category.child_service_categories?.length > 0) && (
+        depth === 0 ? (
+          <div className="bg-gradient-to-r from-stone-800 to-stone-700 px-4 py-3 rounded-xl mb-3">
+            <h3 className="text-lg font-bold text-white">{category.name}</h3>
+          </div>
+        ) : (
+          <div className="px-4 py-2 mb-2">
+            <h4 className="text-sm font-semibold text-stone-600 border-b border-stone-200 pb-1">{category.name}</h4>
+          </div>
+        )
+      )}
+
+      {/* Services — restaurant preview style with +/- controls */}
+      {category.services && category.services.length > 0 && (
+        <div className="space-y-1 mb-3">
+          {category.services.map((svc) => {
+            const qty = getItemQty(stopId, svc.id);
+            const note = getItemNote(stopId, svc.id);
+            return (
+              <div key={svc.id} className={`rounded-lg transition-colors ${qty > 0 ? 'bg-orange-50/80 ring-1 ring-orange-200' : 'hover:bg-white/60'}`}>
+                <div className="flex gap-3 p-2">
+                  {svc.imageUrl ? (
+                    <img src={svc.imageUrl} alt={svc.title} className="w-14 h-14 rounded-md object-cover flex-shrink-0 shadow-sm" />
+                  ) : (
+                    <div className="w-14 h-14 rounded-md bg-stone-100 flex items-center justify-center flex-shrink-0">
+                      <ImageIcon className="h-5 w-5 text-stone-300" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0 py-0.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-stone-800 leading-tight">{svc.title}</p>
+                        {svc.subTitle && (
+                          <p className="text-xs text-stone-500 mt-0.5 leading-tight">{svc.subTitle}</p>
+                        )}
+                      </div>
+                      {showPrice && (
+                        <div className="text-right flex-shrink-0">
+                          <p className="text-sm font-bold text-emerald-700">{Number(svc.basePrice).toFixed(2)} ₺</p>
+                          {svc.priceType !== 'fixed' && (
+                            <p className="text-[10px] text-stone-400">{priceLabel(svc.priceType)}</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    {svc.description && (
+                      <p className="text-[11px] text-stone-400 mt-1 line-clamp-2 leading-snug">{svc.description}</p>
+                    )}
+                    {/* Note indicator when collapsed */}
+                    {qty > 0 && note && (
+                      <span className="inline-flex items-center gap-1 text-[11px] text-amber-600 mt-1">
+                        <MessageSquare className="h-3 w-3" />
+                        {note.length > 30 ? note.slice(0, 30) + '...' : note}
+                      </span>
+                    )}
+                  </div>
+                  {/* Quantity controls */}
+                  <div className="shrink-0 flex items-center gap-1 self-center">
+                    <button
+                      className="w-7 h-7 rounded-full border border-stone-300 flex items-center justify-center hover:bg-stone-100 disabled:opacity-30 transition-colors"
+                      onClick={() => setItemQty(stopId, svc.id, qty - 1)}
+                      disabled={qty === 0}
+                    >
+                      <Minus className="h-3 w-3" />
+                    </button>
+                    <span className={`w-6 text-center text-sm font-bold ${qty > 0 ? 'text-orange-600' : 'text-stone-400'}`}>
+                      {qty}
+                    </span>
+                    <button
+                      className="w-7 h-7 rounded-full border border-orange-300 bg-orange-50 flex items-center justify-center hover:bg-orange-100 transition-colors"
+                      onClick={() => setItemQty(stopId, svc.id, qty + 1)}
+                    >
+                      <Plus className="h-3 w-3 text-orange-600" />
+                    </button>
+                  </div>
+                </div>
+                {/* Note input — visible when item is selected */}
+                {qty > 0 && (
+                  <div className="px-2 pb-2">
+                    <div className="flex items-start gap-2 ml-[68px]">
+                      <MessageSquare className="h-3.5 w-3.5 text-stone-400 mt-1.5 shrink-0" />
+                      <input
+                        type="text"
+                        value={note}
+                        onChange={(e) => setItemNote(stopId, svc.id, e.target.value)}
+                        placeholder={t.customer?.notePlaceholder ?? 'Bu ürün için özel istekler...'}
+                        className="flex-1 text-xs bg-white/80 border border-stone-200 rounded-lg px-2.5 py-1.5 text-stone-700 placeholder:text-stone-300 focus:outline-none focus:ring-1 focus:ring-orange-300 focus:border-orange-300"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Child categories */}
+      {category.child_service_categories && category.child_service_categories.length > 0 && (
+        <div className="space-y-3">
+          {category.child_service_categories.map((child) => (
+            <InteractiveMenuCategory
+              key={child.id}
+              category={child}
+              t={t}
+              depth={depth + 1}
+              showPrice={showPrice}
+              stopId={stopId}
+              getItemQty={getItemQty}
+              setItemQty={setItemQty}
+              getItemNote={getItemNote}
+              setItemNote={setItemNote}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MenuBottomBar({
+  stopId,
+  categories,
+  showPrice,
+  getMenuTotal,
+  menuTotalItemCount,
+  t,
+  onSave,
+}: {
+  stopId: number;
+  categories: ClientStopMenuCategoryDto[];
+  showPrice: boolean;
+  getMenuTotal: (stopId: number, categories: ClientStopMenuCategoryDto[]) => number;
+  menuTotalItemCount: (stopId: number) => number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  t: any;
+  onSave: () => void;
+}) {
+  const totalItems = menuTotalItemCount(stopId);
+  const totalPrice = getMenuTotal(stopId, categories);
+
+  if (totalItems === 0) return null;
+
+  return (
+    <div className="flex-shrink-0 border-t border-slate-200 pt-3 mt-2">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm text-slate-600">
+            {totalItems} {t.customer.quantity}
+          </p>
+          {showPrice && (
+            <p className="text-lg font-bold text-orange-600">
+              {t.customer.total}: ₺{totalPrice.toFixed(2)}
+            </p>
+          )}
+        </div>
+        <Button
+          className="bg-orange-500 hover:bg-orange-600 text-white"
+          onClick={onSave}
+        >
+          <Check className="h-4 w-4 mr-1" />
+          {t.customer.saveSelection}
+        </Button>
+      </div>
     </div>
   );
 }

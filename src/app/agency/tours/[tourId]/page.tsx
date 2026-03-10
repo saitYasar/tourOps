@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -20,15 +20,24 @@ import {
   CheckCircle,
   Image as ImageIcon,
   UserCheck,
+  UserPlus,
   Link2,
   Copy,
+  Search,
+  Mail,
+  Phone,
+  CalendarPlus,
+  Star,
+  MapPin,
+  Loader2,
+  Percent,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import dynamic from 'next/dynamic';
 
 import { tourApi, tourStopApi, apiClient, agencyApi } from '@/lib/api';
-import type { ApiTourDto, ApiTourStopDto, CreateTourStopPayload, UpdateTourPayload, ServiceRequestDto, OrganizationPublicDto, TourClientDto } from '@/lib/api';
+import type { ApiTourDto, ApiTourStopDto, CreateTourStopPayload, UpdateTourPayload, ServiceRequestDto, OrganizationPublicDto, TourClientDto, AgencyClientDto } from '@/lib/api';
 import { formatDate } from '@/lib/dateUtils';
 import { useLanguage } from '@/contexts/LanguageContext';
 
@@ -79,6 +88,7 @@ export default function TourDetailPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { t, locale } = useLanguage();
+  const apiLang = (locale === 'de' ? 'en' : locale) as 'tr' | 'en';
   const tourId = Number(params.tourId);
 
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -87,6 +97,14 @@ export default function TourDetailPage() {
   const [deleteStopTarget, setDeleteStopTarget] = useState<ApiTourStopDto | null>(null);
   const [statusAction, setStatusAction] = useState<'publish' | 'cancel' | 'complete' | null>(null);
   const [highlightedStopId, setHighlightedStopId] = useState<number | null>(null);
+  const [deletePhotoId, setDeletePhotoId] = useState<number | null>(null);
+  const [isAddParticipantOpen, setIsAddParticipantOpen] = useState(false);
+  const [addParticipantSearch, setAddParticipantSearch] = useState('');
+  const [addParticipantNotes, setAddParticipantNotes] = useState('');
+  const [requestStatusFilter, setRequestStatusFilter] = useState<string>('all');
+  const [orgSearch, setOrgSearch] = useState('');
+  const [orgSearchDebounced, setOrgSearchDebounced] = useState('');
+  const [selectedOrgDetail, setSelectedOrgDetail] = useState<OrganizationPublicDto | null>(null);
 
   // Edit form state
   const [editForm, setEditForm] = useState({
@@ -126,9 +144,9 @@ export default function TourDetailPage() {
     isLoading: tourLoading,
     error: tourError,
   } = useQuery({
-    queryKey: ['agency-tour', tourId],
+    queryKey: ['agency-tour', tourId, apiLang],
     queryFn: async () => {
-      const result = await tourApi.getById(tourId);
+      const result = await tourApi.getById(tourId, apiLang);
       if (!result.success) throw new Error(result.error);
       return result.data!;
     },
@@ -137,9 +155,9 @@ export default function TourDetailPage() {
 
   // Query: Tour stops
   const { data: stops, isLoading: stopsLoading } = useQuery({
-    queryKey: ['tour-stops', tourId],
+    queryKey: ['tour-stops', tourId, apiLang],
     queryFn: async () => {
-      const result = await tourStopApi.list(tourId);
+      const result = await tourStopApi.list(tourId, apiLang);
       if (!result.success) throw new Error(result.error);
       return result.data!;
     },
@@ -167,11 +185,21 @@ export default function TourDetailPage() {
     enabled: !!tourId,
   });
 
+  // Query: Agency clients (for add participant)
+  const { data: agencyClients } = useQuery({
+    queryKey: ['agency-clients-all'],
+    queryFn: async () => {
+      const response = await apiClient.getAgencyClients(1, 200);
+      return response.data;
+    },
+    enabled: isAddParticipantOpen,
+  });
+
   // Query: All organizations (for map + stop form)
   const { data: allOrganizations } = useQuery({
-    queryKey: ['organizations-public-all'],
+    queryKey: ['organizations-public-all', apiLang],
     queryFn: async () => {
-      const response = await apiClient.getOrganizationsPublic(1, 100);
+      const response = await apiClient.getOrganizationsPublic(1, 100, undefined, apiLang);
       return response.data;
     },
     enabled: !!tourId,
@@ -179,6 +207,22 @@ export default function TourDetailPage() {
 
   // organizations list for both map and stop form
   const organizations = allOrganizations;
+
+  // Debounced organization search for stop form
+  useEffect(() => {
+    const timer = setTimeout(() => setOrgSearchDebounced(orgSearch), 300);
+    return () => clearTimeout(timer);
+  }, [orgSearch]);
+
+  // Query: Search organizations for stop form
+  const { data: searchedOrgs, isLoading: orgSearchLoading } = useQuery({
+    queryKey: ['org-search', orgSearchDebounced, apiLang],
+    queryFn: async () => {
+      const response = await apiClient.getOrganizationsPublic(1, 20, orgSearchDebounced || undefined, apiLang);
+      return response.data || [];
+    },
+    enabled: isStopFormOpen,
+  });
 
   // Mutations
 
@@ -191,6 +235,25 @@ export default function TourDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tour-clients', tourId] });
       toast.success(t.tours.statusUpdated);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+
+  const addParticipantMutation = useMutation({
+    mutationFn: async ({ clientId, notes }: { clientId: number; notes?: string }) => {
+      const result = await tourApi.addParticipant(tourId, clientId, notes);
+      if (!result.success) throw new Error(result.error);
+      return result.data!;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tour-clients', tourId] });
+      queryClient.invalidateQueries({ queryKey: ['tour-detail', tourId] });
+      toast.success(t.tours.participantAdded);
+      setIsAddParticipantOpen(false);
+      setAddParticipantSearch('');
+      setAddParticipantNotes('');
     },
     onError: (error: Error) => {
       toast.error(error.message);
@@ -212,7 +275,8 @@ export default function TourDetailPage() {
         tourId,
         payload,
         editCoverFile || undefined,
-        editGalleryFiles.length > 0 ? editGalleryFiles : undefined
+        editGalleryFiles.length > 0 ? editGalleryFiles : undefined,
+        apiLang
       );
       if (!result.success) throw new Error(result.error);
       return result.data;
@@ -271,7 +335,7 @@ export default function TourDetailPage() {
         scheduledEndTime: stopForm.scheduledEndTime,
         showPriceToCustomer: stopForm.showPriceToCustomer,
       };
-      const result = await tourStopApi.create(payload);
+      const result = await tourStopApi.create(payload, apiLang);
       if (!result.success) throw new Error(result.error);
       return result.data;
     },
@@ -294,7 +358,7 @@ export default function TourDetailPage() {
         scheduledStartTime: stopForm.scheduledStartTime,
         scheduledEndTime: stopForm.scheduledEndTime,
         showPriceToCustomer: stopForm.showPriceToCustomer,
-      });
+      }, apiLang);
       if (!result.success) throw new Error(result.error);
       return result.data;
     },
@@ -310,7 +374,7 @@ export default function TourDetailPage() {
 
   const deleteStopMutation = useMutation({
     mutationFn: async (id: number) => {
-      const result = await tourStopApi.delete(id);
+      const result = await tourStopApi.delete(id, apiLang);
       if (!result.success) throw new Error(result.error);
     },
     onSuccess: () => {
@@ -362,6 +426,8 @@ export default function TourDetailPage() {
       scheduledEndTime: defaults.end,
       showPriceToCustomer: false,
     });
+    setOrgSearch('');
+    setSelectedOrgDetail(null);
     setIsStopFormOpen(true);
   };
 
@@ -374,6 +440,15 @@ export default function TourDetailPage() {
       scheduledEndTime: stop.scheduledEndTime ? stop.scheduledEndTime.substring(0, 16) : '',
       showPriceToCustomer: stop.showPriceToCustomer || false,
     });
+    // Find org from existing data for edit mode
+    const existingOrg = organizations?.find((o) => o.id === stop.organizationId);
+    if (existingOrg) {
+      setSelectedOrgDetail(existingOrg);
+      setOrgSearch(existingOrg.name);
+    } else {
+      setOrgSearch('');
+      setSelectedOrgDetail(null);
+    }
     setIsStopFormOpen(true);
   };
 
@@ -388,6 +463,8 @@ export default function TourDetailPage() {
       scheduledEndTime: defaults.end,
       showPriceToCustomer: false,
     });
+    setSelectedOrgDetail(org);
+    setOrgSearch(org.name);
     setIsStopFormOpen(true);
   };
 
@@ -401,6 +478,8 @@ export default function TourDetailPage() {
       scheduledEndTime: '',
       showPriceToCustomer: false,
     });
+    setOrgSearch('');
+    setSelectedOrgDetail(null);
   };
 
   const handleEditSubmit = (e: React.FormEvent) => {
@@ -622,7 +701,7 @@ export default function TourDetailPage() {
                               {tour.status === 'draft' && (
                                 <button
                                   type="button"
-                                  onClick={() => deletePhotoMutation.mutate(img.id)}
+                                  onClick={() => setDeletePhotoId(img.id)}
                                   className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
                                 >
                                   <X className="h-3 w-3" />
@@ -849,45 +928,85 @@ export default function TourDetailPage() {
           {/* Requests Tab */}
           <TabsContent value="requests" className="space-y-4">
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-lg">{t.tours.requests}</CardTitle>
+                <Select value={requestStatusFilter} onValueChange={setRequestStatusFilter}>
+                  <SelectTrigger className="w-[160px] h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tümü</SelectItem>
+                    <SelectItem value="pending">{t.tours.statusPending}</SelectItem>
+                    <SelectItem value="approved">{t.tours.statusConfirmed}</SelectItem>
+                    <SelectItem value="rejected">{t.tours.statusCancelled}</SelectItem>
+                    <SelectItem value="completed">{t.tours.statusCompleted || 'Tamamlandı'}</SelectItem>
+                    <SelectItem value="cancelled">İptal Edildi</SelectItem>
+                  </SelectContent>
+                </Select>
               </CardHeader>
               <CardContent>
-                {!serviceRequests?.length ? (
-                  <EmptyState
-                    icon={Store}
-                    title={t.tours.noRequests}
-                    description={t.tours.noRequests}
-                  />
-                ) : (
-                  <div className="space-y-3">
-                    {serviceRequests.map((request: ServiceRequestDto) => (
-                      <div
-                        key={request.id}
-                        className="flex items-center justify-between p-4 border rounded-lg"
-                      >
-                        <div className="flex items-center gap-4">
-                          <Store className="h-8 w-8 text-slate-400" />
-                          <div>
-                            <h4 className="font-medium">
-                              Organization #{request.organizationId}
-                            </h4>
-                            <div className="flex items-center gap-4 text-sm text-slate-500">
-                              <span className="flex items-center gap-1">
-                                <Calendar className="h-3 w-3" />
-                                {formatDate(request.requestedDate)}
-                              </span>
-                              <span className="capitalize">{request.requestType.replace('_', ' ')}</span>
+                {(() => {
+                  const requestStatusLabels: Record<string, string> = {
+                    pending: t.tours.statusPending,
+                    approved: t.tours.statusConfirmed,
+                    rejected: 'Reddedildi',
+                    cancelled: 'İptal Edildi',
+                    completed: t.tours.statusCompleted || 'Tamamlandı',
+                  };
+                  const requestTypeLabels: Record<string, string> = {
+                    pre_reservation: 'Ön Rezervasyon',
+                    service_selection: 'Hizmet Seçimi',
+                  };
+                  const filtered = (serviceRequests || []).filter((r: ServiceRequestDto) =>
+                    requestStatusFilter === 'all' || r.status === requestStatusFilter
+                  );
+                  const orgNameMap = new Map<number, string>();
+                  (stops || []).forEach((s: ApiTourStopDto) => {
+                    if (s.organization?.name) orgNameMap.set(s.organizationId, s.organization.name);
+                  });
+                  (organizations || []).forEach((o: OrganizationPublicDto) => {
+                    if (!orgNameMap.has(o.id)) orgNameMap.set(o.id, o.name);
+                  });
+
+                  if (!filtered.length) {
+                    return (
+                      <EmptyState
+                        icon={Store}
+                        title={t.tours.noRequests}
+                        description={t.tours.noRequests}
+                      />
+                    );
+                  }
+                  return (
+                    <div className="space-y-3">
+                      {filtered.map((request: ServiceRequestDto) => (
+                        <div
+                          key={request.id}
+                          className="flex items-center justify-between p-4 border rounded-lg"
+                        >
+                          <div className="flex items-center gap-4">
+                            <Store className="h-8 w-8 text-slate-400" />
+                            <div>
+                              <h4 className="font-medium">
+                                {orgNameMap.get(request.organizationId) || `İşletme #${request.organizationId}`}
+                              </h4>
+                              <div className="flex items-center gap-4 text-sm text-slate-500">
+                                <span className="flex items-center gap-1">
+                                  <Calendar className="h-3 w-3" />
+                                  {formatDate(request.requestedDate)}
+                                </span>
+                                <span>{requestTypeLabels[request.requestType] || request.requestType}</span>
+                              </div>
                             </div>
                           </div>
+                          <Badge variant="outline" className={getStatusBadge(request.status)}>
+                            {requestStatusLabels[request.status] || request.status}
+                          </Badge>
                         </div>
-                        <Badge variant="outline" className={getStatusBadge(request.status)}>
-                          {request.status}
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                      ))}
+                    </div>
+                  );
+                })()}
               </CardContent>
             </Card>
           </TabsContent>
@@ -895,8 +1014,12 @@ export default function TourDetailPage() {
           {/* Clients Tab */}
           <TabsContent value="clients" className="space-y-4">
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-lg">{t.tours.clients}</CardTitle>
+                <Button size="sm" onClick={() => setIsAddParticipantOpen(true)}>
+                  <UserPlus className="h-4 w-4 mr-1" />
+                  {t.tours.addParticipant}
+                </Button>
               </CardHeader>
               <CardContent>
                 {!tourClients?.length ? (
@@ -922,51 +1045,83 @@ export default function TourDetailPage() {
                         completed: t.tours.statusCompleted || 'Tamamlandı',
                         no_show: t.tours.statusNoShow || 'Gelmedi',
                       };
+                      const fullName = `${tc.client.firstName} ${tc.client.lastName}`;
+                      const initials = `${tc.client.firstName?.[0] || ''}${tc.client.lastName?.[0] || ''}`.toUpperCase();
+                      const phoneDisplay = tc.client.phone
+                        ? `${tc.client.phoneCountryCode || ''} ${tc.client.phone}`.trim()
+                        : null;
+
                       return (
                         <div
                           key={tc.id}
-                          className="flex items-center justify-between p-4 border rounded-lg"
+                          className="p-4 border rounded-lg hover:border-slate-300 transition-colors"
                         >
-                          <div className="flex items-center gap-4">
-                            {tc.client.profilePhoto ? (
-                              <img
-                                src={tc.client.profilePhoto}
-                                alt={`${tc.client.firstName} ${tc.client.lastName}`}
-                                className="h-10 w-10 rounded-full object-cover"
-                              />
-                            ) : (
-                              <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center">
-                                <UserCheck className="h-5 w-5 text-slate-400" />
+                          <div className="flex items-start justify-between gap-4">
+                            {/* Left: Avatar + Info */}
+                            <div className="flex items-start gap-3 min-w-0 flex-1">
+                              {tc.client.profilePhoto ? (
+                                <img
+                                  src={tc.client.profilePhoto}
+                                  alt={fullName}
+                                  className="h-11 w-11 rounded-full object-cover flex-shrink-0"
+                                />
+                              ) : (
+                                <div className="h-11 w-11 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0">
+                                  <span className="text-sm font-semibold text-blue-600">{initials}</span>
+                                </div>
+                              )}
+                              <div className="min-w-0">
+                                <h4 className="font-semibold text-sm">{fullName}</h4>
+                                {/* Contact details */}
+                                <div className="mt-1 space-y-0.5">
+                                  {tc.client.email && (
+                                    <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                                      <Mail className="h-3 w-3 flex-shrink-0" />
+                                      <span className="truncate">{tc.client.email}</span>
+                                    </div>
+                                  )}
+                                  {phoneDisplay && (
+                                    <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                                      <Phone className="h-3 w-3 flex-shrink-0" />
+                                      <span>{phoneDisplay}</span>
+                                    </div>
+                                  )}
+                                  {tc.createdAt && (
+                                    <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                                      <CalendarPlus className="h-3 w-3 flex-shrink-0" />
+                                      <span>{formatDate(tc.createdAt)}</span>
+                                    </div>
+                                  )}
+                                </div>
+                                {tc.notes && (
+                                  <p className="mt-1 text-xs text-slate-500 italic">{tc.notes}</p>
+                                )}
                               </div>
-                            )}
-                            <div>
-                              <h4 className="font-medium">
-                                {tc.client.firstName} {tc.client.lastName}
-                              </h4>
-                              <p className="text-sm text-slate-500">@{tc.client.username}</p>
                             </div>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <Badge variant="outline" className={clientStatusColors[tc.status] || ''}>
-                              {clientStatusLabels[tc.status] || tc.status}
-                            </Badge>
-                            <Select
-                              value={tc.status}
-                              onValueChange={(value) =>
-                                updateClientStatusMutation.mutate({ participantId: tc.id, status: value })
-                              }
-                            >
-                              <SelectTrigger className="w-[140px] h-8 text-xs">
-                                <SelectValue placeholder={t.tours.changeStatus} />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="pending">{t.tours.statusPending}</SelectItem>
-                                <SelectItem value="confirmed">{t.tours.statusConfirmed}</SelectItem>
-                                <SelectItem value="cancelled">{t.tours.statusCancelled}</SelectItem>
-                                <SelectItem value="completed">{t.tours.statusCompleted || 'Tamamlandı'}</SelectItem>
-                                <SelectItem value="no_show">{t.tours.statusNoShow || 'Gelmedi'}</SelectItem>
-                              </SelectContent>
-                            </Select>
+
+                            {/* Right: Status + Controls */}
+                            <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                              <Badge variant="outline" className={clientStatusColors[tc.status] || ''}>
+                                {clientStatusLabels[tc.status] || tc.status}
+                              </Badge>
+                              <Select
+                                value={tc.status}
+                                onValueChange={(value) =>
+                                  updateClientStatusMutation.mutate({ participantId: tc.id, status: value })
+                                }
+                              >
+                                <SelectTrigger className="w-[140px] h-8 text-xs">
+                                  <SelectValue placeholder={t.tours.changeStatus} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="pending">{t.tours.statusPending}</SelectItem>
+                                  <SelectItem value="confirmed">{t.tours.statusConfirmed}</SelectItem>
+                                  <SelectItem value="cancelled">{t.tours.statusCancelled}</SelectItem>
+                                  <SelectItem value="completed">{t.tours.statusCompleted || 'Tamamlandı'}</SelectItem>
+                                  <SelectItem value="no_show">{t.tours.statusNoShow || 'Gelmedi'}</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
                           </div>
                         </div>
                       );
@@ -1134,7 +1289,7 @@ export default function TourDetailPage() {
 
       {/* Stop Form Dialog */}
       <Dialog open={isStopFormOpen} onOpenChange={setIsStopFormOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingStop ? t.tours.editStop : t.tours.addStop}
@@ -1142,32 +1297,133 @@ export default function TourDetailPage() {
           </DialogHeader>
           <form onSubmit={handleStopSubmit}>
             <div className="space-y-4 py-4">
-              {/* Organization Select */}
+              {/* Organization Search */}
               <div className="space-y-2">
                 <Label>{t.tours.organization} *</Label>
-                <Select
-                  value={stopForm.organizationId ? String(stopForm.organizationId) : ''}
-                  onValueChange={(value) => setStopForm((prev) => ({ ...prev, organizationId: Number(value) }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={t.tours.selectOrganization} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {organizations && organizations.map((org) => (
-                      <SelectItem key={org.id} value={String(org.id)}>
-                        <div className="flex items-center gap-2">
-                          <Store className="h-4 w-4 text-slate-400 shrink-0" />
-                          <span>{org.name}</span>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input
+                    placeholder={t.customer.searchOrganizations}
+                    value={orgSearch}
+                    onChange={(e) => {
+                      setOrgSearch(e.target.value);
+                      if (selectedOrgDetail) {
+                        setSelectedOrgDetail(null);
+                        setStopForm((prev) => ({ ...prev, organizationId: 0 }));
+                      }
+                    }}
+                    className="pl-9"
+                  />
+                  {orgSearchLoading && (
+                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-slate-400" />
+                  )}
+                </div>
+
+                {/* Search results dropdown */}
+                {!selectedOrgDetail && searchedOrgs && searchedOrgs.length > 0 && (
+                  <div className="border rounded-lg max-h-48 overflow-y-auto bg-white shadow-sm">
+                    {searchedOrgs.map((org) => (
+                      <button
+                        key={org.id}
+                        type="button"
+                        className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 text-left transition-colors border-b last:border-b-0"
+                        onClick={() => {
+                          setStopForm((prev) => ({ ...prev, organizationId: org.id }));
+                          setSelectedOrgDetail(org);
+                          setOrgSearch(org.name);
+                        }}
+                      >
+                        <Store className="h-4 w-4 text-slate-400 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{org.name}</p>
+                          {org.address && (
+                            <p className="text-xs text-slate-500 truncate">{org.address}</p>
+                          )}
                         </div>
-                      </SelectItem>
+                        {org.averageRating > 0 && (
+                          <div className="flex items-center gap-0.5 text-xs text-amber-600 shrink-0">
+                            <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                            {Number(org.averageRating).toFixed(1)}
+                          </div>
+                        )}
+                      </button>
                     ))}
-                  </SelectContent>
-                </Select>
+                  </div>
+                )}
+
+                {!selectedOrgDetail && orgSearch && !orgSearchLoading && searchedOrgs && searchedOrgs.length === 0 && (
+                  <p className="text-sm text-slate-500 text-center py-2">{t.common.notFoundDesc}</p>
+                )}
+
+                {/* Selected organization detail card */}
+                {selectedOrgDetail && (
+                  <Card className="border-green-200 bg-green-50/50">
+                    <CardContent className="p-3 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <CheckCircle className="h-4 w-4 text-green-600 shrink-0" />
+                          <span className="font-medium text-sm truncate">{selectedOrgDetail.name}</span>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 shrink-0"
+                          onClick={() => {
+                            setSelectedOrgDetail(null);
+                            setStopForm((prev) => ({ ...prev, organizationId: 0 }));
+                            setOrgSearch('');
+                          }}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-600">
+                        {selectedOrgDetail.address && (
+                          <div className="col-span-2 flex items-start gap-1">
+                            <MapPin className="h-3 w-3 mt-0.5 shrink-0 text-slate-400" />
+                            <span>{selectedOrgDetail.address}</span>
+                          </div>
+                        )}
+                        {selectedOrgDetail.description && (
+                          <div className="col-span-2 text-slate-500 line-clamp-2">
+                            {selectedOrgDetail.description}
+                          </div>
+                        )}
+                        {selectedOrgDetail.averageRating > 0 && (
+                          <div className="flex items-center gap-1">
+                            <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                            <span>{Number(selectedOrgDetail.averageRating).toFixed(1)} ({selectedOrgDetail.totalReviews})</span>
+                          </div>
+                        )}
+                        {(selectedOrgDetail as any).agencyCommissionRate != null && (
+                          <div className="flex items-center gap-1">
+                            <Percent className="h-3 w-3 text-slate-400" />
+                            <span>{t.restaurant.agencyCommissionRate}: %{(selectedOrgDetail as any).agencyCommissionRate}</span>
+                          </div>
+                        )}
+                        {selectedOrgDetail.email && (
+                          <div className="flex items-center gap-1">
+                            <Mail className="h-3 w-3 text-slate-400" />
+                            <span>{selectedOrgDetail.email}</span>
+                          </div>
+                        )}
+                        {selectedOrgDetail.phone && (
+                          <div className="flex items-center gap-1">
+                            <Phone className="h-3 w-3 text-slate-400" />
+                            <span>+{selectedOrgDetail.phoneCountryCode} {selectedOrgDetail.phone}</span>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>{t.tours.scheduledTime} ({t.tours.startDate}) *</Label>
+                  <Label>{t.tours.startDate}</Label>
                   <Input
                     type="datetime-local"
                     value={stopForm.scheduledStartTime}
@@ -1177,7 +1433,7 @@ export default function TourDetailPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>{t.tours.scheduledTime} ({t.tours.endDate}) *</Label>
+                  <Label>{t.tours.endDate}</Label>
                   <Input
                     type="datetime-local"
                     value={stopForm.scheduledEndTime}
@@ -1248,6 +1504,111 @@ export default function TourDetailPage() {
         onConfirm={() => deleteStopTarget && deleteStopMutation.mutate(deleteStopTarget.id)}
         variant="destructive"
       />
+
+      {/* Delete Photo Confirm */}
+      <ConfirmDialog
+        open={!!deletePhotoId}
+        onOpenChange={(open) => !open && setDeletePhotoId(null)}
+        title={t.common.delete}
+        description={t.tours.deletePhotoConfirm}
+        confirmLabel={t.common.delete}
+        onConfirm={() => {
+          if (deletePhotoId) deletePhotoMutation.mutate(deletePhotoId);
+          setDeletePhotoId(null);
+        }}
+        variant="destructive"
+      />
+
+      {/* Add Participant Dialog */}
+      <Dialog open={isAddParticipantOpen} onOpenChange={(open) => {
+        setIsAddParticipantOpen(open);
+        if (!open) { setAddParticipantSearch(''); setAddParticipantNotes(''); }
+      }}>
+        <DialogContent className="sm:max-w-md max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>{t.tours.addParticipant}</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3 flex-1 overflow-hidden flex flex-col">
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Input
+                placeholder={t.tours.searchClient}
+                value={addParticipantSearch}
+                onChange={(e) => setAddParticipantSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+
+            {/* Notes */}
+            <Textarea
+              placeholder={t.tours.notesPlaceholder}
+              value={addParticipantNotes}
+              onChange={(e) => setAddParticipantNotes(e.target.value)}
+              rows={2}
+            />
+
+            {/* Client List */}
+            <div className="flex-1 overflow-y-auto space-y-2 min-h-0">
+              {!agencyClients?.length ? (
+                <p className="text-sm text-slate-500 text-center py-4">{t.tours.noAgencyClients}</p>
+              ) : (
+                (() => {
+                  const tourClientIds = new Set(tourClients?.map((tc: TourClientDto) => tc.clientId) || []);
+                  const filtered = agencyClients.filter((ac: AgencyClientDto) => {
+                    const name = `${ac.client.firstName} ${ac.client.lastName} ${ac.client.username}`.toLowerCase();
+                    return name.includes(addParticipantSearch.toLowerCase());
+                  });
+                  if (filtered.length === 0) {
+                    return <p className="text-sm text-slate-500 text-center py-4">{t.tours.noAgencyClients}</p>;
+                  }
+                  return filtered.map((ac: AgencyClientDto) => {
+                    const alreadyInTour = tourClientIds.has(ac.clientId);
+                    return (
+                      <div
+                        key={ac.id}
+                        className={`flex items-center justify-between p-3 border rounded-lg ${alreadyInTour ? 'opacity-50' : 'hover:bg-slate-50 cursor-pointer'}`}
+                        onClick={() => {
+                          if (!alreadyInTour && !addParticipantMutation.isPending) {
+                            addParticipantMutation.mutate({
+                              clientId: ac.clientId,
+                              notes: addParticipantNotes || undefined,
+                            });
+                          }
+                        }}
+                      >
+                        <div className="flex items-center gap-3">
+                          {ac.client.profilePhoto ? (
+                            <img
+                              src={ac.client.profilePhoto}
+                              alt={`${ac.client.firstName} ${ac.client.lastName}`}
+                              className="h-9 w-9 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="h-9 w-9 rounded-full bg-slate-100 flex items-center justify-center">
+                              <UserCheck className="h-4 w-4 text-slate-400" />
+                            </div>
+                          )}
+                          <div>
+                            <p className="font-medium text-sm">{ac.client.firstName} {ac.client.lastName}</p>
+                            <p className="text-xs text-slate-500">@{ac.client.username}</p>
+                          </div>
+                        </div>
+                        {alreadyInTour ? (
+                          <Badge variant="outline" className="text-xs">{t.tours.alreadyInTour}</Badge>
+                        ) : (
+                          <Plus className="h-4 w-4 text-slate-400" />
+                        )}
+                      </div>
+                    );
+                  });
+                })()
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

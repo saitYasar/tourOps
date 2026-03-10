@@ -70,6 +70,7 @@ export default function ToursPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { t, locale } = useLanguage();
+  const apiLang = (locale === 'de' ? 'en' : locale) as 'tr' | 'en';
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<TourStatus | 'all'>('all');
   const [page, setPage] = useState(1);
@@ -103,9 +104,9 @@ export default function ToursPage() {
     error: toursError,
     refetch,
   } = useQuery({
-    queryKey: ['agency-tours', page],
+    queryKey: ['agency-tours', page, apiLang],
     queryFn: async () => {
-      const result = await tourApi.list(page, LIMIT);
+      const result = await tourApi.list(page, LIMIT, apiLang);
       if (!result.success) throw new Error(result.error);
       return { data: result.data!, meta: result.meta! };
     },
@@ -126,7 +127,7 @@ export default function ToursPage() {
         maxParticipants: formData.maxParticipants || undefined,
         minParticipants: formData.minParticipants || undefined,
       };
-      const result = await tourApi.create(payload, coverImageFile || undefined, galleryFiles.length > 0 ? galleryFiles : undefined);
+      const result = await tourApi.create(payload, coverImageFile || undefined, galleryFiles.length > 0 ? galleryFiles : undefined, apiLang);
       if (!result.success) throw new Error(result.error);
       return result.data;
     },
@@ -152,7 +153,7 @@ export default function ToursPage() {
         maxParticipants: formData.maxParticipants || undefined,
         minParticipants: formData.minParticipants || undefined,
       };
-      const result = await tourApi.update(editingTour.id, payload, coverImageFile || undefined, galleryFiles.length > 0 ? galleryFiles : undefined);
+      const result = await tourApi.update(editingTour.id, payload, coverImageFile || undefined, galleryFiles.length > 0 ? galleryFiles : undefined, apiLang);
       if (!result.success) throw new Error(result.error);
       return result.data;
     },
@@ -356,7 +357,11 @@ export default function ToursPage() {
                   </TableHeader>
                   <TableBody>
                     {filteredTours.map((tour) => (
-                      <TableRow key={tour.id}>
+                      <TableRow
+                        key={tour.id}
+                        className="cursor-pointer hover:bg-slate-50"
+                        onClick={() => router.push(`/agency/tours/${tour.id}`)}
+                      >
                         <TableCell className="font-mono text-sm">{tour.tourCode}</TableCell>
                         <TableCell className="font-medium">{tour.tourName}</TableCell>
                         <TableCell>
@@ -371,7 +376,7 @@ export default function ToursPage() {
                         <TableCell>
                           <TourStatusBadge status={tour.status} />
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex justify-end gap-1">
                             <Button
                               variant="ghost"

@@ -8,17 +8,17 @@ type OrganizationStatus = 'pending' | 'active' | 'suspended';
 
 const statusConfig: Record<OrganizationStatus, { label: Record<string, string>; icon: typeof CheckCircle; className: string }> = {
   active: {
-    label: { tr: 'Aktif', en: 'Active', de: 'Aktiv' },
+    label: { tr: 'Sistem Aktif', en: 'System Active', de: 'System Aktiv' },
     icon: CheckCircle,
     className: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   },
   pending: {
-    label: { tr: 'Beklemede', en: 'Pending', de: 'Ausstehend' },
+    label: { tr: 'Sistem Beklemede', en: 'System Pending', de: 'System Ausstehend' },
     icon: Clock,
     className: 'bg-amber-50 text-amber-700 border-amber-200',
   },
   suspended: {
-    label: { tr: 'Askıda', en: 'Suspended', de: 'Gesperrt' },
+    label: { tr: 'Sistem Askıda', en: 'System Suspended', de: 'System Gesperrt' },
     icon: AlertTriangle,
     className: 'bg-red-50 text-red-700 border-red-200',
   },
@@ -61,8 +61,9 @@ export function Header({ title, description, children, organizationStatus, lang 
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input
-            placeholder="Ara..."
+            placeholder="Yakında..."
             className="w-64 pl-9"
+            disabled
           />
         </div>
 

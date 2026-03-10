@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Image from 'next/image';
 import Link from 'next/link';
 import { AuthRedirect } from '@/components/landing/AuthRedirect';
 
@@ -46,7 +47,7 @@ export default function HomePage() {
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-red-600 to-rose-700 flex items-center justify-center">
               <span className="text-white font-bold text-sm">T</span>
             </div>
             <span className="text-xl font-bold text-slate-900">TourOps</span>
@@ -60,7 +61,7 @@ export default function HomePage() {
             </Link>
             <Link
               href="/register"
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+              className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
             >
               Kayıt Ol
             </Link>
@@ -70,33 +71,40 @@ export default function HomePage() {
 
       <main>
         {/* Hero */}
-        <section className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 text-white">
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PHBhdGggZD0iTTM2IDM0djItSDJ2LTJoMzR6bTAgMGgydi0ySDM2djJ6Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-50" />
-          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 sm:py-32 lg:py-40">
+        <section className="relative overflow-hidden text-white min-h-[600px] sm:min-h-[700px]">
+          <Image
+            src="/avustur.png"
+            alt="Türkiye'nin eşsiz turizm destinasyonları"
+            fill
+            priority
+            className="object-cover object-center"
+            sizes="100vw"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-900/35 to-slate-900/70" />
+          <div className="absolute inset-0 bg-gradient-to-r from-red-950/30 to-rose-950/30" />
+          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-28 sm:py-36 lg:py-44">
             <div className="max-w-3xl mx-auto text-center">
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-tight">
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-sm text-red-200 mb-8">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                Türkiye&apos;nin Her Köşesine Ulaşın
+              </div>
+              <h1 className="text-4xl sm:text-5xl lg:text-7xl font-bold tracking-tight leading-tight drop-shadow-lg">
                 Tur Yönetiminin{' '}
-                <span className="bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">
+                <span className="bg-gradient-to-r from-red-400 via-orange-300 to-amber-400 bg-clip-text text-transparent">
                   Dijital Merkezi
                 </span>
               </h1>
-              <p className="mt-6 text-lg sm:text-xl text-slate-300 leading-relaxed">
+              <p className="mt-6 text-lg sm:text-xl text-slate-200 leading-relaxed max-w-2xl mx-auto drop-shadow">
                 Acenteler, işletmeler ve gezginler için hepsi bir arada platform.
                 Turları planlayın, işletmelerle bağlantı kurun, müşterilerinize
                 unutulmaz deneyimler sunun.
               </p>
-              <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+              <div className="mt-10">
                 <Link
                   href="/register"
-                  className="w-full sm:w-auto px-8 py-3.5 text-base font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors shadow-lg shadow-blue-600/25"
+                  className="inline-block px-10 py-4 text-base font-semibold text-white bg-red-600 hover:bg-red-500 rounded-xl transition-all shadow-lg shadow-red-600/30 hover:shadow-red-500/40 hover:-translate-y-0.5"
                 >
                   Ücretsiz Başlayın
-                </Link>
-                <Link
-                  href="/login"
-                  className="w-full sm:w-auto px-8 py-3.5 text-base font-semibold text-slate-300 hover:text-white border border-slate-600 hover:border-slate-400 rounded-xl transition-colors"
-                >
-                  Giriş Yap
                 </Link>
               </div>
             </div>
@@ -116,8 +124,8 @@ export default function HomePage() {
             </div>
             <div className="mt-16 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
               {/* Feature 1 */}
-              <div className="p-6 rounded-2xl bg-blue-50 border border-blue-100">
-                <div className="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center text-white text-xl">
+              <div className="p-6 rounded-2xl bg-red-50 border border-red-100">
+                <div className="w-12 h-12 rounded-xl bg-red-600 flex items-center justify-center text-white text-xl">
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 6h10"/><path d="M6 12h9"/><path d="M11 18h7"/><circle cx="4" cy="6" r="2"/><circle cx="14" cy="12" r="2"/><circle cx="9" cy="18" r="2"/></svg>
                 </div>
                 <h3 className="mt-4 text-lg font-semibold text-slate-900">Tur Planlama</h3>
@@ -146,8 +154,8 @@ export default function HomePage() {
                 </p>
               </div>
               {/* Feature 4 */}
-              <div className="p-6 rounded-2xl bg-violet-50 border border-violet-100">
-                <div className="w-12 h-12 rounded-xl bg-violet-600 flex items-center justify-center text-white text-xl">
+              <div className="p-6 rounded-2xl bg-rose-50 border border-rose-100">
+                <div className="w-12 h-12 rounded-xl bg-rose-600 flex items-center justify-center text-white text-xl">
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                 </div>
                 <h3 className="mt-4 text-lg font-semibold text-slate-900">Güvenlik</h3>
@@ -172,11 +180,11 @@ export default function HomePage() {
             </div>
             <div className="mt-16 grid grid-cols-1 lg:grid-cols-3 gap-8">
               {/* Agency */}
-              <div className="rounded-2xl bg-white border border-blue-200 shadow-sm overflow-hidden">
-                <div className="h-2 bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-800" />
+              <div className="rounded-2xl bg-white border border-red-200 shadow-sm overflow-hidden">
+                <div className="h-2 bg-gradient-to-r from-red-600 via-red-700 to-rose-800" />
                 <div className="p-8">
-                  <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-700"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                  <div className="w-12 h-12 rounded-xl bg-red-100 flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-700"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
                   </div>
                   <h3 className="mt-4 text-xl font-bold text-slate-900">Acenteler</h3>
                   <p className="mt-2 text-sm text-slate-600">
@@ -184,28 +192,36 @@ export default function HomePage() {
                   </p>
                   <ul className="mt-6 space-y-3">
                     <li className="flex items-center gap-2 text-sm text-slate-700">
-                      <span className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-xs font-bold">&#10003;</span>
+                      <span className="w-5 h-5 rounded-full bg-red-100 flex items-center justify-center text-red-600 text-xs font-bold">&#10003;</span>
                       Bölge bazlı tur oluşturma
                     </li>
                     <li className="flex items-center gap-2 text-sm text-slate-700">
-                      <span className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-xs font-bold">&#10003;</span>
+                      <span className="w-5 h-5 rounded-full bg-red-100 flex items-center justify-center text-red-600 text-xs font-bold">&#10003;</span>
                       İşletme davet sistemi
                     </li>
                     <li className="flex items-center gap-2 text-sm text-slate-700">
-                      <span className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-xs font-bold">&#10003;</span>
+                      <span className="w-5 h-5 rounded-full bg-red-100 flex items-center justify-center text-red-600 text-xs font-bold">&#10003;</span>
                       Fiyat ve menü yönetimi
                     </li>
                     <li className="flex items-center gap-2 text-sm text-slate-700">
-                      <span className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-xs font-bold">&#10003;</span>
+                      <span className="w-5 h-5 rounded-full bg-red-100 flex items-center justify-center text-red-600 text-xs font-bold">&#10003;</span>
                       Detaylı raporlama
                     </li>
                   </ul>
-                  <Link
-                    href="/register"
-                    className="mt-8 block text-center px-6 py-2.5 text-sm font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
-                  >
-                    Acente Olarak Başla
-                  </Link>
+                  <div className="mt-8 flex flex-col gap-2">
+                    <Link
+                      href="/login?type=agency"
+                      className="block text-center px-6 py-2.5 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+                    >
+                      Acente Girişi
+                    </Link>
+                    <Link
+                      href="/register?type=agency"
+                      className="block text-center px-6 py-2.5 text-sm font-semibold text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                    >
+                      Kayıt Ol
+                    </Link>
+                  </div>
                 </div>
               </div>
 
@@ -238,12 +254,20 @@ export default function HomePage() {
                       Gelir analizi
                     </li>
                   </ul>
-                  <Link
-                    href="/register"
-                    className="mt-8 block text-center px-6 py-2.5 text-sm font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors"
-                  >
-                    İşletme Olarak Başla
-                  </Link>
+                  <div className="mt-8 flex flex-col gap-2">
+                    <Link
+                      href="/login?type=organization"
+                      className="block text-center px-6 py-2.5 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors"
+                    >
+                      İşletme Girişi
+                    </Link>
+                    <Link
+                      href="/register?type=organization"
+                      className="block text-center px-6 py-2.5 text-sm font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors"
+                    >
+                      Kayıt Ol
+                    </Link>
+                  </div>
                 </div>
               </div>
 
@@ -301,7 +325,7 @@ export default function HomePage() {
             </div>
             <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8">
               <div className="text-center">
-                <div className="w-16 h-16 rounded-2xl bg-blue-600 text-white text-2xl font-bold flex items-center justify-center mx-auto">
+                <div className="w-16 h-16 rounded-2xl bg-red-600 text-white text-2xl font-bold flex items-center justify-center mx-auto">
                   1
                 </div>
                 <h3 className="mt-6 text-lg font-semibold text-slate-900">Kayıt Olun</h3>
@@ -310,7 +334,7 @@ export default function HomePage() {
                 </p>
               </div>
               <div className="text-center">
-                <div className="w-16 h-16 rounded-2xl bg-blue-600 text-white text-2xl font-bold flex items-center justify-center mx-auto">
+                <div className="w-16 h-16 rounded-2xl bg-red-600 text-white text-2xl font-bold flex items-center justify-center mx-auto">
                   2
                 </div>
                 <h3 className="mt-6 text-lg font-semibold text-slate-900">Profilinizi Tamamlayın</h3>
@@ -319,7 +343,7 @@ export default function HomePage() {
                 </p>
               </div>
               <div className="text-center">
-                <div className="w-16 h-16 rounded-2xl bg-blue-600 text-white text-2xl font-bold flex items-center justify-center mx-auto">
+                <div className="w-16 h-16 rounded-2xl bg-red-600 text-white text-2xl font-bold flex items-center justify-center mx-auto">
                   3
                 </div>
                 <h3 className="mt-6 text-lg font-semibold text-slate-900">İşbirliği Başlasın</h3>
@@ -332,17 +356,25 @@ export default function HomePage() {
         </section>
 
         {/* CTA */}
-        <section className="py-20 bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 text-white">
-          <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 className="text-3xl sm:text-4xl font-bold">
+        <section className="relative py-24 text-white overflow-hidden">
+          <Image
+            src="/avustur.png"
+            alt="Türkiye turizm destinasyonları"
+            fill
+            className="object-cover object-center"
+            sizes="100vw"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-red-900/70 via-red-800/60 to-rose-900/70" />
+          <div className="relative max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h2 className="text-3xl sm:text-4xl font-bold drop-shadow-lg">
               Tur Yönetiminizi Dijitalleştirin
             </h2>
-            <p className="mt-4 text-lg text-blue-100">
+            <p className="mt-4 text-lg text-red-100">
               Hemen ücretsiz kayıt olun ve platformun tüm özelliklerini keşfedin.
             </p>
             <Link
               href="/register"
-              className="mt-8 inline-block px-8 py-3.5 text-base font-semibold text-blue-700 bg-white hover:bg-blue-50 rounded-xl transition-colors shadow-lg"
+              className="mt-8 inline-block px-8 py-3.5 text-base font-semibold text-red-700 bg-white hover:bg-red-50 rounded-xl transition-all shadow-lg hover:-translate-y-0.5"
             >
               Ücretsiz Başlayın
             </Link>

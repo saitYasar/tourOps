@@ -65,6 +65,7 @@ type FormData = {
   legalName: string;
   taxNumber: number;
   taxOffice: string;
+  agencyCommissionRate?: number;
 };
 
 const countryCodes = [
@@ -136,6 +137,7 @@ export default function OrganizationSetupPage() {
     legalName: z.string().min(2, t.common.required),
     taxNumber: z.number().min(1000000000, t.common.required).max(99999999999, t.common.required),
     taxOffice: z.string().min(2, t.common.required),
+    agencyCommissionRate: z.number().min(0).max(100, t.restaurant.agencyCommissionRateMax).optional(),
   }), [t]);
 
   const [currentStep, setCurrentStep] = useState<Step>('basic');
@@ -841,6 +843,29 @@ export default function OrganizationSetupPage() {
                       className={errors.taxOffice ? '[&>button]:border-red-500' : ''}
                     />
                     {errors.taxOffice && <p className="text-xs text-red-500">{errors.taxOffice.message}</p>}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="agencyCommissionRate">{t.restaurant.agencyCommissionRate}</Label>
+                    <p className="text-xs text-slate-500">{t.restaurant.agencyCommissionRateDesc}</p>
+                    <div className="relative">
+                      <Input
+                        id="agencyCommissionRate"
+                        type="number"
+                        inputMode="numeric"
+                        min={0}
+                        max={100}
+                        placeholder={t.restaurant.agencyCommissionRatePlaceholder}
+                        className={`pr-8 ${errors.agencyCommissionRate ? 'border-red-500' : ''}`}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setValue('agencyCommissionRate', val ? Number(val) : undefined);
+                        }}
+                        value={watch('agencyCommissionRate') ?? ''}
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">%</span>
+                    </div>
+                    {errors.agencyCommissionRate && <p className="text-xs text-red-500">{errors.agencyCommissionRate.message}</p>}
                   </div>
                 </div>
               )}

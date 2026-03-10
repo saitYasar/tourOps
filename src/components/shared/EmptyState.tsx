@@ -2,7 +2,7 @@ import { Inbox } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface EmptyStateProps {
-  icon?: React.ElementType;
+  icon?: React.ComponentType<{ className?: string }>;
   title: string;
   description?: string;
   actionLabel?: string;
