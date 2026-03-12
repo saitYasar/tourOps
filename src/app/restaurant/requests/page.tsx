@@ -12,7 +12,7 @@ import { formatDate } from '@/lib/dateUtils';
 
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import {
   Select,
   SelectContent,
@@ -69,8 +69,8 @@ export default function RestaurantRequestsPage() {
 
   // Mutation: Approve
   const approveMutation = useMutation({
-    mutationFn: ({ id, choiceDeadline: deadline }: { id: number; choiceDeadline?: number }) =>
-      preReservationOrgApi.approve(id, deadline, apiLang),
+    mutationFn: ({ id, choiceDeadline: deadline, responseNote: note }: { id: number; choiceDeadline?: number; responseNote?: string }) =>
+      preReservationOrgApi.approve(id, deadline, note, apiLang),
     onSuccess: (result) => {
       if (!result.success) {
         toast.error(result.error || t.common.error);
@@ -129,7 +129,8 @@ export default function RestaurantRequestsPage() {
 
     if (actionType === 'approve') {
       const deadline = choiceDeadline ? Number(choiceDeadline) : undefined;
-      approveMutation.mutate({ id: selectedRequest.id, choiceDeadline: deadline });
+      const note = responseNote.trim() || undefined;
+      approveMutation.mutate({ id: selectedRequest.id, choiceDeadline: deadline, responseNote: note });
     } else {
       if (!responseNote.trim()) {
         toast.error(t.requests.rejectionReasonRequired);
@@ -162,7 +163,6 @@ export default function RestaurantRequestsPage() {
       <div className="flex-1 p-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-            <CardTitle className="text-lg font-medium">{t.requests.list}</CardTitle>
             <Select
               value={statusFilter}
               onValueChange={(v) => setStatusFilter(v as PreReservationStatus | 'all')}

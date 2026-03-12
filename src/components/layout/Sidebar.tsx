@@ -17,6 +17,7 @@ import {
   Plane,
   Image,
   Code2,
+  LifeBuoy,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -38,6 +39,7 @@ const agencyNavItems: NavItem[] = [
   { labelKey: 'team', href: '/agency/team', icon: Users },
   { labelKey: 'clients', href: '/agency/clients', icon: User },
   { labelKey: 'externalApi', href: '/agency/external-api', icon: Code2 },
+  { labelKey: 'support', href: '/agency/support', icon: LifeBuoy },
 ];
 
 const restaurantNavItems: NavItem[] = [
@@ -47,6 +49,7 @@ const restaurantNavItems: NavItem[] = [
   { labelKey: 'menu', href: '/restaurant/menu', icon: UtensilsCrossed },
   { labelKey: 'photos', href: '/restaurant/photos', icon: Image },
   { labelKey: 'team', href: '/restaurant/team', icon: Users },
+  { labelKey: 'support', href: '/restaurant/support', icon: LifeBuoy },
 ];
 
 const customerNavItems: NavItem[] = [

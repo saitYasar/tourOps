@@ -1,7 +1,7 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useState, useEffect } from 'react';
 import {
   Calendar,
   MapPin,
@@ -20,9 +20,6 @@ import {
   XCircle,
   AlertCircle,
   FileText,
-  RefreshCw,
-  Ban,
-  Loader2,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -31,8 +28,10 @@ import {
   apiClient,
   type ClientProfileDto,
   type ClientReservationDto,
-  type ServiceRequestDto,
   type ClientParticipantTourDto,
+  type ClientStopChoicesDto,
+  type ClientServiceChoiceDto,
+  type ClientTourStopDto,
 } from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { LanguageSwitcher } from '@/components/shared';
@@ -47,7 +46,6 @@ export default function CustomerDashboard() {
   const { t, locale } = useLanguage();
   const apiLang = (locale === 'de' ? 'en' : locale) as 'tr' | 'en';
   const router = useRouter();
-  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'dashboard' | 'reservations' | 'serviceRequests' | 'profile'>('dashboard');
 
   // Client Profile
@@ -70,12 +68,52 @@ export default function CustomerDashboard() {
     enabled: !!profile,
   });
 
-  // Service Requests
-  const { data: serviceRequestsData, isLoading: serviceRequestsLoading } = useQuery({
-    queryKey: ['client-service-requests', profile?.id, apiLang],
-    queryFn: () => apiClient.getServiceRequestsByClient(profile!.id, 1, 50, apiLang),
-    enabled: !!profile?.id,
-  });
+  // Derive tours early so hooks can depend on it
+  const tours: ClientParticipantTourDto[] = (toursData as unknown as { data?: ClientParticipantTourDto[] })?.data ??
+                (Array.isArray(toursData) ? toursData : []);
+
+  // Service Choices (loaded from tour stops via /client/tours/stops/{stopId}/choices)
+  const [stopChoices, setStopChoices] = useState<{ stop: ClientTourStopDto; tourName: string; choices: ClientStopChoicesDto }[]>([]);
+  const [choicesLoading, setChoicesLoading] = useState(false);
+
+  useEffect(() => {
+    if (!tours.length) return;
+    let cancelled = false;
+    setChoicesLoading(true);
+    (async () => {
+      const results: { stop: ClientTourStopDto; tourName: string; choices: ClientStopChoicesDto }[] = [];
+      for (const tourItem of tours) {
+        try {
+          const detailData = await apiClient.getMyTourDetail(tourItem.tour.id, apiLang);
+          const detail = (detailData && typeof detailData === 'object' && 'data' in detailData)
+            ? (detailData as unknown as { data: { tour: { stops: ClientTourStopDto[] }; } }).data
+            : detailData;
+          const stops = detail?.tour?.stops || [];
+          const approvedStops = stops.filter((s: ClientTourStopDto) => s.preReservationStatus === 'approved');
+          for (const stop of approvedStops) {
+            try {
+              const choicesData = await apiClient.getStopChoices(stop.id, apiLang);
+              const choices: ClientStopChoicesDto = (choicesData && typeof choicesData === 'object' && 'data' in choicesData)
+                ? (choicesData as unknown as { data: ClientStopChoicesDto }).data
+                : choicesData;
+              if (choices?.serviceChoices?.length || choices?.resourceChoice) {
+                results.push({ stop, tourName: tourItem.tour?.tourName || '', choices });
+              }
+            } catch {
+              // Stop may not have choices yet
+            }
+          }
+        } catch {
+          // Tour detail may fail
+        }
+      }
+      if (!cancelled) {
+        setStopChoices(results);
+        setChoicesLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [tours.length, apiLang]);
 
   const handleLogout = () => {
     localStorage.removeItem(AUTH_TOKEN_KEY);
@@ -102,10 +140,6 @@ export default function CustomerDashboard() {
 
   const reservations = (reservationsData as unknown as { data?: ClientReservationDto[] })?.data ??
                        (Array.isArray(reservationsData) ? reservationsData : []);
-  const tours: ClientParticipantTourDto[] = (toursData as unknown as { data?: ClientParticipantTourDto[] })?.data ??
-                (Array.isArray(toursData) ? toursData : []);
-  const serviceRequests = (serviceRequestsData as unknown as { data?: ServiceRequestDto[] })?.data ??
-                          (Array.isArray(serviceRequestsData) ? serviceRequestsData : []);
 
   const pendingReservations = reservations.filter((r: ClientReservationDto) => r.status === 'pending');
   const approvedReservations = reservations.filter((r: ClientReservationDto) => r.status === 'approved');
@@ -203,24 +237,22 @@ export default function CustomerDashboard() {
           <DashboardView
             profile={profile}
             tours={tours}
-            reservations={reservations}
+            reservations={reservations.filter((r: ClientReservationDto) => r.status !== 'rejected')}
             toursLoading={toursLoading}
             t={t}
           />
         )}
         {activeTab === 'reservations' && (
           <ReservationsView
-            reservations={reservations}
+            reservations={reservations.filter((r: ClientReservationDto) => r.status !== 'rejected')}
             loading={reservationsLoading}
             t={t}
           />
         )}
         {activeTab === 'serviceRequests' && (
-          <ServiceRequestsView
-            serviceRequests={serviceRequests}
-            loading={serviceRequestsLoading}
-            queryClient={queryClient}
-            profileId={profile.id}
+          <ServiceChoicesView
+            stopChoices={stopChoices}
+            loading={choicesLoading}
             t={t}
           />
         )}
@@ -499,45 +531,19 @@ function ReservationsView({
 }
 
 // ============================================
-// Service Requests View
+// Service Choices View
 // ============================================
-function ServiceRequestsView({
-  serviceRequests,
+function ServiceChoicesView({
+  stopChoices,
   loading,
-  queryClient: qc,
-  profileId,
   t,
 }: {
-  serviceRequests: ServiceRequestDto[];
+  stopChoices: { stop: ClientTourStopDto; tourName: string; choices: ClientStopChoicesDto }[];
   loading: boolean;
-  queryClient: ReturnType<typeof useQueryClient>;
-  profileId: number;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   t: any;
 }) {
-  const cancelMutation = useMutation({
-    mutationFn: (id: number) => apiClient.cancelServiceRequest(id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['client-service-requests'] });
-    },
-  });
-
-  const retryMutation = useMutation({
-    mutationFn: (id: number) => apiClient.retryServiceRequest(id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['client-service-requests'] });
-    },
-  });
-
   if (loading) return <LoadingState message={t.common.loading} />;
-
-  const statusConfig: Record<string, { icon: React.ComponentType<{ className?: string }>; color: string; label: string }> = {
-    pending: { icon: Clock, color: 'text-amber-600 bg-amber-50', label: t.requests.pending },
-    approved: { icon: CheckCircle2, color: 'text-emerald-600 bg-emerald-50', label: t.requests.approved },
-    rejected: { icon: XCircle, color: 'text-red-600 bg-red-50', label: t.requests.rejected },
-    completed: { icon: CheckCircle2, color: 'text-blue-600 bg-blue-50', label: t.common.success },
-    cancelled: { icon: Ban, color: 'text-slate-600 bg-slate-50', label: t.common.cancel },
-  };
 
   return (
     <div className="space-y-6">
@@ -546,7 +552,7 @@ function ServiceRequestsView({
         <h3 className="text-lg font-bold text-slate-800">{t.customer.serviceRequests}</h3>
       </div>
 
-      {!serviceRequests.length ? (
+      {!stopChoices.length ? (
         <Card className="bg-white border-dashed border-2 border-orange-200">
           <CardContent className="p-8 text-center">
             <FileText className="h-12 w-12 text-orange-300 mx-auto mb-3" />
@@ -556,76 +562,31 @@ function ServiceRequestsView({
         </Card>
       ) : (
         <div className="space-y-3">
-          {serviceRequests.map((sr) => {
-            const config = statusConfig[sr.status] || statusConfig.pending;
-            const StatusIcon = config.icon;
-            return (
-              <Card key={sr.id} className="bg-white border-0 shadow-sm hover:shadow-md transition-all">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg ${config.color}`}>
-                        <StatusIcon className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-slate-800">
-                          {sr.requestType === 'pre_reservation' ? t.customer.preReservation : t.customer.serviceSelection} #{sr.id}
-                        </p>
-                        <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
-                          <Calendar className="h-3 w-3" />
-                          {new Date(sr.requestedDate).toLocaleDateString('tr-TR')}
-                          {sr.serviceDeliveryDate && (
-                            <>
-                              <span className="text-slate-300">|</span>
-                              <Clock className="h-3 w-3" />
-                              {new Date(sr.serviceDeliveryDate).toLocaleDateString('tr-TR')}
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`text-xs font-medium px-3 py-1 rounded-full ${config.color}`}>
-                        {config.label}
-                      </span>
-                    </div>
+          {stopChoices.map(({ stop, tourName, choices }) => (
+            <Card key={stop.id} className="bg-white border-0 shadow-sm hover:shadow-md transition-all">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="p-2 rounded-lg text-emerald-600 bg-emerald-50">
+                    <CheckCircle2 className="h-5 w-5" />
                   </div>
-                  {sr.rejectionReason && (
-                    <p className="text-xs text-red-500 mt-2 pl-12">{sr.rejectionReason}</p>
-                  )}
-                  {/* Actions */}
-                  {(sr.status === 'pending' || sr.status === 'rejected') && (
-                    <div className="flex gap-2 mt-3 pl-12">
-                      {sr.status === 'pending' && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-red-600 border-red-200 hover:bg-red-50"
-                          onClick={() => cancelMutation.mutate(sr.id)}
-                          disabled={cancelMutation.isPending}
-                        >
-                          {cancelMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Ban className="h-3 w-3 mr-1" />}
-                          {t.customer.cancelRequest}
-                        </Button>
-                      )}
-                      {sr.status === 'rejected' && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-sky-600 border-sky-200 hover:bg-sky-50"
-                          onClick={() => retryMutation.mutate(sr.id)}
-                          disabled={retryMutation.isPending}
-                        >
-                          {retryMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RefreshCw className="h-3 w-3 mr-1" />}
-                          {t.customer.retryRequest}
-                        </Button>
-                      )}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
+                  <div>
+                    <p className="font-medium text-slate-800">{stop.organization?.name}</p>
+                    <p className="text-xs text-slate-500">{tourName}</p>
+                  </div>
+                </div>
+                {choices.serviceChoices && choices.serviceChoices.length > 0 && (
+                  <div className="space-y-1.5 pl-12">
+                    {choices.serviceChoices.map((sc: ClientServiceChoiceDto) => (
+                      <div key={sc.id} className="flex items-center justify-between text-sm">
+                        <span className="text-slate-700">{sc.service?.title || `#${sc.serviceId}`}</span>
+                        <span className="font-medium text-slate-800">x{sc.quantity}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))}
         </div>
       )}
     </div>

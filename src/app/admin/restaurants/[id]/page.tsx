@@ -104,31 +104,34 @@ export default function OrganizationDetailPage() {
     enabled: editMode,
   });
 
-  // Location data for edit mode
+  // Location data - also used in read mode to resolve names when backend doesn't return nested objects
+  const orgData = result?.success ? (result.data as unknown as OrganizationDto) : null;
+  const needsLocationResolve = !!orgData && (!orgData.country || !orgData.city || !orgData.district);
+
   const { data: countriesResult } = useQuery({
     queryKey: ['countries'],
     queryFn: () => locationApi.getCountries(),
-    enabled: editMode,
+    enabled: editMode || needsLocationResolve,
   });
 
   const { data: citiesResult } = useQuery({
-    queryKey: ['cities', form.countryId],
-    queryFn: () => locationApi.getCities(form.countryId),
-    enabled: editMode && !!form.countryId,
+    queryKey: ['cities', editMode ? form.countryId : orgData?.countryId],
+    queryFn: () => locationApi.getCities(editMode ? form.countryId : orgData?.countryId),
+    enabled: editMode ? !!form.countryId : (needsLocationResolve && !!orgData?.countryId),
   });
 
   const { data: districtsResult } = useQuery({
-    queryKey: ['districts', form.cityId],
-    queryFn: () => locationApi.getDistricts(form.cityId),
-    enabled: editMode && !!form.cityId,
+    queryKey: ['districts', editMode ? form.cityId : orgData?.cityId],
+    queryFn: () => locationApi.getDistricts(editMode ? form.cityId : orgData?.cityId),
+    enabled: editMode ? !!form.cityId : (needsLocationResolve && !!orgData?.cityId),
   });
 
   const categories = categoriesResult?.success
     ? (categoriesResult.data as PaginatedResponse<CategoryDto>)?.data || []
     : [];
-  const countries = countriesResult?.success ? (countriesResult.data as unknown as LocationDto[]) || [] : [];
-  const cities = citiesResult?.success ? (citiesResult.data as unknown as LocationDto[]) || [] : [];
-  const districts = districtsResult?.success ? (districtsResult.data as unknown as LocationDto[]) || [] : [];
+  const countries = countriesResult?.success ? (countriesResult.data as PaginatedResponse<LocationDto>)?.data || [] : [];
+  const cities = citiesResult?.success ? (citiesResult.data as PaginatedResponse<LocationDto>)?.data || [] : [];
+  const districts = districtsResult?.success ? (districtsResult.data as PaginatedResponse<LocationDto>)?.data || [] : [];
 
   // Auto-select for cascading location
   useAutoSelect(
@@ -634,9 +637,9 @@ export default function OrganizationDetailPage() {
               <div className="space-y-3">
                 <InfoRow label={a.addressLabel} value={org.address} icon={MapPin} />
                 <div className="flex items-center gap-4">
-                  <InfoRow label={a.countryLabel} value={org.country?.name} />
-                  <InfoRow label={a.cityLabel} value={org.city?.name} />
-                  <InfoRow label={a.districtLabel} value={org.district?.name} />
+                  <InfoRow label={a.countryLabel} value={org.country?.name || countries.find(c => c.id === org.countryId)?.name} />
+                  <InfoRow label={a.cityLabel} value={org.city?.name || cities.find(c => c.id === org.cityId)?.name} />
+                  <InfoRow label={a.districtLabel} value={org.district?.name || districts.find(d => d.id === org.districtId)?.name} />
                 </div>
                 {hasLocation && (
                   <div>

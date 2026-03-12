@@ -1,21 +1,16 @@
 'use client';
 
-import { useState, useCallback, useMemo, useEffect, Component, type ReactNode } from 'react';
-import { Building2, Armchair, Check, Loader2, ChevronLeft, MapPin, Box, Layers, AlertTriangle } from 'lucide-react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
+import { Building2, Armchair, Check, Loader2, ChevronLeft, ChevronRight, Layers, DoorOpen, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
-import type { Floor, Room, Table } from '@/types';
 import type { ResourceDto } from '@/lib/api';
 import dynamic from 'next/dynamic';
 
-/** Filter out structural/decorative objects — keep only tables.
- *  Objects are: Cam Kenarı, Duvar, Kolon, Serbest Obje (Projeksiyon, Perde, etc.)
- *  Uses resourceType.code when available, then name patterns + capacity heuristic. */
+/** Filter out structural/decorative objects — keep only tables. */
 function filterTables(resources: ResourceDto[]): ResourceDto[] {
   return resources.filter(r => {
-    // 1. If resourceType is populated, use it directly
     if (r.resourceType?.code) return r.resourceType.code === 'table';
-    // 2. Known object name patterns (all object kinds)
     const lower = r.name.toLowerCase();
     const dashIdx = r.name.lastIndexOf('-');
     const baseName = dashIdx > 0 ? r.name.substring(0, dashIdx).toLowerCase() : lower;
@@ -25,7 +20,6 @@ function filterTables(resources: ResourceDto[]): ResourceDto[] {
     if (baseName.startsWith('serbest') || baseName.startsWith('free')) return false;
     if (baseName.startsWith('projeksiyon') || baseName.startsWith('projector')) return false;
     if (baseName.startsWith('perde') || baseName.startsWith('curtain')) return false;
-    // 3. Objects have capacity 0, tables always have capacity >= 1
     if (r.capacity === 0 || r.capacity == null) return false;
     return true;
   });
@@ -37,102 +31,15 @@ const FloorPlanCanvas = dynamic(
   { ssr: false, loading: () => <div className="h-[450px] bg-slate-100 rounded-xl animate-pulse" /> }
 );
 
-// Lazy load 3D model (heavy Three.js dependency)
-const VenueModel3D = dynamic(
-  () => import('@/components/restaurant/VenueModel3D').then(m => ({ default: m.VenueModel3D })),
-  { ssr: false, loading: () => <div className="h-[400px] bg-slate-100 rounded-xl animate-pulse" /> }
-);
-
-// ── Error boundary for 3D Canvas ───────────────────────────────
-interface ErrorBoundaryState { hasError: boolean }
-class Canvas3DErrorBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, ErrorBoundaryState> {
-  state: ErrorBoundaryState = { hasError: false };
-  static getDerivedStateFromError() { return { hasError: true }; }
-  componentDidCatch(error: Error) {
-    console.warn('[VenueModel3D] Render error:', error.message);
-  }
-  render() {
-    if (this.state.hasError) return this.props.fallback;
-    return this.props.children;
-  }
-}
-
 interface CustomerVenueSelectorProps {
   floors: ResourceDto[];
   childrenCache: Record<number, ResourceDto[]>;
   loadingChildren: boolean;
   fetchChildren: (parentId: number, force?: boolean) => Promise<void>;
-  onSelectChair: (chair: ResourceDto) => void;
+  onSelectChair: (chair: ResourceDto, skipConfirm?: boolean) => void;
   savingTable: boolean;
   existingResourceId?: number;
-}
-
-// Parse coordinates that can be "x,y" string, [x,y] array, or {x,y} object
-function parseCoords(coords: unknown): { x: number; y: number } {
-  if (!coords) return { x: 0, y: 0 };
-  if (typeof coords === 'object' && !Array.isArray(coords)) {
-    const obj = coords as Record<string, unknown>;
-    return { x: Number(obj.x) || 0, y: Number(obj.y) || 0 };
-  }
-  if (Array.isArray(coords) && coords.length >= 2) {
-    return { x: Number(coords[0]) || 0, y: Number(coords[1]) || 0 };
-  }
-  if (typeof coords === 'string') {
-    const parts = coords.split(',');
-    if (parts.length >= 2) return { x: parseFloat(parts[0]) || 0, y: parseFloat(parts[1]) || 0 };
-  }
-  return { x: 0, y: 0 };
-}
-
-// Convert ResourceDto to legacy Floor type
-function toFloor(r: ResourceDto): Floor {
-  return {
-    id: String(r.id),
-    restaurantId: String(r.organizationId),
-    name: r.name,
-    order: r.order ?? 0,
-    createdAt: r.createdAt ?? '',
-    updatedAt: r.updatedAt ?? '',
-  };
-}
-
-// Convert ResourceDto to legacy Room type
-function toRoom(r: ResourceDto, floorId: number): Room {
-  const c = parseCoords(r.coordinates);
-  return {
-    id: String(r.id),
-    floorId: String(floorId),
-    restaurantId: String(r.organizationId),
-    name: r.name,
-    order: r.order ?? 0,
-    createdAt: r.createdAt ?? '',
-    updatedAt: r.updatedAt ?? '',
-    x: c.x,
-    y: c.y,
-    width: r.width,
-    height: r.height,
-  };
-}
-
-// Convert ResourceDto to legacy Table type
-function toTable(r: ResourceDto, roomId: number): Table {
-  const c = parseCoords(r.coordinates);
-  return {
-    id: String(r.id),
-    roomId: String(roomId),
-    restaurantId: String(r.organizationId),
-    name: r.name,
-    capacity: r.capacity ?? 0,
-    order: r.order ?? 0,
-    createdAt: r.createdAt ?? '',
-    updatedAt: r.updatedAt ?? '',
-    isWindowSide: false,
-    x: c.x,
-    y: c.y,
-    w: r.width,
-    h: r.height,
-    rotation: r.rotation,
-  };
+  currentClientId?: number;
 }
 
 export function CustomerVenueSelector({
@@ -143,128 +50,112 @@ export function CustomerVenueSelector({
   onSelectChair,
   savingTable,
   existingResourceId,
+  currentClientId,
 }: CustomerVenueSelectorProps) {
   const { t } = useLanguage();
-  const [viewTab, setViewTab] = useState<'plan' | '3d'>('plan');
+
+  // Navigation state: floor → room → table (chairs)
   const [activeFloorId, setActiveFloorId] = useState<number | null>(null);
+  const [activeRoomId, setActiveRoomId] = useState<number | null>(null);
   const [selectedTableId, setSelectedTableId] = useState<number | null>(null);
-  const [showChairs, setShowChairs] = useState(false);
 
-  // Auto-select first floor + pre-fetch ALL floors' children (3D needs all)
+  // Auto-select first floor and fetch its children on mount
   useEffect(() => {
-    if (floorResources.length === 0) return;
-    if (!activeFloorId) {
-      setActiveFloorId(floorResources[0].id);
-    }
-    for (const floor of floorResources) {
-      if (!childrenCache[floor.id]) {
-        fetchChildren(floor.id);
+    if (floorResources.length > 0 && !activeFloorId) {
+      const firstId = floorResources[0].id;
+      setActiveFloorId(firstId);
+      if (!childrenCache[firstId]) {
+        fetchChildren(firstId);
       }
     }
-  }, [floorResources, activeFloorId, childrenCache, fetchChildren]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [floorResources]);
 
-  // When any floor's rooms load, auto-fetch tables for each room
-  useEffect(() => {
-    for (const floor of floorResources) {
-      const rooms = childrenCache[floor.id] ?? [];
-      for (const room of rooms) {
-        if (!childrenCache[room.id]) {
-          fetchChildren(room.id);
-        }
-      }
-    }
-  }, [floorResources, childrenCache, fetchChildren]);
-
-  // Get rooms and tables for active floor
+  // Derived data
   const activeRooms = activeFloorId ? (childrenCache[activeFloorId] ?? []) : [];
-  const activeTablesMap: Record<number, ResourceDto[]> = {};
-  for (const room of activeRooms) {
-    activeTablesMap[room.id] = filterTables(childrenCache[room.id] ?? []);
-  }
-
-  // Get chairs for selected table
+  const roomTables = activeRoomId ? filterTables(childrenCache[activeRoomId] ?? []) : [];
   const chairResources = selectedTableId ? (childrenCache[selectedTableId] ?? []) : [];
 
-  // Convert to legacy types for VenueModel3D
-  const legacyFloors = useMemo(() => floorResources.map(toFloor), [floorResources]);
+  // Breadcrumb data
+  const activeFloor = floorResources.find(f => f.id === activeFloorId);
+  const activeRoom = activeRooms.find(r => r.id === activeRoomId);
+  const activeTable = roomTables.find(t => t.id === selectedTableId);
 
-  const legacyRooms = useMemo(() => {
-    const result: Room[] = [];
-    for (const floor of floorResources) {
-      const rooms = childrenCache[floor.id] ?? [];
-      result.push(...rooms.map(r => toRoom(r, floor.id)));
-    }
-    return result;
-  }, [floorResources, childrenCache]);
-
-  const legacyTables = useMemo(() => {
-    const result: Table[] = [];
-    for (const floor of floorResources) {
-      const rooms = childrenCache[floor.id] ?? [];
-      for (const room of rooms) {
-        const tables = filterTables(childrenCache[room.id] ?? []);
-        result.push(...tables.map(tbl => toTable(tbl, room.id)));
-      }
-    }
-    return result;
-  }, [floorResources, childrenCache]);
-
-  // Handle floor tab change
+  // Handlers
   const handleFloorChange = useCallback((floorId: number) => {
     setActiveFloorId(floorId);
+    setActiveRoomId(null);
     setSelectedTableId(null);
-    setShowChairs(false);
-    fetchChildren(floorId);
-  }, [fetchChildren]);
+    if (!childrenCache[floorId]) {
+      fetchChildren(floorId);
+    }
+  }, [fetchChildren, childrenCache]);
 
-  // Handle table click → fetch chairs
+  const handleRoomClick = useCallback((roomId: number) => {
+    setActiveRoomId(roomId);
+    setSelectedTableId(null);
+    if (!childrenCache[roomId]) {
+      fetchChildren(roomId);
+    }
+  }, [fetchChildren, childrenCache]);
+
   const handleTableClick = useCallback((tableId: number) => {
     setSelectedTableId(tableId);
-    setShowChairs(true);
-    fetchChildren(tableId, true);
+    fetchChildren(tableId, true); // always force-refresh for latest occupancy
   }, [fetchChildren]);
 
-  // Back from chairs
-  const handleBackFromChairs = () => {
-    setShowChairs(false);
+  const handleBackToRooms = () => {
+    setActiveRoomId(null);
     setSelectedTableId(null);
   };
 
-  // Find parent names for breadcrumb
-  const selectedTableResource = useMemo(() => {
-    if (!selectedTableId) return null;
-    for (const room of activeRooms) {
-      const tables = childrenCache[room.id] ?? [];
-      const found = tables.find(t => t.id === selectedTableId);
-      if (found) return { table: found, room, floor: floorResources.find(f => f.id === activeFloorId) };
-    }
-    return null;
-  }, [selectedTableId, activeRooms, childrenCache, floorResources, activeFloorId]);
+  const handleBackToTables = () => {
+    setSelectedTableId(null);
+  };
 
-  // Chair selection overlay
-  if (showChairs && selectedTableId) {
+  // ─── Level 3: Chair selection ───────────────────────────────
+  if (selectedTableId) {
     return (
       <div className="space-y-4">
-        {/* Header */}
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center gap-3">
-            <Button variant="outline" size="sm" onClick={handleBackFromChairs}>
-              <ChevronLeft className="h-4 w-4 mr-1" />
-              {t.customer.back}
-            </Button>
-            <div>
-              <h3 className="font-bold text-lg flex items-center gap-2">
-                <Armchair className="h-5 w-5 text-orange-500" />
-                {t.customer.selectChair}
-              </h3>
-              {selectedTableResource && (
-                <p className="text-sm text-slate-500">
-                  {selectedTableResource.floor?.name} &gt; {selectedTableResource.room.name} &gt; {selectedTableResource.table.name}
-                </p>
-              )}
-            </div>
+        {/* Breadcrumb + Back */}
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="sm" onClick={handleBackToTables}>
+            <ChevronLeft className="h-4 w-4 mr-1" />
+            {t.customer.back}
+          </Button>
+          <div>
+            <h3 className="font-bold text-lg flex items-center gap-2">
+              <Armchair className="h-5 w-5 text-orange-500" />
+              {t.customer.selectChair}
+            </h3>
+            <p className="text-sm text-slate-500">
+              {activeFloor?.name} &gt; {activeRoom?.name} &gt; {activeTable?.name}
+            </p>
           </div>
         </div>
+
+        {/* Legend */}
+        <div className="flex flex-wrap gap-3 text-xs">
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-sm bg-slate-100 border border-slate-300" />
+            <span className="text-slate-500">{t.customer.seatEmpty}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-sm bg-emerald-100 border border-emerald-400" />
+            <span className="text-emerald-600">{t.customer.seatYours}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-sm bg-red-100 border border-red-400" />
+            <span className="text-red-500">{t.customer.seatOccupied}</span>
+          </div>
+        </div>
+
+        {/* Resource type title for chairs */}
+        {chairResources.length > 0 && chairResources[0].resourceType?.name && (
+          <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide">
+            {chairResources[0].resourceType.name}
+          </h3>
+        )}
 
         {/* Chairs grid */}
         {loadingChildren && chairResources.length === 0 ? (
@@ -280,31 +171,60 @@ export function CustomerVenueSelector({
         ) : (
           <div className="grid grid-cols-3 gap-3">
             {chairResources.map(chair => {
+              const occupant = chair.client;
+              const isOwnSeat = !!(currentClientId && occupant && occupant.id === currentClientId);
+              const isOccupiedByOther = !!(occupant && !isOwnSeat);
               const isSelected = existingResourceId === chair.id;
+              const occupantName = occupant ? `${occupant.firstName} ${occupant.lastName}` : '';
+
               return (
-                <button
-                  key={chair.id}
-                  disabled={savingTable}
-                  className={`relative p-4 rounded-xl border-2 transition-all text-center ${
-                    savingTable ? 'opacity-50 cursor-wait' :
-                    isSelected
-                      ? 'border-emerald-400 bg-emerald-50 ring-2 ring-emerald-200'
-                      : 'border-slate-200 hover:border-orange-300 hover:bg-orange-50/50'
-                  }`}
-                  onClick={() => onSelectChair(chair)}
-                >
-                  {isSelected && (
-                    <div className="absolute top-1.5 right-1.5">
-                      <Check className="h-3.5 w-3.5 text-emerald-600" />
+                <div key={chair.id} className="relative group">
+                  <button
+                    disabled={savingTable || isOccupiedByOther}
+                    className={`relative w-full p-4 rounded-xl border-2 transition-all text-center ${
+                      savingTable ? 'opacity-50 cursor-wait' :
+                      isOccupiedByOther
+                        ? 'border-red-300 bg-red-50 cursor-not-allowed opacity-80'
+                        : isOwnSeat || isSelected
+                          ? 'border-emerald-400 bg-emerald-50 ring-2 ring-emerald-200'
+                          : 'border-slate-200 hover:border-orange-300 hover:bg-orange-50/50'
+                    }`}
+                    onClick={() => {
+                      if (!isOccupiedByOther) onSelectChair(chair);
+                    }}
+                  >
+                    {(isOwnSeat || isSelected) && (
+                      <div className="absolute top-1.5 right-1.5">
+                        <Check className="h-3.5 w-3.5 text-emerald-600" />
+                      </div>
+                    )}
+                    {savingTable ? (
+                      <Loader2 className="h-8 w-8 mx-auto mb-1 text-orange-500 animate-spin" />
+                    ) : (
+                      <Armchair className={`h-8 w-8 mx-auto mb-1 ${
+                        isOccupiedByOther ? 'text-red-400' :
+                        isOwnSeat || isSelected ? 'text-emerald-600' : 'text-slate-400'
+                      }`} />
+                    )}
+                    <p className={`font-bold text-sm ${
+                      isOccupiedByOther ? 'text-red-600' :
+                      isOwnSeat ? 'text-emerald-700' : 'text-slate-800'
+                    }`}>{chair.name}</p>
+                    {isOwnSeat && (
+                      <p className="text-[10px] text-emerald-600 font-medium mt-0.5">{t.customer.yourSeat}</p>
+                    )}
+                    {isOccupiedByOther && (
+                      <p className="text-[10px] text-red-500 font-medium mt-0.5 truncate">{occupantName}</p>
+                    )}
+                  </button>
+                  {/* Tooltip on hover for occupied chairs */}
+                  {isOccupiedByOther && (
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-slate-800 text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                      {occupantName}
+                      <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800" />
                     </div>
                   )}
-                  {savingTable ? (
-                    <Loader2 className="h-8 w-8 mx-auto mb-1 text-orange-500 animate-spin" />
-                  ) : (
-                    <Armchair className={`h-8 w-8 mx-auto mb-1 ${isSelected ? 'text-emerald-600' : 'text-slate-400'}`} />
-                  )}
-                  <p className="font-bold text-sm text-slate-800">{chair.name}</p>
-                </button>
+                </div>
               );
             })}
           </div>
@@ -313,43 +233,69 @@ export function CustomerVenueSelector({
     );
   }
 
-  // Check if any data is loading for the floor
-  const isFloorDataLoading = loadingChildren && activeRooms.length === 0;
-  const hasRoomsButNoTables = activeRooms.length > 0 && loadingChildren && Object.values(activeTablesMap).every(t => t.length === 0);
+  // ─── Level 2: Table selection (room selected) ───────────────
+  if (activeRoomId) {
+    const tablesMap: Record<number, ResourceDto[]> = { [activeRoomId]: roomTables };
+    const roomForCanvas = activeRooms.filter(r => r.id === activeRoomId);
+    const isTablesLoading = loadingChildren && roomTables.length === 0;
 
-  // 3D model needs ALL data loaded before mounting (Three.js can't handle data transitions)
-  const allRoomsLoaded = floorResources.every(f => childrenCache[f.id] !== undefined);
-  const allRooms = floorResources.flatMap(f => childrenCache[f.id] ?? []);
-  const allTablesLoaded = allRooms.length === 0 || allRooms.every(r => childrenCache[r.id] !== undefined);
-  const dataReadyFor3D = allRoomsLoaded && allTablesLoaded && legacyRooms.length > 0;
+    return (
+      <div className="space-y-3">
+        {/* Breadcrumb + Back */}
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="sm" onClick={handleBackToRooms}>
+            <ChevronLeft className="h-4 w-4 mr-1" />
+            {t.customer.back}
+          </Button>
+          <div>
+            <h3 className="font-bold text-lg">{activeRoom?.name}</h3>
+            <p className="text-sm text-slate-500">
+              {activeFloor?.name} &gt; {activeRoom?.name}
+            </p>
+          </div>
+        </div>
+
+        {/* Resource type title for tables */}
+        {roomTables.length > 0 && roomTables[0].resourceType?.name && (
+          <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide">
+            {roomTables[0].resourceType.name}
+          </h3>
+        )}
+
+        {/* Tables */}
+        {isTablesLoading ? (
+          <div className="flex items-center justify-center py-16 gap-2 text-slate-400">
+            <Loader2 className="h-5 w-5 animate-spin" />
+            <span className="text-sm">{t.common.loading}</span>
+          </div>
+        ) : roomTables.length === 0 ? (
+          <div className="text-center py-16">
+            <Building2 className="h-12 w-12 text-slate-300 mx-auto mb-2" />
+            <p className="text-slate-500">{t.customer.noTables}</p>
+          </div>
+        ) : (
+          <FloorPlanCanvas
+            rooms={roomForCanvas}
+            tablesMap={tablesMap}
+            selectedTableId={null}
+            onTableClick={handleTableClick}
+          />
+        )}
+      </div>
+    );
+  }
+
+  // ─── Level 1: Room selection (floor selected) ───────────────
+  const isRoomsLoading = loadingChildren && activeRooms.length === 0 && !!activeFloorId;
 
   return (
     <div className="space-y-3">
-      {/* View tabs */}
-      <div className="flex gap-1 p-1 bg-slate-100 rounded-lg">
-        <button
-          className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all ${
-            viewTab === 'plan'
-              ? 'bg-white text-orange-600 shadow-sm'
-              : 'text-slate-500 hover:text-slate-700'
-          }`}
-          onClick={() => setViewTab('plan')}
-        >
-          <MapPin className="h-4 w-4" />
-          {t.customer.venuePlan}
-        </button>
-        <button
-          className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all ${
-            viewTab === '3d'
-              ? 'bg-white text-orange-600 shadow-sm'
-              : 'text-slate-500 hover:text-slate-700'
-          }`}
-          onClick={() => setViewTab('3d')}
-        >
-          <Box className="h-4 w-4" />
-          {t.customer.venue3D}
-        </button>
-      </div>
+      {/* Resource type title for floors */}
+      {floorResources.length > 0 && floorResources[0].resourceType?.name && (
+        <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide">
+          {floorResources[0].resourceType.name}
+        </h3>
+      )}
 
       {/* Floor tabs */}
       {floorResources.length > 1 && (
@@ -371,77 +317,48 @@ export function CustomerVenueSelector({
         </div>
       )}
 
-      {/* Content */}
-      {viewTab === 'plan' ? (
-        <div>
-          {isFloorDataLoading ? (
-            <div className="flex items-center justify-center py-16 gap-2 text-slate-400">
-              <Loader2 className="h-5 w-5 animate-spin" />
-              <span className="text-sm">{t.common.loading}</span>
-            </div>
-          ) : activeRooms.length === 0 ? (
-            <div className="text-center py-16">
-              <Building2 className="h-12 w-12 text-slate-300 mx-auto mb-2" />
-              <p className="text-slate-500">{t.customer.noRooms}</p>
-            </div>
-          ) : (
-            <>
-              {hasRoomsButNoTables && (
-                <div className="flex items-center justify-center py-2 gap-2 text-slate-400">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span className="text-xs">{t.common.loading}</span>
-                </div>
-              )}
-              <FloorPlanCanvas
-                rooms={activeRooms}
-                tablesMap={activeTablesMap}
-                selectedTableId={selectedTableId}
-                onTableClick={handleTableClick}
-              />
-            </>
-          )}
-        </div>
-      ) : !dataReadyFor3D ? (
-        <div className="flex items-center justify-center h-[400px] bg-slate-50 rounded-xl gap-2 text-slate-400">
+      {/* Resource type title for rooms */}
+      {activeRooms.length > 0 && activeRooms[0].resourceType?.name && (
+        <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide">
+          {activeRooms[0].resourceType.name}
+        </h3>
+      )}
+
+      {/* Rooms */}
+      {isRoomsLoading ? (
+        <div className="flex items-center justify-center py-16 gap-2 text-slate-400">
           <Loader2 className="h-5 w-5 animate-spin" />
           <span className="text-sm">{t.common.loading}</span>
         </div>
+      ) : activeRooms.length === 0 && activeFloorId ? (
+        <div className="text-center py-16">
+          <Building2 className="h-12 w-12 text-slate-300 mx-auto mb-2" />
+          <p className="text-slate-500">{t.customer.noRooms}</p>
+        </div>
       ) : (
-        <Canvas3DErrorBoundary
-          fallback={
-            <div className="flex flex-col items-center justify-center h-[400px] bg-slate-50 rounded-xl border-2 border-dashed border-slate-200">
-              <AlertTriangle className="h-10 w-10 text-amber-400 mb-3" />
-              <p className="text-slate-500 text-sm">3D model yüklenemedi</p>
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-3"
-                onClick={() => setViewTab('plan')}
-              >
-                <MapPin className="h-4 w-4 mr-1" />
-                {t.customer.venuePlan}
-              </Button>
-            </div>
-          }
-        >
-          <VenueModel3D
-            floors={legacyFloors}
-            rooms={legacyRooms}
-            tables={legacyTables}
-            selectedTableId={selectedTableId ? String(selectedTableId) : null}
-            onFloorSelect={(floorId) => {
-              const id = Number(floorId);
-              setActiveFloorId(id);
-              fetchChildren(id);
-            }}
-            onRoomSelect={(roomId) => {
-              fetchChildren(Number(roomId));
-            }}
-            onTableSelect={(tableId) => {
-              handleTableClick(Number(tableId));
-            }}
-          />
-        </Canvas3DErrorBoundary>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {activeRooms.map(room => (
+            <button
+              key={room.id}
+              className="flex items-center gap-3 p-4 rounded-xl border-2 border-slate-200 hover:border-orange-300 hover:bg-orange-50/50 transition-all text-left group"
+              onClick={() => handleRoomClick(room.id)}
+            >
+              <div className="w-12 h-12 rounded-lg bg-orange-100 flex items-center justify-center shrink-0">
+                <DoorOpen className="h-6 w-6 text-orange-500" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-slate-800">{room.name}</p>
+                {room.capacity > 0 && (
+                  <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
+                    <Users className="h-3 w-3" />
+                    {room.capacity} {t.customer.persons}
+                  </p>
+                )}
+              </div>
+              <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-orange-400 transition-colors shrink-0" />
+            </button>
+          ))}
+        </div>
       )}
     </div>
   );

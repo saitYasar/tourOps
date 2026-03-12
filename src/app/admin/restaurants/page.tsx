@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useDebounce } from '@/hooks/useDebounce';
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -477,6 +478,7 @@ export default function AdminRestaurantsPage() {
   const { t } = useLanguage();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearch = useDebounce(searchTerm, 800);
   const [statusFilter, setStatusFilter] = useState<CompanyStatus | 'all'>('all');
   const [page, setPage] = useState(1);
   const [limit] = useState(20);
@@ -486,23 +488,31 @@ export default function AdminRestaurantsPage() {
     newStatus: CompanyStatus;
   } | null>(null);
 
+  // Reset page when search term changes
+  const prevSearchRef = useRef(debouncedSearch);
+  useEffect(() => {
+    if (prevSearchRef.current !== debouncedSearch) {
+      setPage(1);
+      prevSearchRef.current = debouncedSearch;
+    }
+  }, [debouncedSearch]);
+
   // Fetch all organizations (for status counts)
   const { data: allOrgsResult } = useQuery({
     queryKey: ['admin-organizations-counts'],
     queryFn: () =>
-      adminApi.getCompanies({
-        type: 'organization',
+      adminApi.getOrganizationsList({
         limit: 100,
       }),
   });
 
   // Fetch organizations with current filter (for the list)
   const { data: companiesResult, isLoading } = useQuery({
-    queryKey: ['admin-organizations', statusFilter, page, limit],
+    queryKey: ['admin-organizations', statusFilter, debouncedSearch, page, limit],
     queryFn: () =>
-      adminApi.getCompanies({
-        type: 'organization',
+      adminApi.getOrganizationsList({
         status: statusFilter === 'all' ? undefined : statusFilter,
+        name: debouncedSearch || undefined,
         page,
         limit,
       }),
@@ -532,18 +542,6 @@ export default function AdminRestaurantsPage() {
   const companies = companiesResult?.success ? companiesResult.data?.data || [] : [];
   const meta = companiesResult?.success ? companiesResult.data?.meta : null;
 
-  // Client-side search filter
-  const filteredCompanies = companies.filter(
-    (company) =>
-      company.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      company.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      company.address?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      company.legalName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      company.taxNumber?.toString().includes(searchTerm) ||
-      company.authorizedPerson?.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      company.authorizedPerson?.lastName?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
   // Status counts from the unfiltered query
   const allOrgs = allOrgsResult?.success ? allOrgsResult.data?.data || [] : [];
   const allOrgsMeta = allOrgsResult?.success ? allOrgsResult.data?.meta : null;
@@ -555,7 +553,7 @@ export default function AdminRestaurantsPage() {
   };
 
   // Transform for map
-  const mapRestaurants = filteredCompanies
+  const mapRestaurants = companies
     .filter((c) => c.lat && c.lng)
     .map((c) => ({
       id: String(c.id),
@@ -701,11 +699,11 @@ export default function AdminRestaurantsPage() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <p className="text-sm text-slate-500">
-                {filteredCompanies.length} {t.admin.orgListing}
+                {companies.length} {t.admin.orgListing}
               </p>
             </div>
 
-            {filteredCompanies.length === 0 ? (
+            {companies.length === 0 ? (
               <Card className="border-0 shadow-sm">
                 <CardContent className="py-12 text-center">
                   <Building2 className="h-12 w-12 text-slate-300 mx-auto mb-3" />
@@ -716,7 +714,7 @@ export default function AdminRestaurantsPage() {
                 </CardContent>
               </Card>
             ) : (
-              filteredCompanies.map((company) => (
+              companies.map((company) => (
                 <CompanyDetailCard
                   key={company.id}
                   company={company}
@@ -766,9 +764,9 @@ export default function AdminRestaurantsPage() {
                 </CardTitle>
                 <CardDescription>
                   {mapRestaurants.length} {t.admin.orgOnMap}
-                  {mapRestaurants.length < filteredCompanies.length && (
+                  {mapRestaurants.length < companies.length && (
                     <span className="text-amber-600 ml-1">
-                      ({filteredCompanies.length - mapRestaurants.length} {t.admin.orgNoLocation})
+                      ({companies.length - mapRestaurants.length} {t.admin.orgNoLocation})
                     </span>
                   )}
                 </CardDescription>
@@ -778,7 +776,7 @@ export default function AdminRestaurantsPage() {
                   restaurants={mapRestaurants}
                   selectedRestaurantId={selectedCompany ? String(selectedCompany.id) : null}
                   onRestaurantSelect={(r) => {
-                    const found = filteredCompanies.find((c) => String(c.id) === r?.id);
+                    const found = companies.find((c) => String(c.id) === r?.id);
                     setSelectedCompany(found || null);
                   }}
                   height="500px"

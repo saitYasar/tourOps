@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -29,6 +29,7 @@ import {
   type ResourceDto,
   type ClientStopChoicesDto,
   type ClientServiceChoiceDto,
+  type ClientProfileDto,
 } from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
@@ -76,6 +77,8 @@ export default function CustomerTourDetailPage() {
   const [serviceChoiceIds, setServiceChoiceIds] = useState<Record<number, Record<number, number>>>({});
   // Notes per menu item: stopId -> { serviceId -> note }
   const [menuNotes, setMenuNotes] = useState<Record<number, Record<number, string>>>({});
+  // Debounce timers for note API calls
+  const noteTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   // Children cache for layout hierarchy (floor -> rooms, room -> tables, table -> chairs)
   const [childrenCache, setChildrenCache] = useState<Record<number, ResourceDto[]>>({});
@@ -108,10 +111,21 @@ export default function CustomerTourDetailPage() {
   // Stop layout for table selection
   const { data: layoutData, isLoading: layoutLoading, error: layoutError } = useQuery({
     queryKey: ['client-stop-layout', tableStopId, apiLang],
-    queryFn: () => apiClient.getStopLayout(tableStopId!, apiLang),
+    queryFn: () => apiClient.getStopLayout(tableStopId!),
     enabled: !!tableStopId,
     retry: false,
   });
+
+  // Client profile (for identifying own seat)
+  const { data: clientProfileData } = useQuery({
+    queryKey: ['client-profile', apiLang],
+    queryFn: () => apiClient.getClientProfile(apiLang),
+  });
+  const clientProfile: ClientProfileDto | undefined = clientProfileData
+    ? (typeof clientProfileData === 'object' && 'data' in clientProfileData
+      ? (clientProfileData as unknown as { data: ClientProfileDto }).data
+      : clientProfileData as ClientProfileDto)
+    : undefined;
 
   // Load existing choices for a stop
   const loadStopChoices = useCallback(async (stopId: number) => {
@@ -124,16 +138,34 @@ export default function CustomerTourDetailPage() {
       // Sync resource choice
       if (choices?.resourceChoice) {
         const rc = choices.resourceChoice;
-        // We store minimal info - the resource name comes from the resource
-        setSelectedTables(prev => ({
-          ...prev,
-          [stopId]: {
-            resourceId: rc.resourceId,
-            floorName: '',
-            roomName: '',
-            tableName: rc.resource?.name || `#${rc.resourceId}`,
-          },
-        }));
+        // API returns an array of resource hierarchy items
+        if (Array.isArray(rc) && rc.length > 0) {
+          const findByType = (type: string) => rc.find((item: { resourceTypeCode: string }) => item.resourceTypeCode === type);
+          const floor = findByType('floor');
+          const room = findByType('room');
+          const table = findByType('table');
+          const seat = findByType('seat');
+          setSelectedTables(prev => ({
+            ...prev,
+            [stopId]: {
+              resourceId: 0,
+              floorName: floor?.resourceName || '',
+              roomName: room?.resourceName || '',
+              tableName: seat ? `${table?.resourceName || ''} - ${seat.resourceName}` : (table?.resourceName || ''),
+            },
+          }));
+        } else if (!Array.isArray(rc)) {
+          // Legacy single object format
+          setSelectedTables(prev => ({
+            ...prev,
+            [stopId]: {
+              resourceId: rc.resourceId,
+              floorName: '',
+              roomName: '',
+              tableName: rc.resource?.name || `#${rc.resourceId}`,
+            },
+          }));
+        }
       }
 
       // Sync service choices
@@ -157,13 +189,14 @@ export default function CustomerTourDetailPage() {
     }
   }, [apiLang]);
 
-  // Fetch children for a resource (rooms for floor, tables for room, chairs for table)
+  // Fetch children for a resource via layout API with parentId
   const fetchChildren = useCallback(async (parentId: number, force = false) => {
     if (!force && childrenCache[parentId]) return;
+    if (!tableStopId) return;
     setLoadingChildren(true);
     try {
-      const result = await apiClient.getResourceChildren(parentId, 1, 100);
-      const children = result?.data ?? result ?? [];
+      const result = await apiClient.getStopLayout(tableStopId, parentId);
+      const children = Array.isArray(result) ? result : (result as unknown as { data?: ResourceDto[] })?.data ?? [];
       const childArray = Array.isArray(children) ? children : [];
       setChildrenCache(prev => ({ ...prev, [parentId]: childArray }));
     } catch {
@@ -171,7 +204,7 @@ export default function CustomerTourDetailPage() {
     } finally {
       setLoadingChildren(false);
     }
-  }, [childrenCache]);
+  }, [childrenCache, tableStopId, apiLang]);
 
   // Load choices for all approved stops on mount
   useEffect(() => {
@@ -257,17 +290,29 @@ export default function CustomerTourDetailPage() {
   };
 
   // Select a chair - save to backend, then auto-open menu
-  const handleSelectChair = async (chair: ResourceDto) => {
+  const handleSelectChair = async (chair: ResourceDto, skipConfirm = false) => {
     if (!tableStopId) return;
     const currentStopId = tableStopId;
+
+    // If user already has a seat and clicks a different empty seat, ask for confirmation
+    const hasExisting = !!selectedTables[currentStopId];
+    if (hasExisting && !skipConfirm && selectedTables[currentStopId]?.resourceId !== chair.id) {
+      const confirmed = window.confirm(t.customer.confirmSeatChange);
+      if (!confirmed) return;
+    }
+
     const parentNames = findParentNames(chair.id);
     setSavingTable(true);
     try {
-      const hasExisting = !!selectedTables[currentStopId];
       if (hasExisting) {
         await apiClient.updateResourceChoice(currentStopId, { resourceId: chair.id });
       } else {
         await apiClient.createResourceChoice(currentStopId, { resourceId: chair.id });
+      }
+      // Refresh children cache for the table to update occupancy
+      const tableId = chair.parentId;
+      if (tableId) {
+        fetchChildren(tableId, true);
       }
       setSelectedTables(prev => ({
         ...prev,
@@ -348,21 +393,28 @@ export default function CustomerTourDetailPage() {
   const getItemNote = (stopId: number, serviceId: number) =>
     menuNotes[stopId]?.[serviceId] ?? '';
 
-  const setItemNote = async (stopId: number, serviceId: number, note: string) => {
+  const setItemNote = (stopId: number, serviceId: number, note: string) => {
     // Update local state immediately
     setMenuNotes(prev => ({
       ...prev,
       [stopId]: { ...(prev[stopId] || {}), [serviceId]: note },
     }));
-    // If a choice already exists, save to backend
-    const choiceId = serviceChoiceIds[stopId]?.[serviceId];
-    if (choiceId) {
-      try {
-        await apiClient.updateServiceChoice(choiceId, { note });
-      } catch (err) {
-        console.error('Not kaydedilemedi:', err);
-      }
+    // Debounce the API call — wait until user stops typing
+    const timerKey = `${stopId}_${serviceId}`;
+    if (noteTimersRef.current[timerKey]) {
+      clearTimeout(noteTimersRef.current[timerKey]);
     }
+    noteTimersRef.current[timerKey] = setTimeout(async () => {
+      delete noteTimersRef.current[timerKey];
+      const choiceId = serviceChoiceIds[stopId]?.[serviceId];
+      if (choiceId) {
+        try {
+          await apiClient.updateServiceChoice(choiceId, { note });
+        } catch (err) {
+          console.error('Not kaydedilemedi:', err);
+        }
+      }
+    }, 800);
   };
 
   // Calculate total price for a stop's menu selections
@@ -484,13 +536,20 @@ export default function CustomerTourDetailPage() {
 
         {/* Stops */}
         <div>
+          {/* Filter out rejected pre-reservations — only show pending & approved */}
+          {(() => {
+            const visibleStops = (tour.stops || []).filter(
+              (s: ClientTourStopDto) => s.preReservationStatus !== 'rejected'
+            );
+            return (
+              <>
           <div className="flex items-center gap-2 mb-4">
             <MapPin className="h-5 w-5 text-orange-500" />
             <h3 className="text-lg font-bold text-slate-800">{t.customer.stops}</h3>
-            <span className="text-sm text-slate-500">({tour.stops?.length || 0})</span>
+            <span className="text-sm text-slate-500">({visibleStops.length})</span>
           </div>
 
-          {!tour.stops || tour.stops.length === 0 ? (
+          {visibleStops.length === 0 ? (
             <Card className="bg-white border-dashed border-2 border-orange-200">
               <CardContent className="p-8 text-center">
                 <MapPin className="h-12 w-12 text-orange-300 mx-auto mb-3" />
@@ -499,7 +558,7 @@ export default function CustomerTourDetailPage() {
             </Card>
           ) : (
             <div className="space-y-3">
-              {tour.stops.map((stop: ClientTourStopDto) => {
+              {visibleStops.map((stop: ClientTourStopDto) => {
                 const org = stop.organization;
                 const preResCfg = stop.preReservationStatus
                   ? preResStatusConfig[stop.preReservationStatus] || preResStatusConfig.pending
@@ -568,7 +627,7 @@ export default function CustomerTourDetailPage() {
                           {tableInfo && (
                             <div className="flex items-center gap-1 text-xs text-emerald-600 mt-1.5 font-medium">
                               <Check className="h-3 w-3" />
-                              {t.customer.table}: {tableInfo.roomName} - {tableInfo.tableName}
+                              {[tableInfo.floorName, tableInfo.roomName, tableInfo.tableName].filter(Boolean).join(' · ')}
                             </div>
                           )}
 
@@ -625,6 +684,9 @@ export default function CustomerTourDetailPage() {
               })}
             </div>
           )}
+              </>
+            );
+          })()}
         </div>
       </div>
 
@@ -660,6 +722,7 @@ export default function CustomerTourDetailPage() {
                 onSelectChair={handleSelectChair}
                 savingTable={savingTable}
                 existingResourceId={tableStopId ? selectedTables[tableStopId]?.resourceId : undefined}
+                currentClientId={clientProfile?.id}
               />
             )}
           </div>
@@ -822,6 +885,12 @@ function InteractiveMenuCategory({
                     </div>
                     {svc.description && (
                       <p className="text-[11px] text-stone-400 mt-1 line-clamp-2 leading-snug">{svc.description}</p>
+                    )}
+                    {svc.contentsDescription && (
+                      <div className="mt-1.5 p-1.5 bg-amber-50/60 rounded border border-amber-100">
+                        <p className="text-[10px] font-medium text-amber-700 mb-0.5">{t.menu?.serviceContentsDescription ?? 'İçindekiler & Hizmet Açıklaması'}</p>
+                        <p className="text-[11px] text-stone-500 leading-snug whitespace-pre-line">{svc.contentsDescription}</p>
+                      </div>
                     )}
                     {/* Note indicator when collapsed */}
                     {qty > 0 && note && (

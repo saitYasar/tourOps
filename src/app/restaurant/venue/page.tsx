@@ -1037,7 +1037,7 @@ export default function VenuePage() {
                   <Pencil className="h-4 w-4 text-blue-600" />
                 </div>
                 <p className="text-sm text-blue-800">
-                  Düzenleme yapmak için Mekan Planı sekmesine geçin.
+                  Düzenleme yapmak için Kat Planı sekmesine geçin.
                 </p>
               </div>
             )}

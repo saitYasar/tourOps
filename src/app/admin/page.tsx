@@ -67,38 +67,50 @@ export default function AdminDashboardPage() {
   // Calculate inactive (pasif) - organizations that are suspended
   const inactiveOrgs = suspendedOrgs;
 
+  // Agencies by status
+  const activeAgencies = agencies.filter(agency => agency.status === 'active').length;
+  const suspendedAgencies = agencies.filter(agency => agency.status === 'suspended').length;
+
+  // Combined company stats (organizations + agencies)
+  const totalCompanies = totalOrgs + totalAgencies;
+  const activeCompanies = activeOrgs + activeAgencies;
+  const inactiveCompanies = inactiveOrgs + suspendedAgencies;
+  const pendingCompanies = pendingOrgs + pendingAgencies;
+
+  const hasAnyError = !orgsResult?.success || !agenciesResult?.success;
+
   const statsCards = [
     {
-      title: t.admin.totalOrgLabel,
-      value: totalOrgs,
+      title: t.admin.totalCompanyLabel,
+      value: totalCompanies,
       icon: Building2,
       color: 'bg-orange-500',
       href: '/admin/restaurants',
-      hasError: !orgsResult?.success,
+      hasError: hasAnyError,
     },
     {
-      title: t.admin.activeOrgLabel,
-      value: activeOrgs,
+      title: t.admin.activeCompanyLabel,
+      value: activeCompanies,
       icon: CheckCircle2,
       color: 'bg-green-500',
       href: '/admin/restaurants?status=active',
-      hasError: !orgsResult?.success,
+      hasError: hasAnyError,
     },
     {
-      title: t.admin.inactiveOrgLabel,
-      value: inactiveOrgs,
+      title: t.admin.inactiveCompanyLabel,
+      value: inactiveCompanies,
       icon: Ban,
       color: 'bg-red-500',
       href: '/admin/restaurants?status=suspended',
-      hasError: !orgsResult?.success,
+      hasError: hasAnyError,
     },
     {
       title: t.admin.pendingApproval,
-      value: pendingOrgs,
+      value: pendingCompanies,
       icon: Clock,
       color: 'bg-amber-500',
       href: '/admin/restaurants?status=pending',
-      hasError: !orgsResult?.success,
+      hasError: hasAnyError,
     },
   ];
 

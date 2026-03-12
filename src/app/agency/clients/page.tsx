@@ -38,7 +38,6 @@ const initialFormData: ClientFormData = {
 
 export default function AgencyClientsPage() {
   const { t, locale } = useLanguage();
-  const apiLang = (locale === 'de' ? 'en' : locale) as 'tr' | 'en';
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -60,8 +59,8 @@ export default function AgencyClientsPage() {
     error,
     refetch,
   } = useQuery({
-    queryKey: ['agency-clients', apiLang],
-    queryFn: () => agencyApi.getClients(1, 100, apiLang),
+    queryKey: ['agency-clients'],
+    queryFn: () => agencyApi.getClients(1, 100),
   });
 
   const clients = clientsData?.success ? clientsData.data?.data || [] : [];

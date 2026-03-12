@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   MapPin,
   Phone,
@@ -68,6 +68,7 @@ export default function AgencySetupPage() {
   const router = useRouter();
   const { t } = useLanguage();
   const { updateSessionFromRegistration } = useAuth();
+  const queryClient = useQueryClient();
 
   const steps = useMemo<{ id: Step; title: string; description: string }[]>(() => [
     { id: 'basic', title: t.agency.basicInfo, description: t.agency.basicInfoDesc },
@@ -147,6 +148,7 @@ export default function AgencySetupPage() {
         }
 
         toast.success(t.agency.agencyCreated);
+        queryClient.invalidateQueries({ queryKey: ['my-agency'] });
         router.push('/agency');
       } else {
         toast.error(result.error || t.agency.agencyCreateFailed);

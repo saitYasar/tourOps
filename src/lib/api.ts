@@ -397,6 +397,15 @@ export interface ResourceCoordinates {
 }
 
 // Kaynak - Tek tablo, parent-child ilişkisi
+// Client info attached to a resource (e.g. chair occupant from layout API)
+export interface ResourceClientDto {
+  id: number;
+  firstName: string;
+  lastName: string;
+  username?: string;
+  profilePhoto?: string | null;
+}
+
 export interface ResourceDto {
   id: number;
   organizationId: number;
@@ -405,6 +414,7 @@ export interface ResourceDto {
   parentId: number | null;         // Üst kaynak (null = kök seviye)
   parent?: ResourceDto;            // Join ile gelen üst kaynak
   children?: ResourceDto[];        // Alt kaynaklar
+  client?: ResourceClientDto | null; // Sandalyede oturan müşteri bilgisi
 
   name: string;                    // "Kat 1", "Salon A", "Masa 5"
   capacity: number;                // Kapasite (kişi sayısı)
@@ -546,6 +556,7 @@ export interface ServiceDto {
   title: string;
   subTitle?: string | null;
   description?: string | null;
+  contentsDescription?: string | null;
   imageKey?: string | null;
   imageUrl?: string | null;
   basePrice: number | string;
@@ -564,6 +575,7 @@ export interface CreateServiceDto {
   priceType: PriceType;
   subTitle?: string;
   description?: string;
+  contentsDescription?: string;
   estimatedDurationMinutes?: number;
 }
 
@@ -571,6 +583,7 @@ export interface UpdateServiceDto {
   title?: string;
   subTitle?: string;
   description?: string;
+  contentsDescription?: string;
   basePrice?: number;
   priceType?: PriceType;
   estimatedDurationMinutes?: number;
@@ -629,6 +642,7 @@ export interface CompanyDto {
 export interface CompanyFilters {
   type: CompanyType;
   status?: CompanyStatus;
+  search?: string;
   page?: number;
   limit?: number;
   lang?: 'tr' | 'en';
@@ -866,6 +880,7 @@ export interface ClientStopMenuServiceDto {
   title: string;
   subTitle: string | null;
   description: string | null;
+  contentsDescription: string | null;
   basePrice: string | number;
   priceType: string;
   imageUrl: string | null;
@@ -884,6 +899,12 @@ export interface CreateServiceChoiceDto {
 export interface UpdateServiceChoiceDto {
   quantity?: number;
   note?: string;
+}
+
+export interface ClientResourceChoiceItemDto {
+  resourceTypeCode: string;   // "floor" | "room" | "table" | "seat"
+  resourceTypeName: string;   // "Floor" | "Room" | "Table" | "Chair"
+  resourceName: string;       // "1. Kat", "Salon 1", "Masa 1", "Masa 1-3"
 }
 
 export interface ClientResourceChoiceDto {
@@ -905,7 +926,7 @@ export interface ClientServiceChoiceDto {
 }
 
 export interface ClientStopChoicesDto {
-  resourceChoice?: ClientResourceChoiceDto | null;
+  resourceChoice?: ClientResourceChoiceItemDto[] | ClientResourceChoiceDto | null;
   serviceChoices?: ClientServiceChoiceDto[];
   [key: string]: unknown;
 }
@@ -915,7 +936,7 @@ export interface AgencyStopChoicesDto {
   clientId: number;
   clientName?: string;
   client?: { id: number; firstName?: string; lastName?: string; email?: string; profilePhoto?: string | null };
-  resourceChoice?: ClientResourceChoiceDto | null;
+  resourceChoice?: ClientResourceChoiceItemDto[] | ClientResourceChoiceDto | null;
   serviceChoices?: ClientServiceChoiceDto[];
   [key: string]: unknown;
 }
@@ -1091,6 +1112,8 @@ export interface ApiTourDto {
   coverImageUrl?: string | null;
   galleryImages?: { id: number; imageUrl: string }[];
   stops?: ApiTourStopDto[];
+  agency?: { id: number; name: string; email?: string; phone?: string };
+  participants?: { id: number; clientId: number; clientName?: string; status?: string; notes?: string }[];
   createdAt?: string;
   updatedAt?: string;
 }
@@ -1124,6 +1147,7 @@ export interface ApiTourStopDto {
   scheduledStartTime: string;
   scheduledEndTime: string;
   showPriceToCustomer?: boolean;
+  preReservationStatus?: 'pending' | 'approved' | 'rejected' | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -1561,9 +1585,12 @@ class ApiClient {
   // Organizations - Public
   // ============================================
 
-  async getOrganizationsPublic(page = 1, limit = 10, name?: string, lang: 'tr' | 'en' = 'tr') {
+  async getOrganizationsPublic(page = 1, limit = 10, name?: string, lang: 'tr' | 'en' = 'tr', filters?: { cityId?: number; districtId?: number; categoryId?: number }) {
     const params = new URLSearchParams({ page: String(page), limit: String(limit), status: 'active' });
     if (name) params.set('name', name);
+    if (filters?.cityId) params.set('cityId', String(filters.cityId));
+    if (filters?.districtId) params.set('districtId', String(filters.districtId));
+    if (filters?.categoryId) params.set('categoryId', String(filters.categoryId));
     return this.request<PaginatedResponse<OrganizationPublicDto>>(`/organizations?${params}`, {
       method: 'GET',
     }, lang);
@@ -1830,10 +1857,10 @@ class ApiClient {
   // Agencies - Get My Agency
   // ============================================
 
-  async getMyAgency(lang: 'tr' | 'en' = 'tr') {
+  async getMyAgency() {
     return this.request<AgencyResponseDto>('/agencies/my', {
       method: 'GET',
-    }, lang);
+    }, 'tr', true); // skipLang - this endpoint doesn't accept lang param
   }
 
   // ============================================
@@ -1952,11 +1979,11 @@ class ApiClient {
   // Agencies - Clients
   // ============================================
 
-  async getAgencyClients(page = 1, limit = 10, lang: 'tr' | 'en' = 'tr') {
+  async getAgencyClients(page = 1, limit = 10) {
     const url = `/agencies/clients?page=${page}&limit=${limit}`;
     return this.request<PaginatedResponse<AgencyClientDto>>(url, {
       method: 'GET',
-    }, lang);
+    }, 'tr', true);
   }
 
   // Note: GET /agencies/clients/{clientId} returns 404 - backend only supports list and delete
@@ -2415,8 +2442,8 @@ class ApiClient {
   // Service Categories
   // ============================================
 
-  async getServiceCategories() {
-    return this.request<ServiceCategoryDto[]>('/service-categories/tree', {
+  async getServiceCategories(lang: string = 'tr') {
+    return this.request<ServiceCategoryDto[]>(`/service-categories/tree?lang=${lang}`, {
       method: 'GET',
     }, 'tr', true);
   }
@@ -2471,6 +2498,7 @@ class ApiClient {
     formData.append('priceType', data.priceType);
     if (data.subTitle) formData.append('subTitle', data.subTitle);
     if (data.description) formData.append('description', data.description);
+    if (data.contentsDescription) formData.append('contentsDescription', data.contentsDescription);
     if (data.estimatedDurationMinutes !== undefined) {
       formData.append('estimatedDurationMinutes', String(data.estimatedDurationMinutes));
     }
@@ -2498,6 +2526,7 @@ class ApiClient {
     if (data.title !== undefined) formData.append('title', data.title);
     if (data.subTitle !== undefined) formData.append('subTitle', data.subTitle);
     if (data.description !== undefined) formData.append('description', data.description);
+    if (data.contentsDescription !== undefined) formData.append('contentsDescription', data.contentsDescription);
     if (data.basePrice !== undefined) formData.append('basePrice', String(data.basePrice));
     if (data.priceType !== undefined) formData.append('priceType', data.priceType);
     if (data.estimatedDurationMinutes !== undefined) {
@@ -2531,8 +2560,8 @@ class ApiClient {
     }, 'tr', true);
   }
 
-  async getServicesByCategory(categoryId: number, page = 1, limit = 100) {
-    return this.request<PaginatedResponse<ServiceDto>>(`/services/category/${categoryId}?page=${page}&limit=${limit}`, {
+  async getServicesByCategory(categoryId: number, page = 1, limit = 100, lang: string = 'tr') {
+    return this.request<PaginatedResponse<ServiceDto>>(`/services/category/${categoryId}?page=${page}&limit=${limit}&lang=${lang}`, {
       method: 'GET',
     }, 'tr', true);
   }
@@ -2563,10 +2592,13 @@ class ApiClient {
     return this.request<any>(`/organization/pre-reservations/${id}`, { method: 'GET' }, lang);
   }
 
-  async approveOrgPreReservation(id: number, choiceDeadline?: number, lang: 'tr' | 'en' = 'tr') {
+  async approveOrgPreReservation(id: number, choiceDeadline?: number, responseNote?: string, lang: 'tr' | 'en' = 'tr') {
     const body: Record<string, unknown> = {};
     if (choiceDeadline !== undefined && choiceDeadline !== null) {
       body.choiceDeadline = choiceDeadline;
+    }
+    if (responseNote) {
+      body.responseNote = responseNote;
     }
     return this.request<any>(`/organization/pre-reservations/${id}/approve`, {
       method: 'PUT',
@@ -2614,6 +2646,7 @@ class ApiClient {
     const params = new URLSearchParams();
     params.set('type', filters.type);
     if (filters.status) params.set('status', filters.status);
+    if (filters.search) params.set('search', filters.search);
     if (filters.page) params.set('page', String(filters.page));
     if (filters.limit) params.set('limit', String(filters.limit));
     if (filters.lang) params.set('lang', filters.lang);
@@ -2621,6 +2654,29 @@ class ApiClient {
     return this.request<PaginatedResponse<CompanyDto>>(`/admin/companies?${params.toString()}`, {
       method: 'GET',
     }, filters.lang || 'tr', true); // skipLang since we add it manually
+  }
+
+  async getOrganizationsList(filters: { name?: string; status?: CompanyStatus; page?: number; limit?: number; lang?: 'tr' | 'en' }) {
+    const params = new URLSearchParams();
+    if (filters.name) params.set('name', filters.name);
+    if (filters.status) params.set('status', filters.status);
+    if (filters.page) params.set('page', String(filters.page));
+    if (filters.limit) params.set('limit', String(filters.limit));
+
+    return this.request<PaginatedResponse<CompanyDto>>(`/organizations?${params.toString()}`, {
+      method: 'GET',
+    }, filters.lang || 'tr');
+  }
+
+  async getAgenciesList(filters: { name?: string; page?: number; limit?: number; lang?: 'tr' | 'en' }) {
+    const params = new URLSearchParams();
+    if (filters.name) params.set('name', filters.name);
+    if (filters.page) params.set('page', String(filters.page));
+    if (filters.limit) params.set('limit', String(filters.limit));
+
+    return this.request<PaginatedResponse<CompanyDto>>(`/agencies?${params.toString()}`, {
+      method: 'GET',
+    }, filters.lang || 'tr');
   }
 
   async getAgencyById(id: number, lang: 'tr' | 'en' = 'tr') {
@@ -2848,8 +2904,10 @@ class ApiClient {
   // Admin - Tours
   // ============================================
 
-  async getAdminTours(page = 1, limit = 10, lang: 'tr' | 'en' = 'tr') {
-    return this.request<PaginatedResponse<ApiTourDto>>(`/admin/tours?page=${page}&limit=${limit}`, {}, lang);
+  async getAdminTours(page = 1, limit = 10, lang: 'tr' | 'en' = 'tr', status?: string) {
+    let url = `/admin/tours?page=${page}&limit=${limit}`;
+    if (status) url += `&status=${status}`;
+    return this.request<PaginatedResponse<ApiTourDto>>(url, {}, lang);
   }
 
   async getAdminTourById(id: number, lang: 'tr' | 'en' = 'tr') {
@@ -3080,10 +3138,11 @@ class ApiClient {
     }, lang);
   }
 
-  async getStopLayout(stopId: number, lang: 'tr' | 'en' = 'tr') {
-    return this.request<ResourceDto[]>(`/client/tours/stops/${stopId}/layout`, {
+  async getStopLayout(stopId: number, parentId?: number) {
+    const params = parentId !== undefined ? `?parentId=${parentId}` : '';
+    return this.request<ResourceDto[]>(`/client/tours/stops/${stopId}/layout${params}`, {
       method: 'GET',
-    }, lang);
+    }, 'tr', true);
   }
 
   // Resource choice (table/seat selection)
@@ -3394,9 +3453,9 @@ export const realAuthApi = {
   // Organizations - Public
   // ============================================
 
-  async getOrganizationsPublic(page = 1, limit = 10, name?: string, lang: 'tr' | 'en' = 'tr') {
+  async getOrganizationsPublic(page = 1, limit = 10, name?: string, lang: 'tr' | 'en' = 'tr', filters?: { cityId?: number; districtId?: number; categoryId?: number }) {
     try {
-      const response = await apiClient.getOrganizationsPublic(page, limit, name, lang);
+      const response = await apiClient.getOrganizationsPublic(page, limit, name, lang, filters);
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
@@ -3825,9 +3884,9 @@ export const agencyApi = {
   },
 
   // Get clients
-  async getClients(page = 1, limit = 10, lang: 'tr' | 'en' = 'tr') {
+  async getClients(page = 1, limit = 10) {
     try {
-      const response = await apiClient.getAgencyClients(page, limit, lang);
+      const response = await apiClient.getAgencyClients(page, limit);
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
@@ -4070,6 +4129,38 @@ export const adminApi = {
       }
 
       // Normalize meta: API returns totalCount, frontend expects total
+      if (response.meta && !response.meta.total && response.meta.totalCount) {
+        response.meta.total = response.meta.totalCount;
+      }
+
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  // List organizations via GET /organizations (supports name search)
+  async getOrganizationsList(filters: { name?: string; status?: CompanyStatus; page?: number; limit?: number; lang?: 'tr' | 'en' }) {
+    try {
+      const response = await apiClient.getOrganizationsList(filters);
+
+      // Normalize meta
+      if (response.meta && !response.meta.total && response.meta.totalCount) {
+        response.meta.total = response.meta.totalCount;
+      }
+
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  // List agencies via GET /agencies (supports name search)
+  async getAgenciesList(filters: { name?: string; page?: number; limit?: number; lang?: 'tr' | 'en' }) {
+    try {
+      const response = await apiClient.getAgenciesList(filters);
+
+      // Normalize meta
       if (response.meta && !response.meta.total && response.meta.totalCount) {
         response.meta.total = response.meta.totalCount;
       }
@@ -4378,9 +4469,9 @@ export const adminApi = {
   // Tours
   // ============================================
 
-  async getTours(page = 1, limit = 50, lang: 'tr' | 'en' = 'tr') {
+  async getTours(page = 1, limit = 50, lang: 'tr' | 'en' = 'tr', status?: string) {
     try {
-      const response = await apiClient.getAdminTours(page, limit, lang);
+      const response = await apiClient.getAdminTours(page, limit, lang, status);
       // Normalize: backend may return tourPhotos instead of galleryImages
       const data = (response.data || []).map((tour: any) => {
         if (!tour.galleryImages && tour.tourPhotos) {
@@ -4419,9 +4510,9 @@ export const adminApi = {
 // ============================================
 
 export const serviceCategoryApi = {
-  async getAll(): Promise<{ success: boolean; data?: ServiceCategoryDto[]; error?: string }> {
+  async getAll(lang: string = 'tr'): Promise<{ success: boolean; data?: ServiceCategoryDto[]; error?: string }> {
     try {
-      const response = await apiClient.getServiceCategories();
+      const response = await apiClient.getServiceCategories(lang);
       const data = Array.isArray(response) ? response : (response as any).data ?? [];
       return { success: true, data };
     } catch (error) {
@@ -4517,9 +4608,9 @@ export const serviceApi = {
     }
   },
 
-  async getByCategory(categoryId: number, page = 1, limit = 100): Promise<{ success: boolean; data?: ServiceDto[]; error?: string }> {
+  async getByCategory(categoryId: number, page = 1, limit = 100, lang: string = 'tr'): Promise<{ success: boolean; data?: ServiceDto[]; error?: string }> {
     try {
-      const response = await apiClient.getServicesByCategory(categoryId, page, limit);
+      const response = await apiClient.getServicesByCategory(categoryId, page, limit, lang);
       return { success: true, data: response.data };
     } catch (error) {
       return { success: false, error: (error as Error).message };
@@ -4770,9 +4861,9 @@ export const preReservationOrgApi = {
     }
   },
 
-  async approve(id: number, choiceDeadline?: number, lang: 'tr' | 'en' = 'tr'): Promise<{ success: boolean; error?: string }> {
+  async approve(id: number, choiceDeadline?: number, responseNote?: string, lang: 'tr' | 'en' = 'tr'): Promise<{ success: boolean; error?: string }> {
     try {
-      await apiClient.approveOrgPreReservation(id, choiceDeadline, lang);
+      await apiClient.approveOrgPreReservation(id, choiceDeadline, responseNote, lang);
       return { success: true };
     } catch (error) {
       return { success: false, error: (error as Error).message };

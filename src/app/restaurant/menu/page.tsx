@@ -16,6 +16,7 @@ import {
   ChevronRight,
   ChevronDown,
   Globe,
+  Info,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -74,6 +75,7 @@ interface ServiceFormData {
   title: string;
   subTitle: string;
   description: string;
+  contentsDescription: string;
   basePrice: number;
   priceType: PriceType;
   estimatedDurationMinutes: number;
@@ -89,6 +91,7 @@ const initialServiceForm: ServiceFormData = {
   title: '',
   subTitle: '',
   description: '',
+  contentsDescription: '',
   basePrice: 0,
   priceType: 'fixed',
   estimatedDurationMinutes: 0,
@@ -153,7 +156,7 @@ function PreviewServiceList({
           <div className="flex-1 min-w-0 py-0.5">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-stone-800 leading-tight">{s.title}</p>
+                <p className="text-sm font-semibold text-stone-800 leading-tight truncate" title={s.title}>{s.title}</p>
                 {s.subTitle && (
                   <p className="text-xs text-stone-500 mt-0.5 leading-tight">{s.subTitle}</p>
                 )}
@@ -167,6 +170,12 @@ function PreviewServiceList({
             </div>
             {s.description && (
               <p className="text-[11px] text-stone-400 mt-1 line-clamp-2 leading-snug">{s.description}</p>
+            )}
+            {s.contentsDescription && (
+              <div className="mt-1.5 p-1.5 bg-amber-50/60 rounded border border-amber-100">
+                <p className="text-[10px] font-medium text-amber-700 mb-0.5">{t.menu.serviceContentsDescription}</p>
+                <p className="text-[11px] text-stone-500 leading-snug whitespace-pre-line">{s.contentsDescription}</p>
+              </div>
             )}
           </div>
         </div>
@@ -390,9 +399,9 @@ export default function MenuPage() {
     error: categoriesError,
     refetch: refetchCategories,
   } = useQuery({
-    queryKey: ['serviceCategories'],
+    queryKey: ['serviceCategories', locale],
     queryFn: async () => {
-      const res = await serviceCategoryApi.getAll();
+      const res = await serviceCategoryApi.getAll(locale);
       if (!res.success) throw new Error(res.error);
       return res.data!;
     },
@@ -403,10 +412,10 @@ export default function MenuPage() {
     data: services,
     isLoading: servicesLoading,
   } = useQuery({
-    queryKey: ['servicesByCategory', selectedCategory?.id],
+    queryKey: ['servicesByCategory', selectedCategory?.id, locale],
     queryFn: async () => {
       if (!selectedCategory) return [];
-      const res = await serviceApi.getByCategory(selectedCategory.id);
+      const res = await serviceApi.getByCategory(selectedCategory.id, 1, 100, locale);
       if (!res.success) throw new Error(res.error);
       return res.data!;
     },
@@ -598,6 +607,7 @@ export default function MenuPage() {
       title: service.title,
       subTitle: service.subTitle || '',
       description: service.description || '',
+      contentsDescription: service.contentsDescription || '',
       basePrice: Number(service.basePrice),
       priceType: service.priceType,
       estimatedDurationMinutes: service.estimatedDurationMinutes || 0,
@@ -634,6 +644,7 @@ export default function MenuPage() {
           title: serviceForm.title,
           subTitle: serviceForm.subTitle || undefined,
           description: serviceForm.description || undefined,
+          contentsDescription: serviceForm.contentsDescription || undefined,
           basePrice: serviceForm.basePrice,
           priceType: serviceForm.priceType,
           estimatedDurationMinutes: serviceForm.estimatedDurationMinutes || undefined,
@@ -647,6 +658,7 @@ export default function MenuPage() {
           title: serviceForm.title,
           subTitle: serviceForm.subTitle || undefined,
           description: serviceForm.description || undefined,
+          contentsDescription: serviceForm.contentsDescription || undefined,
           basePrice: serviceForm.basePrice,
           priceType: serviceForm.priceType,
           estimatedDurationMinutes: serviceForm.estimatedDurationMinutes || undefined,
@@ -700,7 +712,26 @@ export default function MenuPage() {
   const handleCategoryReorder = async (fromId: number, toId: number) => {
     if (!categories) return;
 
-    const list = [...categories];
+    // Helper: find the sibling list that contains a given id
+    const findSiblingList = (id: number): ServiceCategoryDto[] | null => {
+      // Check top-level
+      if (categories.some((c) => c.id === id)) return categories;
+      // Check each parent's children
+      for (const parent of categories) {
+        if (parent.child_service_categories?.some((c) => c.id === id)) {
+          return parent.child_service_categories;
+        }
+      }
+      return null;
+    };
+
+    const fromList = findSiblingList(fromId);
+    const toList = findSiblingList(toId);
+
+    // Both must be in the same level (same parent or both top-level)
+    if (!fromList || !toList || fromList !== toList) return;
+
+    const list = [...fromList];
     const fromIdx = list.findIndex((c) => c.id === fromId);
     const toIdx = list.findIndex((c) => c.id === toId);
     if (fromIdx === -1 || toIdx === -1) return;
@@ -823,6 +854,15 @@ export default function MenuPage() {
                     </div>
                     <div className="flex items-center gap-1">
                       <Button
+                        variant="default"
+                        size="sm"
+                        className="h-8 text-xs"
+                        onClick={openCreateServiceForm}
+                      >
+                        <Plus className="h-3 w-3 mr-1" />
+                        {t.menu.newService}
+                      </Button>
+                      <Button
                         variant="outline"
                         size="sm"
                         className="h-8 text-xs"
@@ -873,8 +913,8 @@ export default function MenuPage() {
                     <div className="grid gap-3 md:grid-cols-2">
                       {services.map((service) => (
                         <Card key={service.id} className="overflow-hidden">
-                          <div className="flex">
-                            <div className="w-24 h-24 bg-slate-100 flex-shrink-0">
+                          <div className="flex p-3 gap-3">
+                            <div className="w-20 h-20 bg-slate-100 flex-shrink-0 rounded-lg overflow-hidden">
                               {service.imageUrl ? (
                                 <img
                                   src={service.imageUrl}
@@ -887,10 +927,10 @@ export default function MenuPage() {
                                 </div>
                               )}
                             </div>
-                            <CardContent className="flex-1 p-3">
+                            <CardContent className="flex-1 p-0">
                               <div className="flex items-start justify-between">
                                 <div className="min-w-0 flex-1">
-                                  <h4 className="font-medium text-sm">{service.title}</h4>
+                                  <h4 className="font-medium text-sm truncate" title={service.title}>{service.title}</h4>
                                   {service.subTitle && (
                                     <p className="text-xs text-slate-500 line-clamp-1">
                                       {service.subTitle}
@@ -1065,6 +1105,27 @@ export default function MenuPage() {
                     setServiceForm((prev) => ({ ...prev, description: e.target.value }))
                   }
                   placeholder={t.menu.serviceDescription}
+                  rows={3}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center gap-1.5">
+                  <Label htmlFor="serviceContentsDesc">{t.menu.serviceContentsDescription}</Label>
+                  <div className="relative group">
+                    <span className="text-amber-500 cursor-help font-bold text-sm">*</span>
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-800 text-white text-xs rounded-lg whitespace-normal w-64 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 leading-relaxed">
+                      {t.menu.serviceContentsDescriptionTooltip}
+                    </div>
+                  </div>
+                </div>
+                <Textarea
+                  id="serviceContentsDesc"
+                  value={serviceForm.contentsDescription}
+                  onChange={(e) =>
+                    setServiceForm((prev) => ({ ...prev, contentsDescription: e.target.value }))
+                  }
+                  placeholder={t.menu.serviceContentsDescription}
                   rows={3}
                 />
               </div>

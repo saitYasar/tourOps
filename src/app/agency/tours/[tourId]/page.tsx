@@ -43,7 +43,7 @@ import { toast } from 'sonner';
 import dynamic from 'next/dynamic';
 
 import { tourApi, tourStopApi, apiClient, agencyApi } from '@/lib/api';
-import type { ApiTourDto, ApiTourStopDto, CreateTourStopPayload, UpdateTourPayload, ServiceRequestDto, OrganizationPublicDto, TourClientDto, AgencyClientDto, AgencyStopChoicesDto, AgencyStopServiceSummaryDto, ResourceDto } from '@/lib/api';
+import type { ApiTourDto, ApiTourStopDto, CreateTourStopPayload, UpdateTourPayload, ServiceRequestDto, OrganizationPublicDto, TourClientDto, AgencyClientDto, AgencyStopChoicesDto, AgencyStopServiceSummaryDto, ResourceDto, CategoryDto, LocationDto } from '@/lib/api';
 import { formatDate } from '@/lib/dateUtils';
 import { useLanguage } from '@/contexts/LanguageContext';
 
@@ -107,10 +107,12 @@ export default function TourDetailPage() {
   const [isAddParticipantOpen, setIsAddParticipantOpen] = useState(false);
   const [addParticipantSearch, setAddParticipantSearch] = useState('');
   const [addParticipantNotes, setAddParticipantNotes] = useState('');
-  const [requestStatusFilter, setRequestStatusFilter] = useState<string>('all');
   const [orgSearch, setOrgSearch] = useState('');
   const [orgSearchDebounced, setOrgSearchDebounced] = useState('');
   const [selectedOrgDetail, setSelectedOrgDetail] = useState<OrganizationPublicDto | null>(null);
+  const [orgFilterCityId, setOrgFilterCityId] = useState<number | null>(null);
+  const [orgFilterDistrictId, setOrgFilterDistrictId] = useState<number | null>(null);
+  const [orgFilterCategoryId, setOrgFilterCategoryId] = useState<number | null>(null);
   const [choicesStopId, setChoicesStopId] = useState<number | null>(null);
   const [expandedClientId, setExpandedClientId] = useState<number | null>(null);
 
@@ -195,9 +197,9 @@ export default function TourDetailPage() {
 
   // Query: Agency clients (for add participant)
   const { data: agencyClients } = useQuery({
-    queryKey: ['agency-clients-all', apiLang],
+    queryKey: ['agency-clients-all'],
     queryFn: async () => {
-      const response = await apiClient.getAgencyClients(1, 100, apiLang);
+      const response = await apiClient.getAgencyClients(1, 100);
       return response.data;
     },
     enabled: isAddParticipantOpen,
@@ -240,7 +242,7 @@ export default function TourDetailPage() {
   const { data: stopLayout, isLoading: layoutLoading } = useQuery({
     queryKey: ['stop-layout', choicesStopId, apiLang],
     queryFn: async () => {
-      const response = await apiClient.getStopLayout(choicesStopId!, apiLang);
+      const response = await apiClient.getStopLayout(choicesStopId!);
       return Array.isArray(response) ? response : (response as any).data ?? [];
     },
     enabled: !!choicesStopId,
@@ -254,9 +256,43 @@ export default function TourDetailPage() {
 
   // Query: Search organizations for stop form
   const { data: searchedOrgs, isLoading: orgSearchLoading } = useQuery({
-    queryKey: ['org-search', orgSearchDebounced, apiLang],
+    queryKey: ['org-search', orgSearchDebounced, orgFilterCityId, orgFilterDistrictId, orgFilterCategoryId, apiLang],
     queryFn: async () => {
-      const response = await apiClient.getOrganizationsPublic(1, 20, orgSearchDebounced || undefined, apiLang);
+      const response = await apiClient.getOrganizationsPublic(1, 20, orgSearchDebounced || undefined, apiLang, {
+        cityId: orgFilterCityId || undefined,
+        districtId: orgFilterDistrictId || undefined,
+        categoryId: orgFilterCategoryId || undefined,
+      });
+      return response.data || [];
+    },
+    enabled: isStopFormOpen,
+  });
+
+  // Query: Cities for org filter
+  const { data: filterCities } = useQuery({
+    queryKey: ['filter-cities'],
+    queryFn: async () => {
+      const response = await apiClient.getCities();
+      return response.data || [];
+    },
+    enabled: isStopFormOpen,
+  });
+
+  // Query: Districts for org filter (depends on selected city)
+  const { data: filterDistricts } = useQuery({
+    queryKey: ['filter-districts', orgFilterCityId],
+    queryFn: async () => {
+      const response = await apiClient.getDistricts(orgFilterCityId!);
+      return response.data || [];
+    },
+    enabled: isStopFormOpen && !!orgFilterCityId,
+  });
+
+  // Query: Organization categories for org filter
+  const { data: filterCategories } = useQuery({
+    queryKey: ['filter-org-categories'],
+    queryFn: async () => {
+      const response = await apiClient.getOrganizationCategories();
       return response.data || [];
     },
     enabled: isStopFormOpen,
@@ -518,6 +554,9 @@ export default function TourDetailPage() {
     });
     setOrgSearch('');
     setSelectedOrgDetail(null);
+    setOrgFilterCityId(null);
+    setOrgFilterDistrictId(null);
+    setOrgFilterCategoryId(null);
   };
 
   const handleEditSubmit = (e: React.FormEvent) => {
@@ -639,7 +678,6 @@ export default function TourDetailPage() {
           <TabsList>
             <TabsTrigger value="info">{t.tours.info}</TabsTrigger>
             <TabsTrigger value="stops">{t.tours.stops} ({stops?.length || 0})</TabsTrigger>
-            <TabsTrigger value="requests">{t.tours.requests} ({serviceRequests?.length || 0})</TabsTrigger>
             <TabsTrigger value="clients">{t.tours.clients} ({tourClients?.length || 0})</TabsTrigger>
             <TabsTrigger value="choices">{t.tours.customerChoices}</TabsTrigger>
           </TabsList>
@@ -922,9 +960,28 @@ export default function TourDetailPage() {
                               {index + 1}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <h4 className="font-medium text-sm truncate">
-                                {stop.organization?.name || `Organization #${stop.organizationId}`}
-                              </h4>
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-medium text-sm truncate">
+                                  {stop.organization?.name || `Organization #${stop.organizationId}`}
+                                </h4>
+                                {(() => {
+                                  const dotConfig: Record<string, { color: string; label: string }> = {
+                                    pending: { color: 'bg-orange-400', label: t.tours.stopStatusPending },
+                                    approved: { color: 'bg-green-500', label: t.tours.stopStatusApproved },
+                                    rejected: { color: 'bg-red-500', label: t.tours.stopStatusRejected },
+                                  };
+                                  const status = stop.preReservationStatus;
+                                  const cfg = status
+                                    ? (dotConfig[status] || { color: 'bg-slate-300', label: status })
+                                    : { color: 'bg-slate-300', label: t.tours.stopStatusNoRequest };
+                                  return (
+                                    <span
+                                      className={`w-2.5 h-2.5 rounded-full shrink-0 ${cfg.color}`}
+                                      title={cfg.label}
+                                    />
+                                  );
+                                })()}
+                              </div>
                               <div className="flex items-center gap-2 text-xs text-slate-500">
                                 <Clock className="h-3 w-3 flex-shrink-0" />
                                 <span>
@@ -933,6 +990,22 @@ export default function TourDetailPage() {
                                   {stop.scheduledEndTime ? new Date(stop.scheduledEndTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
                                 </span>
                               </div>
+                              {(() => {
+                                const statusConfig: Record<string, { color: string; label: string }> = {
+                                  pending: { color: 'text-orange-600', label: t.tours.stopStatusPending },
+                                  approved: { color: 'text-green-600', label: t.tours.stopStatusApproved },
+                                  rejected: { color: 'text-red-600', label: t.tours.stopStatusRejected },
+                                };
+                                const status = stop.preReservationStatus;
+                                const cfg = status
+                                  ? (statusConfig[status] || { color: 'text-slate-400', label: status })
+                                  : { color: 'text-slate-400', label: t.tours.stopStatusNoRequest };
+                                return (
+                                  <p className={`text-xs ${cfg.color}`}>
+                                    Ön Rezervasyon: {cfg.label}
+                                  </p>
+                                );
+                              })()}
                             </div>
                             {tour.status === 'draft' && (
                               <div className="flex items-center gap-0.5 flex-shrink-0">
@@ -962,92 +1035,6 @@ export default function TourDetailPage() {
                 </Card>
               </div>
             </div>
-          </TabsContent>
-
-          {/* Requests Tab */}
-          <TabsContent value="requests" className="space-y-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-lg">{t.tours.requests}</CardTitle>
-                <Select value={requestStatusFilter} onValueChange={setRequestStatusFilter}>
-                  <SelectTrigger className="w-[160px] h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Tümü</SelectItem>
-                    <SelectItem value="pending">{t.tours.statusPending}</SelectItem>
-                    <SelectItem value="approved">{t.tours.statusConfirmed}</SelectItem>
-                    <SelectItem value="rejected">{t.tours.statusCancelled}</SelectItem>
-                    <SelectItem value="completed">{t.tours.statusCompleted || 'Tamamlandı'}</SelectItem>
-                    <SelectItem value="cancelled">İptal Edildi</SelectItem>
-                  </SelectContent>
-                </Select>
-              </CardHeader>
-              <CardContent>
-                {(() => {
-                  const requestStatusLabels: Record<string, string> = {
-                    pending: t.tours.statusPending,
-                    approved: t.tours.statusConfirmed,
-                    rejected: 'Reddedildi',
-                    cancelled: 'İptal Edildi',
-                    completed: t.tours.statusCompleted || 'Tamamlandı',
-                  };
-                  const requestTypeLabels: Record<string, string> = {
-                    pre_reservation: 'Ön Rezervasyon',
-                    service_selection: 'Hizmet Seçimi',
-                  };
-                  const filtered = (serviceRequests || []).filter((r: ServiceRequestDto) =>
-                    requestStatusFilter === 'all' || r.status === requestStatusFilter
-                  );
-                  const orgNameMap = new Map<number, string>();
-                  (stops || []).forEach((s: ApiTourStopDto) => {
-                    if (s.organization?.name) orgNameMap.set(s.organizationId, s.organization.name);
-                  });
-                  (organizations || []).forEach((o: OrganizationPublicDto) => {
-                    if (!orgNameMap.has(o.id)) orgNameMap.set(o.id, o.name);
-                  });
-
-                  if (!filtered.length) {
-                    return (
-                      <EmptyState
-                        icon={Store}
-                        title={t.tours.noRequests}
-                        description={t.tours.noRequests}
-                      />
-                    );
-                  }
-                  return (
-                    <div className="space-y-3">
-                      {filtered.map((request: ServiceRequestDto) => (
-                        <div
-                          key={request.id}
-                          className="flex items-center justify-between p-4 border rounded-lg"
-                        >
-                          <div className="flex items-center gap-4">
-                            <Store className="h-8 w-8 text-slate-400" />
-                            <div>
-                              <h4 className="font-medium">
-                                {orgNameMap.get(request.organizationId) || `İşletme #${request.organizationId}`}
-                              </h4>
-                              <div className="flex items-center gap-4 text-sm text-slate-500">
-                                <span className="flex items-center gap-1">
-                                  <Calendar className="h-3 w-3" />
-                                  {formatDate(request.requestedDate)}
-                                </span>
-                                <span>{requestTypeLabels[request.requestType] || request.requestType}</span>
-                              </div>
-                            </div>
-                          </div>
-                          <Badge variant="outline" className={getStatusBadge(request.status)}>
-                            {requestStatusLabels[request.status] || request.status}
-                          </Badge>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })()}
-              </CardContent>
-            </Card>
           </TabsContent>
 
           {/* Clients Tab */}
@@ -1156,8 +1143,6 @@ export default function TourDetailPage() {
                                   <SelectItem value="pending">{t.tours.statusPending}</SelectItem>
                                   <SelectItem value="confirmed">{t.tours.statusConfirmed}</SelectItem>
                                   <SelectItem value="cancelled">{t.tours.statusCancelled}</SelectItem>
-                                  <SelectItem value="completed">{t.tours.statusCompleted || 'Tamamlandı'}</SelectItem>
-                                  <SelectItem value="no_show">{t.tours.statusNoShow || 'Gelmedi'}</SelectItem>
                                 </SelectContent>
                               </Select>
                             </div>
@@ -1202,12 +1187,47 @@ export default function TourDetailPage() {
                             {index + 1}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">{stop.organization?.name || `#${stop.organizationId}`}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-medium truncate">{stop.organization?.name || `#${stop.organizationId}`}</p>
+                              {(() => {
+                                const dotConfig: Record<string, { color: string; label: string }> = {
+                                  pending: { color: 'bg-orange-400', label: t.tours.stopStatusPending },
+                                  approved: { color: 'bg-green-500', label: t.tours.stopStatusApproved },
+                                  rejected: { color: 'bg-red-500', label: t.tours.stopStatusRejected },
+                                };
+                                const status = stop.preReservationStatus;
+                                const cfg = status
+                                  ? (dotConfig[status] || { color: 'bg-slate-300', label: status })
+                                  : { color: 'bg-slate-300', label: t.tours.stopStatusNoRequest };
+                                return (
+                                  <span
+                                    className={`w-2.5 h-2.5 rounded-full shrink-0 ${cfg.color}`}
+                                    title={cfg.label}
+                                  />
+                                );
+                              })()}
+                            </div>
                             <p className="text-xs text-slate-500">
                               {stop.scheduledStartTime ? new Date(stop.scheduledStartTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                               {stop.scheduledStartTime && stop.scheduledEndTime ? ' - ' : ''}
                               {stop.scheduledEndTime ? new Date(stop.scheduledEndTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                             </p>
+                            {(() => {
+                              const statusConfig: Record<string, { color: string; label: string }> = {
+                                pending: { color: 'text-orange-600', label: t.tours.stopStatusPending },
+                                approved: { color: 'text-green-600', label: t.tours.stopStatusApproved },
+                                rejected: { color: 'text-red-600', label: t.tours.stopStatusRejected },
+                              };
+                              const status = stop.preReservationStatus;
+                              const cfg = status
+                                ? (statusConfig[status] || { color: 'text-slate-400', label: status })
+                                : { color: 'text-slate-400', label: t.tours.stopStatusNoRequest };
+                              return (
+                                <p className={`text-xs ${cfg.color}`}>
+                                  Ön Rezervasyon: {cfg.label}
+                                </p>
+                              );
+                            })()}
                           </div>
                         </button>
                       ))}
@@ -1310,7 +1330,15 @@ export default function TourDetailPage() {
                                             <div className="flex flex-wrap gap-1.5">
                                               {room.children.map((table: ResourceDto) => {
                                                 const occupant = stopChoices?.find(
-                                                  (c: AgencyStopChoicesDto) => c.resourceChoice?.resourceId === table.id
+                                                  (c: AgencyStopChoicesDto) => {
+                                                    const rc = c.resourceChoice;
+                                                    if (!rc) return false;
+                                                    if (Array.isArray(rc)) {
+                                                      const rcTable = rc.find((item) => item.resourceTypeCode === 'table');
+                                                      return rcTable?.resourceName === table.name;
+                                                    }
+                                                    return rc.resourceId === table.id;
+                                                  }
                                                 );
                                                 const occupantName = occupant?.client
                                                   ? `${occupant.client.firstName || ''} ${occupant.client.lastName || ''}`.trim()
@@ -1340,7 +1368,15 @@ export default function TourDetailPage() {
                                           <div className="flex flex-wrap gap-1.5">
                                             {(() => {
                                               const occupant = stopChoices?.find(
-                                                (c: AgencyStopChoicesDto) => c.resourceChoice?.resourceId === room.id
+                                                (c: AgencyStopChoicesDto) => {
+                                                  const rc = c.resourceChoice;
+                                                  if (!rc) return false;
+                                                  if (Array.isArray(rc)) {
+                                                    const rcRoom = rc.find((item) => item.resourceTypeCode === 'room');
+                                                    return rcRoom?.resourceName === room.name;
+                                                  }
+                                                  return rc.resourceId === room.id;
+                                                }
                                               );
                                               const occupantName = occupant?.client
                                                 ? `${occupant.client.firstName || ''} ${occupant.client.lastName || ''}`.trim()
@@ -1446,7 +1482,10 @@ export default function TourDetailPage() {
                                         <div>
                                           <p className="text-xs font-medium text-slate-500 mb-1">{t.tours.resource}</p>
                                           <div className="text-sm bg-white rounded p-2 border">
-                                            {choice.resourceChoice.resource?.name || `#${choice.resourceChoice.resourceId}`}
+                                            {Array.isArray(choice.resourceChoice)
+                                              ? choice.resourceChoice.map((item) => `${item.resourceTypeName}: ${item.resourceName}`).join(' · ')
+                                              : (choice.resourceChoice.resource?.name || `#${choice.resourceChoice.resourceId}`)
+                                            }
                                           </div>
                                         </div>
                                       )}
@@ -1646,7 +1685,7 @@ export default function TourDetailPage() {
 
       {/* Stop Form Dialog */}
       <Dialog open={isStopFormOpen} onOpenChange={setIsStopFormOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingStop ? t.tours.editStop : t.tours.addStop}
@@ -1654,6 +1693,66 @@ export default function TourDetailPage() {
           </DialogHeader>
           <form onSubmit={handleStopSubmit}>
             <div className="space-y-4 py-4">
+              {/* Organization Filters */}
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1.5 block">{t.tours.filterByCategory}</Label>
+                  <Select
+                    value={orgFilterCategoryId ? String(orgFilterCategoryId) : 'all'}
+                    onValueChange={(val) => setOrgFilterCategoryId(val === 'all' ? null : Number(val))}
+                  >
+                    <SelectTrigger className="h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t.tours.allCategories}</SelectItem>
+                      {filterCategories?.map((cat: CategoryDto) => (
+                        <SelectItem key={cat.id} value={String(cat.id)}>{cat.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1.5 block">{t.tours.filterByCity}</Label>
+                  <Select
+                    value={orgFilterCityId ? String(orgFilterCityId) : 'all'}
+                    onValueChange={(val) => {
+                      const newCityId = val === 'all' ? null : Number(val);
+                      setOrgFilterCityId(newCityId);
+                      setOrgFilterDistrictId(null);
+                    }}
+                  >
+                    <SelectTrigger className="h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t.tours.allCities}</SelectItem>
+                      {filterCities?.map((city: LocationDto) => (
+                        <SelectItem key={city.id} value={String(city.id)}>{city.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1.5 block">{t.tours.filterByDistrict}</Label>
+                  <Select
+                    value={orgFilterDistrictId ? String(orgFilterDistrictId) : 'all'}
+                    onValueChange={(val) => setOrgFilterDistrictId(val === 'all' ? null : Number(val))}
+                    disabled={!orgFilterCityId}
+                  >
+                    <SelectTrigger className="h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t.tours.allDistricts}</SelectItem>
+                      {filterDistricts?.map((district: LocationDto) => (
+                        <SelectItem key={district.id} value={String(district.id)}>{district.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
               {/* Organization Search */}
               <div className="space-y-2">
                 <Label>{t.tours.organization} *</Label>
@@ -1694,7 +1793,7 @@ export default function TourDetailPage() {
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">{org.name}</p>
                           {org.address && (
-                            <p className="text-xs text-slate-500 truncate">{org.address}</p>
+                            <p className="text-xs text-slate-500 truncate max-w-[320px]" title={org.address}>{org.address}</p>
                           )}
                         </div>
                         {org.averageRating > 0 && (

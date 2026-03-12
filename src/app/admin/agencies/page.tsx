@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useDebounce } from '@/hooks/useDebounce';
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -387,6 +388,7 @@ export default function AdminAgenciesPage() {
   const { t } = useLanguage();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearch = useDebounce(searchTerm, 800);
   const [statusFilter, setStatusFilter] = useState<CompanyStatus | 'all'>('all');
   const [page, setPage] = useState(1);
   const [limit] = useState(20);
@@ -395,23 +397,30 @@ export default function AdminAgenciesPage() {
     newStatus: CompanyStatus;
   } | null>(null);
 
+  // Reset page when search term changes
+  const prevSearchRef = useRef(debouncedSearch);
+  useEffect(() => {
+    if (prevSearchRef.current !== debouncedSearch) {
+      setPage(1);
+      prevSearchRef.current = debouncedSearch;
+    }
+  }, [debouncedSearch]);
+
   // Fetch all agencies (for status counts)
   const { data: allAgenciesResult } = useQuery({
     queryKey: ['admin-agencies-counts'],
     queryFn: () =>
-      adminApi.getCompanies({
-        type: 'agency',
+      adminApi.getAgenciesList({
         limit: 100,
       }),
   });
 
   // Fetch agencies with current filter (for the list)
   const { data: companiesResult, isLoading } = useQuery({
-    queryKey: ['admin-agencies', statusFilter, page, limit],
+    queryKey: ['admin-agencies', statusFilter, debouncedSearch, page, limit],
     queryFn: () =>
-      adminApi.getCompanies({
-        type: 'agency',
-        status: statusFilter === 'all' ? undefined : statusFilter,
+      adminApi.getAgenciesList({
+        name: debouncedSearch || undefined,
         page,
         limit,
       }),
@@ -439,17 +448,6 @@ export default function AdminAgenciesPage() {
 
   const companies = companiesResult?.success ? companiesResult.data?.data || [] : [];
   const meta = companiesResult?.success ? companiesResult.data?.meta : null;
-
-  const filteredCompanies = companies.filter(
-    (company) =>
-      company.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      company.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      company.address?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      company.legalName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      company.taxNumber?.toString().includes(searchTerm) ||
-      company.authorizedPerson?.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      company.authorizedPerson?.lastName?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
 
   // Status counts from the unfiltered query
   const allAgencies = allAgenciesResult?.success ? allAgenciesResult.data?.data || [] : [];
@@ -582,11 +580,11 @@ export default function AdminAgenciesPage() {
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <p className="text-sm text-slate-500">
-            {filteredCompanies.length} acente listeleniyor
+            {companies.length} acente listeleniyor
           </p>
         </div>
 
-        {filteredCompanies.length === 0 ? (
+        {companies.length === 0 ? (
           <Card className="border-0 shadow-sm">
             <CardContent className="py-12 text-center">
               <Briefcase className="h-12 w-12 text-slate-300 mx-auto mb-3" />
@@ -597,7 +595,7 @@ export default function AdminAgenciesPage() {
             </CardContent>
           </Card>
         ) : (
-          filteredCompanies.map((company) => (
+          companies.map((company) => (
             <AgencyDetailCard
               key={company.id}
               company={company}

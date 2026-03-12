@@ -88,8 +88,8 @@ export default function AgencyDashboard() {
 
   // Query: Clients
   const { data: clientsResult } = useQuery({
-    queryKey: ['agency-clients', apiLang],
-    queryFn: () => agencyApi.getClients(1, 1, apiLang),
+    queryKey: ['agency-clients'],
+    queryFn: () => agencyApi.getClients(1, 1),
   });
 
   const isLoading = agencyLoading || toursLoading;
@@ -180,7 +180,7 @@ export default function AgencyDashboard() {
       <div className="flex flex-col h-full">
         <Header title={t.roles.agencyPanel} />
         <div className="flex-1 p-6">
-          <LoadingState message={shouldRedirectToSetup ? 'Yonlendiriliyor...' : t.common.loading} />
+          <LoadingState message={shouldRedirectToSetup ? 'Yönlendiriliyor...' : t.common.loading} />
         </div>
       </div>
     );
