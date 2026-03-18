@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useRef, useMemo, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -27,6 +27,21 @@ import {
   Image as ImageIcon,
   Star,
   MessageSquare,
+  Plus,
+  Layers,
+  UtensilsCrossed,
+  ChevronRight,
+  ChevronDown,
+  FolderTree,
+  Pencil,
+  GripVertical,
+  Upload,
+  Eye,
+  Square,
+  Circle,
+  Power,
+  PowerOff,
+  Box,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -41,8 +56,22 @@ import {
   type LocationDto,
   type PhotoDto,
   type PaginatedResponse,
+  type ServiceCategoryDto,
+  type ServiceDto,
+  type ResourceDto,
+  type ResourceTypeDto,
+  type CreateServiceCategoryDto,
+  type UpdateServiceCategoryDto,
+  type CreateServiceDto,
+  type UpdateServiceDto,
+  type CreateResourceDto,
+  type UpdateResourceDto,
+  type PriceType,
+  type ClientStopMenuCategoryDto,
+  type ClientStopMenuServiceDto,
 } from '@/lib/api';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -55,8 +84,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { LoadingState, ConfirmDialog } from '@/components/shared';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { LoadingState, ConfirmDialog, EmptyState, ErrorState, ImageCropper } from '@/components/shared';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { useAutoSelect } from '@/hooks/useAutoSelect';
+import { LayoutEditor, type LayoutApiAdapter } from '@/components/restaurant/layout-editor';
+import { CardDescription } from '@/components/ui/card';
 
 function resolveImageUrl(url?: string | null): string | null {
   return url || null;
@@ -292,29 +337,56 @@ export default function OrganizationDetailPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          {!editMode ? (
-            <Button onClick={enterEditMode} variant="outline" size="sm">
-              <Edit3 className="h-4 w-4 mr-1" />
-              {a.editMode}
-            </Button>
-          ) : (
-            <>
-              <Button onClick={() => setEditMode(false)} variant="outline" size="sm">
-                <X className="h-4 w-4 mr-1" />
-                {a.cancelEdit}
-              </Button>
-              <Button onClick={handleSave} size="sm" disabled={updateMutation.isPending}>
-                <Save className="h-4 w-4 mr-1" />
-                {updateMutation.isPending ? a.saving : a.saveChanges}
-              </Button>
-            </>
-          )}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span tabIndex={0}>
+                <Button onClick={enterEditMode} variant="outline" size="sm" disabled={editMode}>
+                  <Edit3 className="h-4 w-4 mr-1" />
+                  {a.editMode}
+                </Button>
+              </span>
+            </TooltipTrigger>
+            {editMode && <TooltipContent>{t.tooltips.inEditMode}</TooltipContent>}
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span tabIndex={0}>
+                <Button onClick={() => setEditMode(false)} variant="outline" size="sm" disabled={!editMode}>
+                  <X className="h-4 w-4 mr-1" />
+                  {a.cancelEdit}
+                </Button>
+              </span>
+            </TooltipTrigger>
+            {!editMode && <TooltipContent>{t.tooltips.notInEditMode}</TooltipContent>}
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span tabIndex={0}>
+                <Button onClick={handleSave} size="sm" disabled={!editMode || updateMutation.isPending}>
+                  <Save className="h-4 w-4 mr-1" />
+                  {updateMutation.isPending ? a.saving : a.saveChanges}
+                </Button>
+              </span>
+            </TooltipTrigger>
+            {!editMode && <TooltipContent>{t.tooltips.notInEditMode}</TooltipContent>}
+          </Tooltip>
           <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}>
             <Trash2 className="h-4 w-4 mr-1" />
             {a.deleteButton}
           </Button>
         </div>
       </div>
+
+      {/* Tabs */}
+      <Tabs defaultValue="general">
+        <TabsList className="mb-4">
+          <TabsTrigger value="general">{a.tabGeneral}</TabsTrigger>
+          <TabsTrigger value="menu">{a.menuAndServices}</TabsTrigger>
+          <TabsTrigger value="resources">{a.tabResources}</TabsTrigger>
+        </TabsList>
+
+        {/* ==================== GENERAL TAB ==================== */}
+        <TabsContent value="general" className="space-y-6">
 
       {/* Cover Image */}
       {coverUrl && !imgError && (
@@ -386,29 +458,41 @@ export default function OrganizationDetailPage() {
               <X className="h-5 w-5" />
             </Button>
             <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-2">
-              {galleryIndex > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-white bg-black/50 hover:bg-black/70"
-                  onClick={() => setGalleryIndex(galleryIndex - 1)}
-                >
-                  &larr;
-                </Button>
-              )}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span tabIndex={0}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-white bg-black/50 hover:bg-black/70"
+                      disabled={galleryIndex <= 0}
+                      onClick={() => setGalleryIndex(galleryIndex - 1)}
+                    >
+                      &larr;
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {galleryIndex <= 0 && <TooltipContent>{t.tooltips.firstImage}</TooltipContent>}
+              </Tooltip>
               <span className="text-white text-sm bg-black/50 px-3 py-1 rounded">
                 {galleryIndex + 1} / {photos.length}
               </span>
-              {galleryIndex < photos.length - 1 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-white bg-black/50 hover:bg-black/70"
-                  onClick={() => setGalleryIndex(galleryIndex + 1)}
-                >
-                  &rarr;
-                </Button>
-              )}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span tabIndex={0}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-white bg-black/50 hover:bg-black/70"
+                      disabled={galleryIndex >= photos.length - 1}
+                      onClick={() => setGalleryIndex(galleryIndex + 1)}
+                    >
+                      &rarr;
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {galleryIndex >= photos.length - 1 && <TooltipContent>{t.tooltips.lastImage}</TooltipContent>}
+              </Tooltip>
             </div>
           </div>
         </div>
@@ -808,53 +892,96 @@ export default function OrganizationDetailPage() {
             </div>
 
             <div className="flex gap-2 flex-wrap">
-              {status !== 'active' && (
-                <Button
-                  size="sm"
-                  className="bg-green-600 hover:bg-green-700"
-                  onClick={() => setStatusUpdateTarget('active')}
-                >
-                  <CheckCircle className="h-4 w-4 mr-1" />
-                  {a.approve}
-                </Button>
-              )}
-              {status !== 'suspended' && (
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => setStatusUpdateTarget('suspended')}
-                >
-                  <XCircle className="h-4 w-4 mr-1" />
-                  {a.suspend}
-                </Button>
-              )}
-              {status !== 'pending' && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setStatusUpdateTarget('pending')}
-                  className="text-yellow-600 border-yellow-200 hover:bg-yellow-50"
-                >
-                  <Clock className="h-4 w-4 mr-1" />
-                  {a.setPending}
-                </Button>
-              )}
-              {hasLocation && (
-                <a
-                  href={`https://www.google.com/maps?q=${org.lat},${org.lng}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <Button variant="outline" size="sm">
-                    <Globe className="h-4 w-4 mr-1" />
-                    {a.viewOnMap}
-                  </Button>
-                </a>
-              )}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span tabIndex={0}>
+                    <Button
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700"
+                      disabled={status === 'active'}
+                      onClick={() => setStatusUpdateTarget('active')}
+                    >
+                      <CheckCircle className="h-4 w-4 mr-1" />
+                      {a.approve}
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {status === 'active' && <TooltipContent>{t.tooltips.alreadyActive}</TooltipContent>}
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span tabIndex={0}>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      disabled={status === 'suspended'}
+                      onClick={() => setStatusUpdateTarget('suspended')}
+                    >
+                      <XCircle className="h-4 w-4 mr-1" />
+                      {a.suspend}
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {status === 'suspended' && <TooltipContent>{t.tooltips.alreadySuspended}</TooltipContent>}
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span tabIndex={0}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={status === 'pending'}
+                      onClick={() => setStatusUpdateTarget('pending')}
+                      className="text-yellow-600 border-yellow-200 hover:bg-yellow-50"
+                    >
+                      <Clock className="h-4 w-4 mr-1" />
+                      {a.setPending}
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {status === 'pending' && <TooltipContent>{t.tooltips.alreadyPending}</TooltipContent>}
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span tabIndex={0}>
+                    {hasLocation ? (
+                      <a
+                        href={`https://www.google.com/maps?q=${org.lat},${org.lng}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <Button variant="outline" size="sm">
+                          <Globe className="h-4 w-4 mr-1" />
+                          {a.viewOnMap}
+                        </Button>
+                      </a>
+                    ) : (
+                      <Button variant="outline" size="sm" disabled>
+                        <Globe className="h-4 w-4 mr-1" />
+                        {a.viewOnMap}
+                      </Button>
+                    )}
+                  </span>
+                </TooltipTrigger>
+                {!hasLocation && <TooltipContent>{t.tooltips.noLocation}</TooltipContent>}
+              </Tooltip>
             </div>
           </div>
         </CardContent>
       </Card>
+
+        </TabsContent>
+
+        {/* ==================== MENU TAB ==================== */}
+        <TabsContent value="menu">
+          <MenuTab orgId={id} />
+        </TabsContent>
+
+        {/* ==================== RESOURCES TAB ==================== */}
+        <TabsContent value="resources">
+          <ResourcesTab orgId={id} />
+        </TabsContent>
+      </Tabs>
 
       {/* Status Update Confirmation */}
       <ConfirmDialog
@@ -880,6 +1007,1820 @@ export default function OrganizationDetailPage() {
         onConfirm={() => deleteMutation.mutate()}
         variant="destructive"
         confirmLabel={deleteMutation.isPending ? a.deleting : a.deleteButton}
+      />
+    </div>
+  );
+}
+
+// ===================================================================
+// PriceTypeBadge — matching restaurant/menu/page.tsx
+// ===================================================================
+function PriceTypeBadge({ priceType, t: tl }: { priceType: PriceType; t: ReturnType<typeof useLanguage>['t'] }) {
+  const labelMap: Record<PriceType, string> = {
+    fixed: tl.menu.fixed,
+    per_person: tl.menu.perPerson,
+    per_hour: tl.menu.perHour,
+    per_day: tl.menu.perDay,
+  };
+  return (
+    <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+      {labelMap[priceType] || priceType}
+    </Badge>
+  );
+}
+
+// ===================================================================
+// Menu Preview Components — matching restaurant/menu/page.tsx
+// ===================================================================
+function PreviewServiceList({ services, t: tl }: { services: ClientStopMenuServiceDto[]; t: ReturnType<typeof useLanguage>['t'] }) {
+  if (!services.length) return null;
+  const priceLabel = (type: string) => {
+    if (type === 'fixed') return '';
+    if (type === 'per_person') return `/ ${tl.menu.perPerson}`;
+    if (type === 'per_hour') return `/ ${tl.menu.perHour}`;
+    if (type === 'per_day') return `/ ${tl.menu.perDay}`;
+    return '';
+  };
+  return (
+    <div className="space-y-1">
+      {services.map((s) => (
+        <div key={s.id} className="flex gap-3 p-2 rounded-lg hover:bg-white/60 transition-colors">
+          {s.imageUrl ? (
+            <img src={s.imageUrl} alt={s.title} className="w-14 h-14 rounded-md object-cover flex-shrink-0 shadow-sm" />
+          ) : (
+            <div className="w-14 h-14 rounded-md bg-stone-100 flex items-center justify-center flex-shrink-0">
+              <ImageIcon className="h-5 w-5 text-stone-300" />
+            </div>
+          )}
+          <div className="flex-1 min-w-0 py-0.5">
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-sm font-semibold text-stone-800 leading-tight truncate" title={s.title}>{s.title}</p>
+              <div className="text-right flex-shrink-0">
+                <p className="text-sm font-bold text-emerald-700">{Number(s.basePrice).toFixed(2)} ₺</p>
+                {s.priceType !== 'fixed' && <p className="text-[10px] text-stone-400">{priceLabel(s.priceType)}</p>}
+              </div>
+            </div>
+            {s.description && <p className="text-[11px] text-stone-400 mt-1 line-clamp-2 leading-snug">{s.description}</p>}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PreviewCategoryItem({ cat, depth, t: tl }: { cat: ClientStopMenuCategoryDto; depth: number; t: ReturnType<typeof useLanguage>['t'] }) {
+  const [open, setOpen] = useState(depth === 0);
+  const hasServices = cat.services?.length > 0;
+  const hasChildren = cat.child_service_categories?.length > 0;
+  if (!hasServices && !hasChildren) return null;
+  return (
+    <div>
+      {depth === 0 ? (
+        <button type="button" onClick={() => setOpen((v) => !v)} className="w-full bg-gradient-to-r from-stone-800 to-stone-700 px-4 py-3 rounded-xl mb-3 flex items-center justify-between cursor-pointer">
+          <h3 className="text-lg font-bold text-white">{cat.name}</h3>
+          <ChevronDown className={`h-4 w-4 text-white/70 transition-transform ${open ? '' : '-rotate-90'}`} />
+        </button>
+      ) : (
+        <button type="button" onClick={() => setOpen((v) => !v)} className="w-full px-4 py-2 mb-2 flex items-center justify-between cursor-pointer">
+          <h4 className="text-sm font-semibold text-stone-600 border-b border-stone-200 pb-1 flex-1 text-left">{cat.name}</h4>
+          <ChevronDown className={`h-3.5 w-3.5 text-stone-400 transition-transform ml-2 ${open ? '' : '-rotate-90'}`} />
+        </button>
+      )}
+      {open && (
+        <>
+          {hasServices && <PreviewServiceList services={cat.services} t={tl} />}
+          {hasChildren && <PreviewCategoryTree categories={cat.child_service_categories} depth={depth + 1} t={tl} />}
+        </>
+      )}
+    </div>
+  );
+}
+
+function PreviewCategoryTree({ categories: cats, depth, t: tl }: { categories: ClientStopMenuCategoryDto[]; depth: number; t: ReturnType<typeof useLanguage>['t'] }) {
+  return <>{cats.map((cat) => <PreviewCategoryItem key={cat.id} cat={cat} depth={depth} t={tl} />)}</>;
+}
+
+// ===================================================================
+// CategoryTreeItem — matching restaurant/menu/page.tsx
+// ===================================================================
+function AdminCategoryTreeItem({
+  cat, depth, selectedCategory, setSelectedCategory, expandedCategories, setExpandedCategories,
+  draggedId, setDraggedId, dragOverId, setDragOverId, handleCategoryReorder,
+}: {
+  cat: ClientStopMenuCategoryDto; depth: number;
+  selectedCategory: ClientStopMenuCategoryDto | null; setSelectedCategory: (c: ClientStopMenuCategoryDto) => void;
+  expandedCategories: Set<number>; setExpandedCategories: React.Dispatch<React.SetStateAction<Set<number>>>;
+  draggedId: number | null; setDraggedId: (id: number | null) => void;
+  dragOverId: number | null; setDragOverId: (id: number | null) => void;
+  handleCategoryReorder: (fromId: number, toId: number) => void;
+}) {
+  const isSelected = selectedCategory?.id === cat.id;
+  const isDragging = draggedId === cat.id;
+  const isDragOver = dragOverId === cat.id;
+  const children = cat.child_service_categories || [];
+  const hasChildren = children.length > 0;
+  const isExpanded = expandedCategories.has(cat.id);
+
+  const toggleExpand = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpandedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(cat.id)) next.delete(cat.id);
+      else next.add(cat.id);
+      return next;
+    });
+  };
+
+  return (
+    <>
+      <div
+        draggable
+        onDragStart={(e) => { e.dataTransfer.setData('text/plain', String(cat.id)); e.dataTransfer.effectAllowed = 'move'; setDraggedId(cat.id); }}
+        onDragEnd={() => setDraggedId(null)}
+        onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverId(cat.id); }}
+        onDragLeave={() => setDragOverId(null)}
+        onDrop={(e) => { e.preventDefault(); setDragOverId(null); const fromId = parseInt(e.dataTransfer.getData('text/plain')); if (fromId && fromId !== cat.id) handleCategoryReorder(fromId, cat.id); }}
+        className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors ${isSelected ? 'bg-primary/10 text-primary border border-primary/20' : 'hover:bg-slate-50 border border-transparent'} ${isDragging ? 'opacity-40' : ''} ${isDragOver ? 'border-b-2 !border-primary bg-primary/5' : ''}`}
+        style={{ paddingLeft: `${12 + depth * 20}px` }}
+        onClick={() => setSelectedCategory(cat)}
+      >
+        <div className="cursor-grab active:cursor-grabbing p-0.5 hover:bg-slate-200 rounded flex-shrink-0" onMouseDown={(e) => e.stopPropagation()}>
+          <GripVertical className="h-3.5 w-3.5 text-slate-300" />
+        </div>
+        {hasChildren ? (
+          <button className="p-0.5 hover:bg-slate-200 rounded flex-shrink-0" onClick={toggleExpand}>
+            {isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-slate-400" /> : <ChevronRight className="h-3.5 w-3.5 text-slate-400" />}
+          </button>
+        ) : (
+          <div className="w-5 flex-shrink-0" />
+        )}
+        <div className={`w-6 h-6 rounded flex items-center justify-center flex-shrink-0 ${depth > 0 ? 'bg-primary/10' : 'bg-slate-100'}`}>
+          <FolderTree className={`h-3 w-3 ${depth > 0 ? 'text-primary/50' : 'text-slate-400'}`} />
+        </div>
+        <span className="text-sm font-medium truncate flex-1">{cat.name}</span>
+        {hasChildren && <span className="text-[10px] text-slate-400">{children.length}</span>}
+      </div>
+      {hasChildren && isExpanded && children.map((child) => (
+        <AdminCategoryTreeItem
+          key={child.id} cat={child} depth={depth + 1}
+          selectedCategory={selectedCategory} setSelectedCategory={setSelectedCategory}
+          expandedCategories={expandedCategories} setExpandedCategories={setExpandedCategories}
+          draggedId={draggedId} setDraggedId={setDraggedId}
+          dragOverId={dragOverId} setDragOverId={setDragOverId}
+          handleCategoryReorder={handleCategoryReorder}
+        />
+      ))}
+    </>
+  );
+}
+
+// ===================================================================
+// MENU TAB — Mirrors restaurant/menu/page.tsx with admin API
+// ===================================================================
+
+interface AdminCategoryFormData {
+  name: string;
+  displayOrder: number;
+  parentId?: number;
+}
+
+interface AdminServiceFormData {
+  title: string;
+  description: string;
+  basePrice: number;
+  priceType: PriceType;
+  serviceCategoryId: number;
+}
+
+const adminInitialCategoryForm: AdminCategoryFormData = { name: '', displayOrder: 0 };
+const adminInitialServiceForm: AdminServiceFormData = { title: '', description: '', basePrice: 0, priceType: 'fixed', serviceCategoryId: 0 };
+
+const ADMIN_PRICE_TYPE_OPTIONS: { value: PriceType; labelKey: 'fixed' | 'perPerson' | 'perHour' | 'perDay' }[] = [
+  { value: 'fixed', labelKey: 'fixed' },
+  { value: 'per_person', labelKey: 'perPerson' },
+  { value: 'per_hour', labelKey: 'perHour' },
+  { value: 'per_day', labelKey: 'perDay' },
+];
+
+function AdminPriceTypeBadge({ priceType, t }: { priceType: PriceType; t: ReturnType<typeof useLanguage>['t'] }) {
+  const labelMap: Record<PriceType, string> = {
+    fixed: t.menu.fixed,
+    per_person: t.menu.perPerson,
+    per_hour: t.menu.perHour,
+    per_day: t.menu.perDay,
+  };
+  return (
+    <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+      {labelMap[priceType] || priceType}
+    </Badge>
+  );
+}
+
+function MenuTab({ orgId }: { orgId: number }) {
+  const queryClient = useQueryClient();
+  const { t, locale } = useLanguage();
+
+  // State
+  const [selectedCategory, setSelectedCategory] = useState<ClientStopMenuCategoryDto | null>(null);
+  const [isCategoryFormOpen, setIsCategoryFormOpen] = useState(false);
+  const [isServiceFormOpen, setIsServiceFormOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<ClientStopMenuCategoryDto | null>(null);
+  const [editingService, setEditingService] = useState<ClientStopMenuServiceDto | null>(null);
+  const [categoryForm, setCategoryForm] = useState<AdminCategoryFormData>(adminInitialCategoryForm);
+  const [serviceForm, setServiceForm] = useState<AdminServiceFormData>(adminInitialServiceForm);
+  const [deleteTarget, setDeleteTarget] = useState<{ type: 'category' | 'service'; id: number; name: string } | null>(null);
+
+  // Service image states
+  const [serviceImageFile, setServiceImageFile] = useState<File | null>(null);
+  const [serviceImagePreview, setServiceImagePreview] = useState<string | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [previewLang, setPreviewLang] = useState<'tr' | 'en' | 'de'>('tr');
+  const [cropperOpen, setCropperOpen] = useState(false);
+  const [cropperSrc, setCropperSrc] = useState('');
+  const serviceFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Drag state
+  const [draggedId, setDraggedId] = useState<number | null>(null);
+  const [dragOverId, setDragOverId] = useState<number | null>(null);
+  const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set());
+
+  // ===== Queries — flat APIs, build tree on frontend =====
+  const {
+    data: catResult,
+    isLoading: catLoading,
+    error: catError,
+    refetch: refetchCats,
+  } = useQuery({
+    queryKey: ['admin-org-service-categories', orgId],
+    queryFn: () => adminApi.getOrgServiceCategories(orgId),
+  });
+
+  const {
+    data: svcResult,
+    isLoading: svcLoading,
+    refetch: refetchSvcs,
+  } = useQuery({
+    queryKey: ['admin-org-services', orgId],
+    queryFn: () => adminApi.getOrgServices(orgId),
+  });
+
+  const menuLoading = catLoading || svcLoading;
+  const menuError = catError;
+  const refetchMenu = () => { refetchCats(); refetchSvcs(); };
+
+  // Build ServiceCategoryDto[] tree from flat result
+  const rawCategories: ServiceCategoryDto[] = catResult?.success
+    ? Array.isArray(catResult.data) ? catResult.data : (catResult.data as unknown as PaginatedResponse<ServiceCategoryDto>)?.data || []
+    : [];
+
+  const allServices: ServiceDto[] = svcResult?.success
+    ? Array.isArray(svcResult.data) ? svcResult.data : (svcResult.data as unknown as PaginatedResponse<ServiceDto>)?.data || []
+    : [];
+
+  // Convert ServiceCategoryDto tree + flat services into ClientStopMenuCategoryDto tree
+  const buildMenuTree = (cats: ServiceCategoryDto[], svcs: ServiceDto[]): ClientStopMenuCategoryDto[] => {
+    return cats.map((cat) => ({
+      id: cat.id,
+      name: cat.name,
+      displayOrder: cat.displayOrder,
+      imageUrl: cat.imageUrl || null,
+      services: svcs
+        .filter((s) => s.serviceCategoryId === cat.id)
+        .map((s) => ({
+          id: s.id,
+          title: s.title,
+          subTitle: null,
+          description: s.description || null,
+          contentsDescription: null,
+          basePrice: s.basePrice,
+          priceType: s.priceType,
+          imageUrl: (s as ServiceDto & { imageUrl?: string }).imageUrl || null,
+          serviceCategoryId: s.serviceCategoryId,
+        })),
+      child_service_categories: cat.child_service_categories
+        ? buildMenuTree(cat.child_service_categories, svcs)
+        : [],
+    }));
+  };
+
+  const categories = rawCategories.length ? buildMenuTree(rawCategories, allServices) : undefined;
+
+  // Helper: find services for a given category id in the menu tree
+  const findServicesInTree = (categoryId: number, tree: ClientStopMenuCategoryDto[]): ClientStopMenuServiceDto[] => {
+    for (const cat of tree) {
+      if (cat.id === categoryId) return cat.services || [];
+      const found = findServicesInTree(categoryId, cat.child_service_categories || []);
+      if (found.length) return found;
+    }
+    return [];
+  };
+
+  const services = selectedCategory && categories
+    ? findServicesInTree(selectedCategory.id, categories)
+    : [];
+
+  // Preview uses same data (no separate language endpoint available on admin)
+  const previewMenu = categories;
+
+  // ===== Category Mutations =====
+  const createCategoryMutation = useMutation({
+    mutationFn: async ({ data }: { data: CreateServiceCategoryDto }) => {
+      const res = await adminApi.createOrgServiceCategory(orgId, data);
+      if (!res.success) throw new Error(res.error);
+      return res.data!;
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['admin-org-service-categories', orgId] });
+      queryClient.invalidateQueries({ queryKey: ['admin-org-services', orgId] });
+      toast.success(`${t.menu.categories} ${t.menu.created}`);
+      if (variables.data.parentId) {
+        setExpandedCategories((prev) => new Set([...prev, variables.data.parentId!]));
+      }
+      closeCategoryForm();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const updateCategoryMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: UpdateServiceCategoryDto }) => {
+      const res = await adminApi.updateOrgServiceCategory(orgId, id, data);
+      if (!res.success) throw new Error(res.error);
+      return res.data!;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-org-service-categories', orgId] });
+      queryClient.invalidateQueries({ queryKey: ['admin-org-services', orgId] });
+      toast.success(`${t.menu.categories} ${t.menu.updated}`);
+      closeCategoryForm();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const deleteCategoryMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await adminApi.deleteOrgServiceCategory(orgId, id);
+      if (!res.success) throw new Error(res.error);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-org-service-categories', orgId] });
+      queryClient.invalidateQueries({ queryKey: ['admin-org-services', orgId] });
+      toast.success(`${t.menu.categories} ${t.menu.deleted}`);
+      if (selectedCategory && deleteTarget?.id === selectedCategory.id) {
+        setSelectedCategory(null);
+      }
+      setDeleteTarget(null);
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  // ===== Service Mutations =====
+  const createServiceMutation = useMutation({
+    mutationFn: async ({ data, image }: { data: CreateServiceDto; image?: File }) => {
+      const res = await adminApi.createOrgService(orgId, data, image);
+      if (!res.success) throw new Error(res.error);
+      return res.data!;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-org-service-categories', orgId] });
+      queryClient.invalidateQueries({ queryKey: ['admin-org-services', orgId] });
+      toast.success(`${t.menu.services} ${t.menu.created}`);
+      closeServiceForm();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const updateServiceMutation = useMutation({
+    mutationFn: async ({ id, data, image }: { id: number; data: UpdateServiceDto; image?: File }) => {
+      const res = await adminApi.updateOrgService(orgId, id, data, image);
+      if (!res.success) throw new Error(res.error);
+      return res.data!;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-org-service-categories', orgId] });
+      queryClient.invalidateQueries({ queryKey: ['admin-org-services', orgId] });
+      toast.success(`${t.menu.services} ${t.menu.updated}`);
+      closeServiceForm();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const deleteServiceMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await adminApi.deleteOrgService(orgId, id);
+      if (!res.success) throw new Error(res.error);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-org-service-categories', orgId] });
+      queryClient.invalidateQueries({ queryKey: ['admin-org-services', orgId] });
+      toast.success(`${t.menu.services} ${t.menu.deleted}`);
+      setDeleteTarget(null);
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  // ===== Category Form Handlers =====
+  const openCreateCategoryForm = (parentId?: number) => {
+    setEditingCategory(null);
+    setCategoryForm({ ...adminInitialCategoryForm, parentId });
+    setIsCategoryFormOpen(true);
+  };
+
+  const openEditCategoryForm = (category: ClientStopMenuCategoryDto) => {
+    setEditingCategory(category);
+    setCategoryForm({ name: category.name, displayOrder: category.displayOrder ?? 0 });
+    setIsCategoryFormOpen(true);
+  };
+
+  const closeCategoryForm = () => {
+    setIsCategoryFormOpen(false);
+    setEditingCategory(null);
+    setCategoryForm(adminInitialCategoryForm);
+  };
+
+  const handleCategorySubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!categoryForm.name.trim()) {
+      toast.error(t.common.required);
+      return;
+    }
+    if (editingCategory) {
+      updateCategoryMutation.mutate({
+        id: editingCategory.id,
+        data: { name: categoryForm.name, displayOrder: categoryForm.displayOrder },
+      });
+    } else {
+      createCategoryMutation.mutate({
+        data: { name: categoryForm.name, displayOrder: categoryForm.displayOrder, parentId: categoryForm.parentId },
+      });
+    }
+  };
+
+  // ===== Service Form Handlers =====
+  const openCreateServiceForm = () => {
+    if (!selectedCategory) return;
+    setEditingService(null);
+    setServiceForm({ ...adminInitialServiceForm, serviceCategoryId: selectedCategory.id });
+    setServiceImageFile(null);
+    setServiceImagePreview(null);
+    setIsServiceFormOpen(true);
+  };
+
+  const openEditServiceForm = (service: ClientStopMenuServiceDto) => {
+    setEditingService(service);
+    setServiceForm({
+      title: service.title,
+      description: service.description || '',
+      basePrice: Number(service.basePrice),
+      priceType: service.priceType as PriceType,
+      serviceCategoryId: service.serviceCategoryId || selectedCategory?.id || 0,
+    });
+    setServiceImageFile(null);
+    setServiceImagePreview(service.imageUrl || null);
+    setIsServiceFormOpen(true);
+  };
+
+  const closeServiceForm = () => {
+    setIsServiceFormOpen(false);
+    setEditingService(null);
+    setServiceForm(adminInitialServiceForm);
+    setServiceImageFile(null);
+    setServiceImagePreview(null);
+  };
+
+  const handleServiceSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!serviceForm.title.trim()) {
+      toast.error(`${t.menu.serviceTitle} ${t.common.required.toLowerCase()}`);
+      return;
+    }
+    if (!serviceForm.basePrice) {
+      toast.error(`${t.menu.basePrice} ${t.common.required.toLowerCase()}`);
+      return;
+    }
+    if (editingService) {
+      updateServiceMutation.mutate({
+        id: editingService.id,
+        data: {
+          title: serviceForm.title,
+          description: serviceForm.description || undefined,
+          basePrice: serviceForm.basePrice,
+          priceType: serviceForm.priceType,
+          serviceCategoryId: serviceForm.serviceCategoryId,
+        },
+        image: serviceImageFile || undefined,
+      });
+    } else {
+      createServiceMutation.mutate({
+        data: {
+          title: serviceForm.title,
+          description: serviceForm.description || undefined,
+          basePrice: serviceForm.basePrice,
+          priceType: serviceForm.priceType,
+          serviceCategoryId: serviceForm.serviceCategoryId,
+        },
+        image: serviceImageFile || undefined,
+      });
+    }
+  };
+
+  // ===== Delete Handler =====
+  const handleDelete = () => {
+    if (!deleteTarget) return;
+    if (deleteTarget.type === 'category') deleteCategoryMutation.mutate(deleteTarget.id);
+    else deleteServiceMutation.mutate(deleteTarget.id);
+  };
+
+  // ===== Image Handlers =====
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCropperSrc(reader.result as string);
+      setCropperOpen(true);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const handleCropComplete = (blob: Blob) => {
+    const file = new File([blob], 'image.jpg', { type: 'image/jpeg' });
+    const previewUrl = URL.createObjectURL(blob);
+    setServiceImageFile(file);
+    setServiceImagePreview(previewUrl);
+  };
+
+  // ===== Drag & Drop Category Reorder =====
+  const handleCategoryReorder = async (fromId: number, toId: number) => {
+    if (!categories) return;
+    const findSiblingList = (id: number): ClientStopMenuCategoryDto[] | null => {
+      if (categories.some((c) => c.id === id)) return categories;
+      for (const parent of categories) {
+        if (parent.child_service_categories?.some((c) => c.id === id)) return parent.child_service_categories;
+      }
+      return null;
+    };
+    const fromList = findSiblingList(fromId);
+    const toList = findSiblingList(toId);
+    if (!fromList || !toList || fromList !== toList) return;
+    const list = [...fromList];
+    const fromIdx = list.findIndex((c) => c.id === fromId);
+    const toIdx = list.findIndex((c) => c.id === toId);
+    if (fromIdx === -1 || toIdx === -1) return;
+    const [dragged] = list.splice(fromIdx, 1);
+    list.splice(toIdx, 0, dragged);
+    try {
+      const updates = list
+        .map((cat, i) => ({ id: cat.id, newOrder: i, oldOrder: cat.displayOrder ?? 0 }))
+        .filter(({ newOrder, oldOrder }) => newOrder !== oldOrder);
+      await Promise.all(
+        updates.map(({ id, newOrder }) =>
+          adminApi.updateOrgServiceCategory(orgId, id, { displayOrder: newOrder })
+        )
+      );
+      queryClient.invalidateQueries({ queryKey: ['admin-org-service-categories', orgId] });
+      queryClient.invalidateQueries({ queryKey: ['admin-org-services', orgId] });
+    } catch {
+      toast.error(t.common.error);
+    }
+  };
+
+  // Helper: find category by id in tree
+  const findCategoryInTree = (id: number, list?: ClientStopMenuCategoryDto[]): ClientStopMenuCategoryDto | null => {
+    for (const cat of list || []) {
+      if (cat.id === id) return cat;
+      const found = findCategoryInTree(id, cat.child_service_categories);
+      if (found) return found;
+    }
+    return null;
+  };
+
+  const currentCategory = selectedCategory && categories
+    ? findCategoryInTree(selectedCategory.id, categories) || null
+    : null;
+
+  const isCategoryPending = createCategoryMutation.isPending || updateCategoryMutation.isPending;
+  const isServicePending = createServiceMutation.isPending || updateServiceMutation.isPending;
+
+  return (
+    <div className="space-y-4">
+      {/* Preview Button */}
+      <div className="flex justify-end">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span tabIndex={0}>
+              <Button variant="outline" onClick={() => setIsPreviewOpen(true)} disabled={!categories?.length}>
+                <Eye className="h-4 w-4 mr-2" />
+                {t.menu.preview}
+              </Button>
+            </span>
+          </TooltipTrigger>
+          {!categories?.length && <TooltipContent>{t.tooltips.noCategoriesYet}</TooltipContent>}
+        </Tooltip>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-3 h-full">
+        {/* Left Panel: Category Tree */}
+        <Card className="lg:col-span-1 flex flex-col">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+            <CardTitle className="text-lg font-medium">{t.menu.categories}</CardTitle>
+            <Button size="sm" onClick={() => openCreateCategoryForm()}>
+              <Plus className="h-4 w-4 mr-1" />
+              {t.common.create}
+            </Button>
+          </CardHeader>
+          <CardContent className="flex-1 overflow-auto">
+            {menuLoading ? (
+              <LoadingState message={t.common.loading} />
+            ) : menuError ? (
+              <ErrorState onRetry={() => refetchMenu()} />
+            ) : !categories?.length ? (
+              <EmptyState
+                icon={FolderTree}
+                title={t.menu.noCategories}
+                description={t.menu.noCategories}
+                actionLabel={t.menu.newCategory}
+                onAction={() => openCreateCategoryForm()}
+              />
+            ) : (
+              <div className="space-y-0.5">
+                {categories.map((cat) => (
+                  <AdminCategoryTreeItem
+                    key={cat.id}
+                    cat={cat}
+                    depth={0}
+                    selectedCategory={selectedCategory}
+                    setSelectedCategory={setSelectedCategory}
+                    expandedCategories={expandedCategories}
+                    setExpandedCategories={setExpandedCategories}
+                    draggedId={draggedId}
+                    setDraggedId={setDraggedId}
+                    dragOverId={dragOverId}
+                    setDragOverId={setDragOverId}
+                    handleCategoryReorder={handleCategoryReorder}
+                  />
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Right Panel: Selected Category Details + Services */}
+        <Card className="lg:col-span-2 flex flex-col">
+          {!currentCategory ? (
+            <CardContent className="flex-1 flex items-center justify-center">
+              <EmptyState
+                icon={FolderTree}
+                title={t.menu.selectCategory}
+                description={t.menu.selectCategory}
+              />
+            </CardContent>
+          ) : (
+            <>
+              {/* Category Header */}
+              <CardHeader className="pb-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <CardTitle className="text-lg font-medium">
+                      {currentCategory.name}
+                    </CardTitle>
+                    <p className="text-xs text-slate-400 mt-1">
+                      {services?.length || 0} {t.menu.services.toLowerCase()}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="h-8 text-xs"
+                      onClick={openCreateServiceForm}
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      {t.menu.newService}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs"
+                      onClick={() => openCreateCategoryForm(currentCategory.id)}
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Alt Kategori
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => openEditCategoryForm(currentCategory)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() =>
+                        setDeleteTarget({
+                          type: 'category',
+                          id: currentCategory.id,
+                          name: currentCategory.name,
+                        })
+                      }
+                    >
+                      <Trash2 className="h-4 w-4 text-red-500" />
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+
+              {/* Services Section */}
+              <CardContent className="flex-1 overflow-auto">
+                {!services?.length ? (
+                  <EmptyState
+                    icon={FolderTree}
+                    title={t.menu.noServices}
+                    description={t.menu.noServices}
+                    actionLabel={t.menu.newService}
+                    onAction={openCreateServiceForm}
+                  />
+                ) : (
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {services.map((service) => (
+                      <Card key={service.id} className="overflow-hidden">
+                        <div className="flex p-3 gap-3">
+                          <div className="w-20 h-20 bg-slate-100 flex-shrink-0 rounded-lg overflow-hidden">
+                            {service.imageUrl ? (
+                              <img
+                                src={service.imageUrl}
+                                alt={service.title}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="flex items-center justify-center h-full">
+                                <ImageIcon className="h-8 w-8 text-slate-300" />
+                              </div>
+                            )}
+                          </div>
+                          <CardContent className="flex-1 p-0 overflow-hidden">
+                            <div className="flex items-start justify-between gap-1">
+                              <div className="min-w-0 flex-1">
+                                <h4 className="font-medium text-sm truncate" title={service.title}>{service.title}</h4>
+                                {service.description && (
+                                  <p className="text-xs text-slate-500 line-clamp-2 mt-0.5">
+                                    {service.description}
+                                  </p>
+                                )}
+                                <div className="flex items-center gap-1.5 mt-1">
+                                  <span className="text-sm font-semibold text-primary">
+                                    {Number(service.basePrice).toFixed(2)} TL
+                                  </span>
+                                  <AdminPriceTypeBadge priceType={service.priceType as PriceType} t={t} />
+                                </div>
+                              </div>
+                              <div className="flex gap-1 flex-shrink-0">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6"
+                                  onClick={() => openEditServiceForm(service)}
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6"
+                                  onClick={() =>
+                                    setDeleteTarget({
+                                      type: 'service',
+                                      id: service.id,
+                                      name: service.title,
+                                    })
+                                  }
+                                >
+                                  <Trash2 className="h-3 w-3 text-red-500" />
+                                </Button>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </>
+          )}
+        </Card>
+      </div>
+
+      {/* Category Form Dialog */}
+      <Dialog open={isCategoryFormOpen} onOpenChange={() => closeCategoryForm()}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {editingCategory
+                ? t.menu.editCategory
+                : categoryForm.parentId
+                ? 'Yeni Alt Kategori'
+                : t.menu.newCategory}
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCategorySubmit}>
+            <div className="space-y-4 py-4">
+              {categoryForm.parentId && (
+                <div className="bg-primary/5 border border-primary/20 rounded-lg px-3 py-2">
+                  <p className="text-xs text-slate-500">Üst Kategori</p>
+                  <p className="text-sm font-medium text-primary">
+                    {findCategoryInTree(categoryForm.parentId, categories ?? [])?.name}
+                  </p>
+                </div>
+              )}
+              <div className="space-y-2">
+                <Label htmlFor="categoryName">
+                  {categoryForm.parentId ? 'Alt Kategori Adı' : t.menu.categoryName} *
+                </Label>
+                <Input
+                  id="categoryName"
+                  value={categoryForm.name}
+                  onChange={(e) =>
+                    setCategoryForm((prev) => ({ ...prev, name: e.target.value }))
+                  }
+                  placeholder={categoryForm.parentId ? 'Örn: Izgaralar, Çorbalar...' : 'Örn: Ana Yemekler, Tatlılar, İçecekler...'}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="displayOrder">{t.menu.displayOrder}</Label>
+                <Input
+                  id="displayOrder"
+                  type="number"
+                  min={0}
+                  value={categoryForm.displayOrder || ''}
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) =>
+                    setCategoryForm((prev) => ({
+                      ...prev,
+                      displayOrder: parseInt(e.target.value) || 0,
+                    }))
+                  }
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={closeCategoryForm}>
+                {t.common.cancel}
+              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span tabIndex={0}>
+                    <Button type="submit" disabled={isCategoryPending}>
+                      {isCategoryPending
+                        ? t.common.loading
+                        : editingCategory
+                        ? t.common.update
+                        : t.common.create}
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {isCategoryPending && <TooltipContent>{t.tooltips.formSubmitting}</TooltipContent>}
+              </Tooltip>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Service Form Dialog */}
+      <Dialog open={isServiceFormOpen} onOpenChange={() => closeServiceForm()}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {editingService ? t.menu.editService : t.menu.newService}
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleServiceSubmit}>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="serviceTitle">{t.menu.serviceTitle} *</Label>
+                <Input
+                  id="serviceTitle"
+                  value={serviceForm.title}
+                  onChange={(e) =>
+                    setServiceForm((prev) => ({ ...prev, title: e.target.value }))
+                  }
+                  placeholder={t.menu.serviceTitle}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center gap-1.5">
+                  <Label htmlFor="serviceDesc">{t.menu.serviceContentsDescription}</Label>
+                  <div className="relative group">
+                    <span className="text-amber-500 cursor-help font-bold text-sm">*</span>
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-800 text-white text-xs rounded-lg whitespace-normal w-64 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 leading-relaxed">
+                      {t.menu.serviceContentsDescriptionTooltip}
+                    </div>
+                  </div>
+                </div>
+                <Textarea
+                  id="serviceDesc"
+                  value={serviceForm.description}
+                  onChange={(e) =>
+                    setServiceForm((prev) => ({ ...prev, description: e.target.value }))
+                  }
+                  placeholder={t.menu.serviceContentsDescription}
+                  rows={3}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="basePrice">{t.menu.basePrice} (TL) *</Label>
+                  <Input
+                    id="basePrice"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={serviceForm.basePrice || ''}
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) =>
+                      setServiceForm((prev) => ({
+                        ...prev,
+                        basePrice: parseFloat(e.target.value) || 0,
+                      }))
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>{t.menu.priceType} *</Label>
+                  <Select
+                    value={serviceForm.priceType}
+                    onValueChange={(v) =>
+                      setServiceForm((prev) => ({ ...prev, priceType: v as PriceType }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ADMIN_PRICE_TYPE_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {t.menu[opt.labelKey]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Image Upload */}
+              <div className="space-y-2">
+                <Label>{t.menu.uploadImage}</Label>
+                <input
+                  ref={serviceFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleFileSelect}
+                />
+                {serviceImagePreview ? (
+                  <div className="relative inline-block">
+                    <img
+                      src={serviceImagePreview}
+                      alt="Preview"
+                      className="w-32 h-20 rounded-lg object-cover"
+                    />
+                    <div className="absolute top-1 right-1 flex gap-1">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => serviceFileInputRef.current?.click()}
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => {
+                          setServiceImageFile(null);
+                          setServiceImagePreview(null);
+                        }}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => serviceFileInputRef.current?.click()}
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    {t.menu.uploadImage}
+                  </Button>
+                )}
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={closeServiceForm}>
+                {t.common.cancel}
+              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span tabIndex={0}>
+                    <Button type="submit" disabled={isServicePending}>
+                      {isServicePending
+                        ? t.common.loading
+                        : editingService
+                        ? t.common.update
+                        : t.common.create}
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {isServicePending && <TooltipContent>{t.tooltips.formSubmitting}</TooltipContent>}
+              </Tooltip>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Image Cropper Dialog */}
+      <ImageCropper
+        open={cropperOpen}
+        onOpenChange={setCropperOpen}
+        imageSrc={cropperSrc}
+        onCropComplete={handleCropComplete}
+        aspectRatio={1}
+      />
+
+      {/* Delete Confirm Dialog */}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title={`${t.common.delete} ${
+          deleteTarget?.type === 'category' ? t.menu.categories : t.menu.services
+        }`}
+        description={`"${deleteTarget?.name}" ${t.menu.deleteConfirm}`}
+        confirmLabel={t.common.delete}
+        onConfirm={handleDelete}
+        variant="destructive"
+      />
+
+      {/* Menu Preview Dialog — Phone mockup */}
+      <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
+        <DialogContent className="max-w-md p-0 gap-0 overflow-hidden bg-transparent border-0 shadow-none [&>button]:hidden">
+          <div className="mx-auto w-[375px] bg-stone-50 rounded-[2rem] shadow-2xl border-[6px] border-stone-800 overflow-hidden relative">
+            <div className="bg-stone-800 flex items-center justify-center py-1">
+              <div className="w-20 h-5 bg-stone-900 rounded-b-xl" />
+            </div>
+            <div className="max-h-[70vh] overflow-y-auto">
+              <div className="bg-gradient-to-br from-stone-800 to-stone-900 px-5 pt-6 pb-5 text-center">
+                <p className="text-[10px] uppercase tracking-[3px] text-stone-400 mb-1">{t.menu.preview}</p>
+                <h2 className="text-xl font-bold text-white">{t.menu.menuPreview}</h2>
+                <div className="flex items-center justify-center gap-2 mt-2">
+                  <div className="w-8 h-px bg-amber-500" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                  <div className="w-8 h-px bg-amber-500" />
+                </div>
+                <div className="flex items-center justify-center gap-1.5 mt-3">
+                  {(['tr', 'en', 'de'] as const).map((lang) => (
+                    <button
+                      key={lang}
+                      onClick={() => setPreviewLang(lang)}
+                      className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                        previewLang === lang
+                          ? 'bg-amber-500 text-white'
+                          : 'bg-white/10 text-stone-400 hover:bg-white/20'
+                      }`}
+                    >
+                      {lang.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="px-4 py-4 space-y-5">
+                {previewMenu && previewMenu.length > 0 ? (
+                  <PreviewCategoryTree categories={previewMenu} depth={0} t={t} />
+                ) : (
+                  <div className="py-16 text-center">
+                    <FolderTree className="h-10 w-10 text-stone-300 mx-auto mb-3" />
+                    <p className="text-sm text-stone-400">{t.menu.noCategories}</p>
+                  </div>
+                )}
+              </div>
+              <div className="px-5 py-4 text-center border-t border-stone-200 bg-white">
+                <p className="text-[10px] text-stone-400">Powered by TourOps</p>
+              </div>
+            </div>
+            <div className="bg-stone-800 flex justify-center py-2">
+              <div className="w-28 h-1 bg-stone-600 rounded-full" />
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// ===================================================================
+// RESOURCES TAB — Mirrors restaurant/venue/page.tsx with admin API
+// ===================================================================
+
+// Icon mapping for resource types
+const venueTypeIcons: Record<string, React.ComponentType<{ className?: string }>> = {
+  floor: Layers,
+  room: Square,
+  table: Circle,
+  chair: User,
+  seat: User,
+};
+
+interface AdminVenueFormState {
+  isOpen: boolean;
+  editId: number | null;
+  parentId: number | null;
+  resourceTypeId: number | null;
+  name: string;
+  capacity: number;
+  order: number;
+  serviceStartAt: string;
+  serviceEndAt: string;
+  count: number;
+}
+
+const adminVenueInitialForm: AdminVenueFormState = {
+  isOpen: false,
+  editId: null,
+  parentId: null,
+  resourceTypeId: null,
+  name: '',
+  capacity: 4,
+  order: 0,
+  serviceStartAt: '09:00',
+  serviceEndAt: '23:00',
+  count: 1,
+};
+
+function ResourcesTab({ orgId }: { orgId: number }) {
+  const { t } = useLanguage();
+  const queryClient = useQueryClient();
+
+  const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set());
+  const [form, setForm] = useState<AdminVenueFormState>(adminVenueInitialForm);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
+  const [multipleCreating, setMultipleCreating] = useState(false);
+
+  // Queries
+  const { data: resourcesResult, isLoading: resLoading } = useQuery({
+    queryKey: ['admin-org-resources', orgId],
+    queryFn: () => adminApi.getOrgResources(orgId),
+  });
+
+  const { data: resourceTypesResult, isLoading: typesLoading } = useQuery({
+    queryKey: ['admin-resource-types'],
+    queryFn: () => adminApi.getResourceTypes(),
+  });
+
+  const allResources: ResourceDto[] = resourcesResult?.success
+    ? Array.isArray(resourcesResult.data) ? resourcesResult.data : (resourcesResult.data as unknown as PaginatedResponse<ResourceDto>)?.data || []
+    : [];
+
+  const resourceTypes: ResourceTypeDto[] = resourceTypesResult?.success
+    ? Array.isArray(resourceTypesResult.data) ? resourceTypesResult.data : (resourceTypesResult.data as unknown as PaginatedResponse<ResourceTypeDto>)?.data || []
+    : [];
+
+  // Flatten nested tree from API into flat list with parentId + resourceTypeId
+  const normalizedResources = useMemo(() => {
+    const flat: ResourceDto[] = [];
+    const walk = (items: ResourceDto[], parentId: number | null) => {
+      for (const r of items) {
+        flat.push({
+          ...r,
+          resourceTypeId: r.resourceTypeId || r.resourceType?.id || 0,
+          parentId: parentId,
+          children: undefined, // remove nested children to avoid confusion
+        });
+        if (r.children?.length) {
+          walk(r.children, r.id);
+        }
+      }
+    };
+    walk(allResources, null);
+    return flat;
+  }, [allResources]);
+
+  // Build childrenCache from flat list for LayoutEditor
+  const childrenCache = useMemo(() => {
+    const cache: Record<number, ResourceDto[]> = {};
+    for (const r of normalizedResources) {
+      if (r.parentId !== null) {
+        if (!cache[r.parentId]) cache[r.parentId] = [];
+        cache[r.parentId].push(r);
+      }
+    }
+    return cache;
+  }, [normalizedResources]);
+
+  // Admin API adapter for LayoutEditor
+  const adminApiAdapter = useMemo<LayoutApiAdapter>(() => ({
+    getLayout: async (parentId: number) => {
+      const children = normalizedResources.filter((r) => r.parentId === parentId);
+      return { success: true, data: children };
+    },
+    getChildren: async (parentId: number) => {
+      const children = normalizedResources.filter((r) => r.parentId === parentId);
+      return { success: true, data: children };
+    },
+    create: (data) => adminApi.createOrgResource(orgId, data),
+    update: (id, data) => adminApi.updateOrgResource(orgId, id, data),
+    delete: (id) => adminApi.deleteOrgResource(orgId, id),
+  }), [normalizedResources, orgId]);
+
+  const refetchResources = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['admin-org-resources', orgId] });
+  }, [queryClient, orgId]);
+
+  // Build tree from flat list
+  const rootResources = normalizedResources.filter((r) => r.parentId === null);
+  const sortedRoots = [...rootResources].sort((a, b) => b.order - a.order);
+  const getChildren = (parentId: number): ResourceDto[] =>
+    normalizedResources.filter((r) => r.parentId === parentId);
+
+  const getTypeById = (typeId: number): ResourceTypeDto | undefined =>
+    resourceTypes.find((t) => t.id === typeId);
+
+  const getChildType = (parentTypeId: number): ResourceTypeDto | undefined => {
+    const parentType = getTypeById(parentTypeId);
+    // Prefer children array from API (resolve by id from main list), fallback to deprecated childId
+    if (parentType?.children?.length) {
+      const childId = parentType.children[0].id;
+      return getTypeById(childId) || parentType.children[0];
+    }
+    if (parentType?.childId) return getTypeById(parentType.childId);
+    return undefined;
+  };
+
+  const rootType = resourceTypes.find((t) => t.order === 1);
+
+  // Stats
+  const floors = rootResources;
+  const rooms = normalizedResources.filter((r) => {
+    const type = r.resourceType || getTypeById(r.resourceTypeId);
+    return type?.code === 'room';
+  });
+  const tables = normalizedResources.filter((r) => {
+    const type = r.resourceType || getTypeById(r.resourceTypeId);
+    return type?.code === 'table';
+  });
+  const totalCapacity = floors.reduce((acc, f) => acc + f.capacity, 0);
+
+  // Mutations
+  const createMutation = useMutation({
+    mutationFn: (data: CreateResourceDto) => adminApi.createOrgResource(orgId, data),
+    onSuccess: (result) => {
+      if (result.success) {
+        queryClient.invalidateQueries({ queryKey: ['admin-org-resources', orgId] });
+        toast.success(t.venue.resourceCreated);
+        closeForm();
+      } else {
+        toast.error(result.error || t.venue.createError);
+      }
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: UpdateResourceDto }) =>
+      adminApi.updateOrgResource(orgId, id, data),
+    onSuccess: (result) => {
+      if (result.success) {
+        queryClient.invalidateQueries({ queryKey: ['admin-org-resources', orgId] });
+        toast.success(t.venue.resourceUpdated);
+        closeForm();
+      } else {
+        toast.error(result.error || t.venue.updateError);
+      }
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => adminApi.deleteOrgResource(orgId, id),
+    onSuccess: (result) => {
+      if (result.success) {
+        queryClient.invalidateQueries({ queryKey: ['admin-org-resources', orgId] });
+        toast.success(t.venue.resourceDeleted);
+        setDeleteTarget(null);
+      } else {
+        toast.error(result.error || t.venue.deleteError);
+      }
+    },
+  });
+
+  const toggleActive = useMutation({
+    mutationFn: ({ id, active }: { id: number; active: boolean }) =>
+      adminApi.updateOrgResource(orgId, id, { active }),
+    onSuccess: (result) => {
+      if (result.success) {
+        queryClient.invalidateQueries({ queryKey: ['admin-org-resources', orgId] });
+        toast.success(result.data?.active ? t.venue.resourceActivated : t.venue.resourceDeactivated);
+      }
+    },
+  });
+
+  const toggleExpand = (id: number) => {
+    setExpandedItems((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const openCreateForm = (parentId: number | null, resourceTypeId: number) => {
+    const type = getTypeById(resourceTypeId);
+    setForm({
+      isOpen: true,
+      editId: null,
+      parentId,
+      resourceTypeId,
+      name: '',
+      capacity: type?.defaultCapacity || 4,
+      order: 0,
+      serviceStartAt: '09:00',
+      serviceEndAt: '23:00',
+      count: type?.code === 'chair' || type?.code === 'seat' ? 4 : 1,
+    });
+  };
+
+  const openEditForm = (resource: ResourceDto) => {
+    setForm({
+      isOpen: true,
+      editId: resource.id,
+      parentId: resource.parentId,
+      resourceTypeId: resource.resourceTypeId,
+      name: resource.name,
+      capacity: resource.capacity,
+      order: resource.order,
+      serviceStartAt: resource.serviceStartAt || '09:00',
+      serviceEndAt: resource.serviceEndAt || '23:00',
+      count: 1,
+    });
+  };
+
+  const closeForm = () => setForm(adminVenueInitialForm);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const type = form.resourceTypeId ? getTypeById(form.resourceTypeId) : null;
+    const isChair = type?.code === 'chair' || type?.code === 'seat';
+
+    if (!isChair && !form.name.trim()) {
+      toast.error(t.venue.nameRequired);
+      return;
+    }
+    if (!form.resourceTypeId) {
+      toast.error(t.venue.selectResourceType);
+      return;
+    }
+
+    const baseData: CreateResourceDto = {
+      name: form.name,
+      resourceTypeId: form.resourceTypeId,
+      parentId: form.parentId,
+      capacity: form.capacity,
+      order: form.order,
+      serviceStartAt: form.serviceStartAt,
+      serviceEndAt: form.serviceEndAt,
+    };
+
+    if (form.editId) {
+      updateMutation.mutate({
+        id: form.editId,
+        data: {
+          name: form.name,
+          capacity: form.capacity,
+          order: form.order,
+          serviceStartAt: form.serviceStartAt,
+          serviceEndAt: form.serviceEndAt,
+        },
+      });
+    } else if (isChair && form.count > 1) {
+      const baseName = form.name.trim() || t.venue.chair;
+      setMultipleCreating(true);
+      try {
+        for (let i = 1; i <= form.count; i++) {
+          await adminApi.createOrgResource(orgId, { ...baseData, name: `${baseName} ${i}`, order: i });
+        }
+        queryClient.invalidateQueries({ queryKey: ['admin-org-resources', orgId] });
+        toast.success(`${form.count} ${t.venue.chair.toLowerCase()} ${t.venue.resourceCreated.toLowerCase()}`);
+        closeForm();
+      } catch {
+        toast.error(t.venue.chairCreateError);
+      } finally {
+        setMultipleCreating(false);
+      }
+    } else if (type?.code === 'table') {
+      setMultipleCreating(true);
+      try {
+        const tableResult = await adminApi.createOrgResource(orgId, baseData);
+        if (tableResult.success && tableResult.data) {
+          const chairType = resourceTypes.find((t) => t.code === 'chair' || t.code === 'seat');
+          if (chairType) {
+            const cap = form.capacity || 4;
+            const tableName = form.name.trim();
+            let chairsCreated = 0;
+            for (let i = 1; i <= cap; i++) {
+              try {
+                await adminApi.createOrgResource(orgId, {
+                  name: `${tableName}-${i}`,
+                  resourceTypeId: chairType.id,
+                  parentId: tableResult.data.id,
+                  capacity: 1,
+                  order: i,
+                });
+                chairsCreated++;
+              } catch { /* skip failed chair */ }
+            }
+            toast.success(`${t.venue.table} + ${chairsCreated} ${t.venue.chair.toLowerCase()} ${t.venue.resourceCreated.toLowerCase()}`);
+          } else {
+            toast.success(t.venue.resourceCreated);
+          }
+          queryClient.invalidateQueries({ queryKey: ['admin-org-resources', orgId] });
+          closeForm();
+        } else {
+          toast.error(tableResult.error || t.venue.tableCreateError);
+        }
+      } catch {
+        toast.error(t.venue.tableCreateErrorGeneral);
+      } finally {
+        setMultipleCreating(false);
+      }
+    } else {
+      createMutation.mutate(baseData);
+    }
+  };
+
+  const handleDelete = () => {
+    if (deleteTarget) deleteMutation.mutate(deleteTarget.id);
+  };
+
+  const isPending = createMutation.isPending || updateMutation.isPending || multipleCreating;
+
+  // Recursive tree item
+  const ResourceTreeItem = ({ resource, depth = 0 }: { resource: ResourceDto; depth?: number }) => {
+    const type = resource.resourceType || getTypeById(resource.resourceTypeId);
+    const childType = type ? getChildType(type.id) : undefined;
+    const children = getChildren(resource.id);
+    const hasChildren = children.length > 0;
+    const isExpanded = expandedItems.has(resource.id);
+    const Icon = type ? venueTypeIcons[type.code] || Layers : Layers;
+
+    return (
+      <div className={depth > 0 ? 'ml-4' : ''}>
+        <Collapsible open={isExpanded} onOpenChange={() => toggleExpand(resource.id)}>
+          <div className={`border rounded-lg ${!resource.active ? 'opacity-50 bg-slate-50' : ''}`}>
+            <CollapsibleTrigger asChild>
+              <div className="flex items-center justify-between p-3 hover:bg-slate-50 cursor-pointer">
+                <div className="flex items-center gap-2">
+                  {type?.allowsChildren ? (
+                    isExpanded ? <ChevronDown className="h-4 w-4 text-slate-400" /> : <ChevronRight className="h-4 w-4 text-slate-400" />
+                  ) : (
+                    <div className="w-4" />
+                  )}
+                  <Icon className="h-5 w-5 text-indigo-500" />
+                  <span className="font-medium">{resource.name}</span>
+                  <Badge variant="outline" className="text-xs">{type?.name || '-'}</Badge>
+                  {type?.code === 'floor' && (
+                    <span className="text-sm text-slate-400">({t.venue.floorLabel} {resource.order})</span>
+                  )}
+                  {resource.capacity > 1 && (
+                    <span className="text-sm text-slate-400">({resource.capacity} {t.venue.people})</span>
+                  )}
+                  {!resource.active && (
+                    <Badge variant="secondary" className="text-xs">{t.team.inactive}</Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                  {childType && (
+                    <Button variant="ghost" size="sm" onClick={() => openCreateForm(resource.id, childType.id)}>
+                      <Plus className="h-4 w-4 mr-1" />
+                      {childType.name}
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => toggleActive.mutate({ id: resource.id, active: !resource.active })}
+                    title={resource.active ? t.venue.deactivate : t.venue.activate}
+                  >
+                    {resource.active ? <PowerOff className="h-4 w-4 text-orange-500" /> : <Power className="h-4 w-4 text-green-500" />}
+                  </Button>
+                  <Button variant="ghost" size="icon" onClick={() => openEditForm(resource)}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" onClick={() => setDeleteTarget({ id: resource.id, name: resource.name })}>
+                    <Trash2 className="h-4 w-4 text-red-500" />
+                  </Button>
+                </div>
+              </div>
+            </CollapsibleTrigger>
+            {type?.allowsChildren && (
+              <CollapsibleContent className="overflow-visible">
+                <div
+                  className="border-t bg-slate-50/50 p-2 space-y-2"
+                  style={{
+                    maxHeight: type?.code === 'table' ? '200px' : type?.code === 'room' ? '400px' : '500px',
+                    overflowY: 'auto',
+                  }}
+                >
+                  {hasChildren ? (
+                    children.map((child) => <ResourceTreeItem key={child.id} resource={child} depth={depth + 1} />)
+                  ) : (
+                    <p className="text-sm text-slate-500 text-center py-4">
+                      {t.venue.noChildResources} {childType?.name?.toLowerCase() || ''} {t.venue.noChildResourcesSuffix}
+                    </p>
+                  )}
+                </div>
+              </CollapsibleContent>
+            )}
+          </div>
+        </Collapsible>
+      </div>
+    );
+  };
+
+  if (resLoading || typesLoading) return <LoadingState message={t.common.loading} />;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-semibold">{t.venue.title}</h3>
+          <p className="text-sm text-slate-500">{t.venue.description}</p>
+        </div>
+        {rootType ? (
+          <Button onClick={() => openCreateForm(null, rootType.id)}>
+            <Plus className="h-4 w-4 mr-2" />
+            {t.venue.addNew} {rootType.name}
+          </Button>
+        ) : (
+          <Button variant="outline" disabled>
+            <Plus className="h-4 w-4 mr-2" />
+            {t.venue.selectResourceType}
+          </Button>
+        )}
+      </div>
+
+      {normalizedResources.length === 0 ? (
+        <Card className="border-dashed border-2 border-slate-300">
+          <CardContent className="py-16">
+            <div className="flex flex-col items-center justify-center text-center max-w-md mx-auto">
+              <div className="h-20 w-20 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center mb-6">
+                <Building2 className="h-10 w-10 text-indigo-600" />
+              </div>
+              <h2 className="text-2xl font-bold text-slate-900 mb-3">{t.venue.createSeatingTitle}</h2>
+              <p className="text-slate-500 mb-6 leading-relaxed">{t.venue.createSeatingDesc}</p>
+              <div className="grid grid-cols-3 gap-4 mb-8 w-full">
+                <div className="flex flex-col items-center p-4 bg-slate-50 rounded-lg">
+                  <Layers className="h-6 w-6 text-indigo-500 mb-2" />
+                  <span className="text-sm font-medium text-slate-700">{t.venue.addFloorStep}</span>
+                  <span className="text-xs text-slate-400 mt-1">{t.venue.addFloorStepDesc}</span>
+                </div>
+                <div className="flex flex-col items-center p-4 bg-slate-50 rounded-lg">
+                  <Square className="h-6 w-6 text-blue-500 mb-2" />
+                  <span className="text-sm font-medium text-slate-700">{t.venue.addRoomStep}</span>
+                  <span className="text-xs text-slate-400 mt-1">{t.venue.addRoomStepDesc}</span>
+                </div>
+                <div className="flex flex-col items-center p-4 bg-slate-50 rounded-lg">
+                  <Circle className="h-6 w-6 text-amber-500 mb-2" />
+                  <span className="text-sm font-medium text-slate-700">{t.venue.addTableStep}</span>
+                  <span className="text-xs text-slate-400 mt-1">{t.venue.addTableStepDesc}</span>
+                </div>
+              </div>
+              {rootType && (
+                <Button size="lg" onClick={() => openCreateForm(null, rootType.id)} className="gap-2">
+                  <Plus className="h-5 w-5" />
+                  {t.venue.startByAddingFloor}
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          {/* Stats Cards */}
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">{t.venue.totalFloors}</CardTitle>
+                <Layers className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent><div className="text-2xl font-bold">{floors.length}</div></CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">{t.venue.totalRooms}</CardTitle>
+                <Square className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent><div className="text-2xl font-bold">{rooms.length}</div></CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">{t.venue.totalTables}</CardTitle>
+                <Circle className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent><div className="text-2xl font-bold">{tables.length}</div></CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">{t.venue.totalCapacity}</CardTitle>
+                <User className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent><div className="text-2xl font-bold">{totalCapacity} {t.venue.people}</div></CardContent>
+            </Card>
+          </div>
+
+          {/* Layout Editor — 2D visual floor planning */}
+          <div className="mt-4">
+            <LayoutEditor
+              resources={sortedRoots}
+              resourceTypes={resourceTypes}
+              childrenCache={childrenCache}
+              onResourceCreated={refetchResources}
+              onResourceUpdated={refetchResources}
+              onResourceDeleted={refetchResources}
+              apiAdapter={adminApiAdapter}
+            />
+          </div>
+
+          {/* Resource Tree */}
+          <div className="space-y-2">
+            {sortedRoots.map((res) => (
+              <ResourceTreeItem key={res.id} resource={res} />
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* Form Dialog */}
+      <Dialog open={form.isOpen} onOpenChange={() => closeForm()}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {form.editId ? t.venue.editResource : t.venue.addNew}: {form.resourceTypeId && getTypeById(form.resourceTypeId)?.name}
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit}>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="resName">
+                  {t.venue.nameLabel} {form.resourceTypeId && (getTypeById(form.resourceTypeId)?.code === 'chair' || getTypeById(form.resourceTypeId)?.code === 'seat') && !form.editId ? t.venue.optional : '*'}
+                </Label>
+                <Input
+                  id="resName"
+                  value={form.name}
+                  onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+                  placeholder={(() => {
+                    const code = form.resourceTypeId ? getTypeById(form.resourceTypeId)?.code : '';
+                    switch (code) {
+                      case 'floor': return t.venue.floorNameExample;
+                      case 'room': return t.venue.roomNameExample;
+                      case 'table': return t.venue.tableNameExample;
+                      case 'chair': case 'seat': return t.venue.chairNameExample;
+                      default: return '';
+                    }
+                  })()}
+                />
+              </div>
+
+              {form.resourceTypeId && getTypeById(form.resourceTypeId)?.code === 'floor' && (
+                <div className="space-y-2">
+                  <Label htmlFor="floorOrder">{t.venue.floorNumber}</Label>
+                  <Select
+                    value={String(form.order)}
+                    onValueChange={(v) => setForm((prev) => ({ ...prev, order: parseInt(v) }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="-2">-2. {t.venue.floorLabel} ({t.venue.basement})</SelectItem>
+                      <SelectItem value="-1">-1. {t.venue.floorLabel} ({t.venue.basement})</SelectItem>
+                      <SelectItem value="0">{t.venue.groundFloor}</SelectItem>
+                      <SelectItem value="1">1. {t.venue.floorLabel}</SelectItem>
+                      <SelectItem value="2">2. {t.venue.floorLabel}</SelectItem>
+                      <SelectItem value="3">3. {t.venue.floorLabel}</SelectItem>
+                      <SelectItem value="4">4. {t.venue.floorLabel}</SelectItem>
+                      <SelectItem value="5">5. {t.venue.floorLabel}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="resCapacity">
+                  {(() => {
+                    const code = form.resourceTypeId ? getTypeById(form.resourceTypeId)?.code : '';
+                    switch (code) {
+                      case 'floor': return t.venue.floorCapacity;
+                      case 'room': return t.venue.roomCapacity;
+                      case 'table': return t.venue.personCount;
+                      default: return t.venue.capacityLabel;
+                    }
+                  })()}
+                </Label>
+                <Input
+                  id="resCapacity"
+                  type="number"
+                  min={1}
+                  value={form.capacity || ''}
+                  onFocus={(e) => e.target.select()}
+                  placeholder={(() => {
+                    const code = form.resourceTypeId ? getTypeById(form.resourceTypeId)?.code : '';
+                    switch (code) {
+                      case 'floor': return `${t.venue.examplePrefix} 100`;
+                      case 'room': return `${t.venue.examplePrefix} 30`;
+                      case 'table': return `${t.venue.examplePrefix} 4`;
+                      default: return `${t.venue.examplePrefix} 1`;
+                    }
+                  })()}
+                  onChange={(e) => setForm((prev) => ({ ...prev, capacity: parseInt(e.target.value) || 1 }))}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="serviceStart">{t.venue.serviceStart}</Label>
+                  <Input
+                    id="serviceStart"
+                    type="time"
+                    value={form.serviceStartAt}
+                    onChange={(e) => setForm((prev) => ({ ...prev, serviceStartAt: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="serviceEnd">{t.venue.serviceEnd}</Label>
+                  <Input
+                    id="serviceEnd"
+                    type="time"
+                    value={form.serviceEndAt}
+                    onChange={(e) => setForm((prev) => ({ ...prev, serviceEndAt: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              {form.resourceTypeId && (getTypeById(form.resourceTypeId)?.code === 'chair' || getTypeById(form.resourceTypeId)?.code === 'seat') && !form.editId && (
+                <div className="space-y-2">
+                  <Label htmlFor="chairCount">{t.venue.chairCountLabel}</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="chairCount"
+                      type="number"
+                      min={1}
+                      max={50}
+                      value={form.count || ''}
+                      onFocus={(e) => e.target.select()}
+                      onChange={(e) => setForm((prev) => ({ ...prev, count: Math.min(50, Math.max(1, parseInt(e.target.value) || 1)) }))}
+                      className="w-24"
+                    />
+                    <span className="text-sm text-slate-500">
+                      {form.count > 1 ? `"${form.name || t.venue.chair} 1" ... "${form.name || t.venue.chair} ${form.count}" ${t.venue.willBeCreatedAs}` : ''}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={closeForm}>{t.common.cancel}</Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span tabIndex={0}>
+                    <Button type="submit" disabled={isPending}>
+                      {isPending ? t.common.loading : form.editId ? t.common.update : t.common.create}
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {isPending && <TooltipContent>{t.tooltips.formSubmitting}</TooltipContent>}
+              </Tooltip>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirm */}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title={t.venue.deleteResource}
+        description={`"${deleteTarget?.name}" ${t.venue.deleteResourceDesc}`}
+        confirmLabel={t.common.delete}
+        onConfirm={handleDelete}
+        variant="destructive"
       />
     </div>
   );

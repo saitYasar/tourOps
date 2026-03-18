@@ -1,7 +1,7 @@
 import { useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import { resourceApi, type ResourceDto, type ResourceTypeDto } from '@/lib/api';
-import type { EditorRoom, EditorTable, EditorObject, EditorAction, ObjectKind } from '../types';
+import type { EditorRoom, EditorTable, EditorObject, EditorAction, ObjectKind, LayoutApiAdapter } from '../types';
 import { ROOM_COLORS, OBJECT_KIND_LABELS, OBJECT_KIND_CONFIG } from '../types';
 import { parseCoordinates, serializeCoordinates } from '../utils/coordinates';
 import { getTableDefault } from '../utils/tableDefaults';
@@ -28,26 +28,32 @@ function detectObjectKind(name: string): ObjectKind {
 /** Small helper to pause between API calls */
 const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-/** Fetch rooms of a floor: /resources/layout?parentId=floorId
- *  The response may already include room.children (tables) — check before making extra calls. */
-async function fetchRooms(floorId: number): Promise<ResourceDto[]> {
-  const result = await resourceApi.getLayout(floorId);
-  if (result.success && result.data) return result.data;
-  console.error('[LayoutEditor] fetchRooms failed for floor', floorId, '—', result.error);
-  return [];
+/** Fetch rooms of a floor using the provided API adapter or default resourceApi */
+function createFetchRooms(api?: LayoutApiAdapter) {
+  return async (floorId: number): Promise<ResourceDto[]> => {
+    const result = api
+      ? await api.getLayout(floorId)
+      : await resourceApi.getLayout(floorId);
+    if (result.success && result.data) return result.data;
+    console.error('[LayoutEditor] fetchRooms failed for floor', floorId, '—', result.error);
+    return [];
+  };
 }
 
-/** Fetch tables of a room with retry + delay.
- *  Only called as fallback when room.children is not populated by getLayout. */
-async function fetchTables(roomId: number): Promise<ResourceDto[]> {
-  for (let attempt = 0; attempt < 3; attempt++) {
-    if (attempt > 0) await delay(500 * attempt); // 500ms, 1000ms backoff
-    const result = await resourceApi.getChildren(roomId);
-    if (result.success && result.data) return result.data;
-    console.warn(`[LayoutEditor] fetchTables attempt ${attempt + 1} failed for room`, roomId, '—', result.error);
-  }
-  console.error('[LayoutEditor] fetchTables gave up for room', roomId);
-  return [];
+/** Fetch tables of a room with retry + delay using the provided API adapter or default resourceApi */
+function createFetchTables(api?: LayoutApiAdapter) {
+  return async (roomId: number): Promise<ResourceDto[]> => {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) await delay(500 * attempt);
+      const result = api
+        ? await api.getChildren(roomId)
+        : await resourceApi.getChildren(roomId);
+      if (result.success && result.data) return result.data;
+      console.warn(`[LayoutEditor] fetchTables attempt ${attempt + 1} failed for room`, roomId, '—', result.error);
+    }
+    console.error('[LayoutEditor] fetchTables gave up for room', roomId);
+    return [];
+  };
 }
 
 function resourceToRoom(
@@ -207,6 +213,7 @@ export function useLayoutSync(
   onResourceCreated: () => void,
   onResourceUpdated: () => void,
   onResourceDeleted: () => void,
+  apiAdapter?: LayoutApiAdapter,
 ) {
   // Use refs to avoid stale closure and infinite re-render loops
   const typesRef = useRef(resourceTypes);
@@ -214,6 +221,13 @@ export function useLayoutSync(
 
   const onUpdatedRef = useRef(onResourceUpdated);
   onUpdatedRef.current = onResourceUpdated;
+
+  // API adapter ref (stable across renders)
+  const apiRef = useRef(apiAdapter);
+  apiRef.current = apiAdapter;
+  const fetchRooms = createFetchRooms(apiAdapter);
+  const fetchTables = createFetchTables(apiAdapter);
+  const api = apiAdapter || resourceApi;
 
   const loadFloorData = useCallback(
     async (floorId: number) => {
@@ -316,7 +330,7 @@ export function useLayoutSync(
         try {
           const coordStr = serializeCoordinates({ x: room.x, y: room.y });
           console.log('[LayoutEditor] Saving room:', room.id, room.name, 'coords:', coordStr, 'w:', room.w, 'h:', room.h);
-          const result = await resourceApi.update(room.id, {
+          const result = await (apiRef.current || resourceApi).update(room.id, {
             name: room.name,
             capacity: room.capacity,
             coordinates: coordStr,
@@ -340,7 +354,7 @@ export function useLayoutSync(
         try {
           const coordStr = serializeCoordinates({ x: table.x, y: table.y });
           console.log('[LayoutEditor] Saving table:', table.id, table.name, 'coords:', coordStr, 'w:', table.w, 'h:', table.h, 'r:', table.r);
-          const result = await resourceApi.update(table.id, {
+          const result = await (apiRef.current || resourceApi).update(table.id, {
             name: table.name,
             capacity: table.capacity,
             coordinates: coordStr,
@@ -365,7 +379,7 @@ export function useLayoutSync(
         try {
           const coordStr = serializeCoordinates({ x: obj.x, y: obj.y });
           console.log('[LayoutEditor] Saving object:', obj.id, obj.name, 'coords:', coordStr, 'w:', obj.w, 'h:', obj.h, 'r:', obj.r, 'color:', obj.color);
-          const result = await resourceApi.update(obj.id, {
+          const result = await (apiRef.current || resourceApi).update(obj.id, {
             name: obj.name,
             coordinates: coordStr,
             width: obj.w,
@@ -408,7 +422,7 @@ export function useLayoutSync(
       const y = 40;
 
       try {
-        const createData: Parameters<typeof resourceApi.create>[0] = {
+        const createData: import('@/lib/api').CreateResourceDto = {
           name,
           resourceTypeId: roomType.id,
           parentId: floorId,
@@ -423,7 +437,7 @@ export function useLayoutSync(
         if (roomType.supportsCoordinates) {
           createData.coordinates = serializeCoordinates({ x, y });
         }
-        const result = await resourceApi.create(createData);
+        const result = await (apiRef.current || resourceApi).create(createData);
 
         if (result.success && result.data) {
           const newRoom: EditorRoom = {
@@ -473,7 +487,7 @@ export function useLayoutSync(
       })();
 
       try {
-        const createData: Parameters<typeof resourceApi.create>[0] = {
+        const createData: import('@/lib/api').CreateResourceDto = {
           name,
           resourceTypeId: tableType.id,
           parentId: roomId,
@@ -488,7 +502,7 @@ export function useLayoutSync(
         if (tableType.supportsCoordinates) {
           createData.coordinates = serializeCoordinates({ x, y });
         }
-        const result = await resourceApi.create(createData);
+        const result = await (apiRef.current || resourceApi).create(createData);
 
         if (result.success && result.data) {
           const createdChairs: { id: number; name: string; order: number }[] = [];
@@ -518,7 +532,7 @@ export function useLayoutSync(
               const chairY = Math.round(y + defaults.h / 2 + chairPos.y);
 
               try {
-                const chairData: Parameters<typeof resourceApi.create>[0] = {
+                const chairData: import('@/lib/api').CreateResourceDto = {
                   name: chairName,
                   resourceTypeId: chairType.id,
                   parentId: result.data.id,
@@ -528,7 +542,7 @@ export function useLayoutSync(
                 if (chairType.supportsCoordinates) {
                   chairData.coordinates = serializeCoordinates({ x: chairX, y: chairY });
                 }
-                const chairResult = await resourceApi.create(chairData);
+                const chairResult = await (apiRef.current || resourceApi).create(chairData);
                 if (chairResult.success && chairResult.data) {
                   createdChairs.push({ id: chairResult.data.id, name: chairName, order: i + 1 });
                 }
@@ -588,7 +602,7 @@ export function useLayoutSync(
       const color = customColor || (kind === 'free' ? OBJECT_KIND_CONFIG.free.defaultColor : undefined);
 
       try {
-        const createData: Parameters<typeof resourceApi.create>[0] = {
+        const createData: import('@/lib/api').CreateResourceDto = {
           name: tempName,
           resourceTypeId: objectType.id,
           parentId: roomId,
@@ -602,12 +616,12 @@ export function useLayoutSync(
         if (objectType.supportsCoordinates) {
           createData.coordinates = serializeCoordinates({ x, y });
         }
-        const result = await resourceApi.create(createData);
+        const result = await (apiRef.current || resourceApi).create(createData);
 
         if (result.success && result.data) {
           // Update name to include ID: "Label-{id}" — include all fields to prevent backend clearing them
           const finalName = `${label}-${result.data.id}`;
-          await resourceApi.update(result.data.id, {
+          await (apiRef.current || resourceApi).update(result.data.id, {
             name: finalName,
             coordinates: serializeCoordinates({ x, y }),
             width: defaults.w,
@@ -646,7 +660,7 @@ export function useLayoutSync(
   const deleteItem = useCallback(
     async (itemType: 'room' | 'table' | 'object', id: number) => {
       try {
-        const result = await resourceApi.delete(id);
+        const result = await (apiRef.current || resourceApi).delete(id);
         if (result.success) {
           dispatch({ type: 'DELETE_ITEM', itemType, id });
           const label = itemType === 'room' ? 'Oda' : itemType === 'table' ? 'Masa' : 'Nesne';

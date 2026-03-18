@@ -152,6 +152,15 @@ export interface UndoEntry {
   apiReverseOps?: { action: 'delete'; resourceIds: number[] }[];
 }
 
+// API adapter for LayoutEditor — allows both restaurant and admin APIs
+export interface LayoutApiAdapter {
+  getLayout: (parentId: number) => Promise<{ success: boolean; data?: ResourceDto[]; error?: string }>;
+  getChildren: (parentId: number) => Promise<{ success: boolean; data?: ResourceDto[]; error?: string }>;
+  create: (data: import('@/lib/api').CreateResourceDto) => Promise<{ success: boolean; data?: ResourceDto; error?: string }>;
+  update: (id: number, data: import('@/lib/api').UpdateResourceDto) => Promise<{ success: boolean; data?: ResourceDto; error?: string }>;
+  delete: (id: number) => Promise<{ success: boolean; error?: string }>;
+}
+
 export interface LayoutEditorProps {
   resources: ResourceDto[];
   resourceTypes: ResourceTypeDto[];
@@ -160,4 +169,5 @@ export interface LayoutEditorProps {
   onResourceUpdated: () => void;
   onResourceDeleted: () => void;
   onReady?: () => void;
+  apiAdapter?: LayoutApiAdapter;
 }

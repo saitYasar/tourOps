@@ -290,7 +290,8 @@ export interface OrganizationUpdateDto {
 // Photo DTO
 export interface PhotoDto {
   id: number;
-  organizationId: number;
+  organizationId?: number;
+  agencyId?: number;
   imageKey: string;
   order: number;
   createdAt: string;
@@ -695,6 +696,76 @@ export interface AdminUpdateOrganizationDto {
   agencyCommissionRate?: number;
 }
 
+// Admin Quick Create Organization DTO
+export interface AdminQuickCreateOrganizationDto {
+  // İşletme bilgileri
+  name: string;
+  categoryId: number;
+  address: string;
+  countryId: number;
+  cityId: number;
+  districtId: number;
+  phoneCountryCode: number;
+  phone: string;
+  email: string;
+  legalName: string;
+  taxNumber: string;
+  taxOffice: string;
+  description?: string;
+  lat?: string;
+  lng?: string;
+  agencyCommissionRate?: number;
+  // Yetkili kişi bilgileri
+  authorizedPerson?: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+    phoneCountryCode: string;
+  };
+  // Oturma düzeni (opsiyonel)
+  resources?: Array<{
+    name: string;
+    resourceTypeId: number;
+    parentId?: number | null;
+    capacity?: number;
+    order?: number;
+    children?: Array<{
+      name: string;
+      resourceTypeId: number;
+      capacity?: number;
+      order?: number;
+      children?: Array<{
+        name: string;
+        resourceTypeId: number;
+        capacity?: number;
+        order?: number;
+      }>;
+    }>;
+  }>;
+  // Menü / Hizmet kategorileri ve hizmetler (opsiyonel)
+  serviceCategories?: Array<{
+    name: string;
+    description?: string;
+    displayOrder?: number;
+    services?: Array<{
+      title: string;
+      basePrice: number;
+      priceType: PriceType;
+      description?: string;
+      estimatedDurationMinutes?: number;
+    }>;
+  }>;
+}
+
+// Admin Quick Create Response
+export interface AdminQuickCreateOrganizationResponseDto {
+  organization: OrganizationDto;
+  resources?: ResourceDto[];
+  serviceCategories?: ServiceCategoryDto[];
+  services?: ServiceDto[];
+}
+
 // Admin Login DTO
 export interface AdminLoginDto {
   email: string;
@@ -884,6 +955,9 @@ export interface ClientStopMenuServiceDto {
   basePrice: string | number;
   priceType: string;
   imageUrl: string | null;
+  estimatedDurationMinutes?: number | null;
+  serviceCategoryId?: number;
+  active?: boolean;
 }
 
 // Client choice DTOs
@@ -943,10 +1017,19 @@ export interface AgencyStopChoicesDto {
 
 // Agency Stop Service Summary
 export interface AgencyStopServiceSummaryItemDto {
-  serviceId: number;
-  serviceName: string;
+  serviceId?: number;
+  serviceName?: string;
+  service?: {
+    id: number;
+    title: string;
+    subTitle?: string;
+    imageUrl?: string;
+    basePrice?: string;
+    description?: string;
+    [key: string]: unknown;
+  };
   totalQuantity: number;
-  unitPrice: number;
+  unitPrice: number | string;
   totalPrice: number;
   [key: string]: unknown;
 }
@@ -954,6 +1037,8 @@ export interface AgencyStopServiceSummaryItemDto {
 export interface AgencyStopServiceSummaryDto {
   services: AgencyStopServiceSummaryItemDto[];
   grandTotal: number;
+  commissionRate?: number;
+  commissionAmount?: number;
   [key: string]: unknown;
 }
 
@@ -1113,7 +1198,24 @@ export interface ApiTourDto {
   galleryImages?: { id: number; imageUrl: string }[];
   stops?: ApiTourStopDto[];
   agency?: { id: number; name: string; email?: string; phone?: string };
-  participants?: { id: number; clientId: number; clientName?: string; status?: string; notes?: string }[];
+  participants?: {
+    id: number;
+    clientId: number;
+    clientName?: string;
+    status?: string;
+    notes?: string;
+    pricePaid?: string;
+    client?: {
+      id: number;
+      firstName?: string;
+      lastName?: string;
+      email?: string;
+      phone?: string;
+      username?: string;
+      [key: string]: unknown;
+    };
+    [key: string]: unknown;
+  }[];
   createdAt?: string;
   updatedAt?: string;
 }
@@ -1148,6 +1250,7 @@ export interface ApiTourStopDto {
   scheduledEndTime: string;
   showPriceToCustomer?: boolean;
   preReservationStatus?: 'pending' | 'approved' | 'rejected' | null;
+  choicesStatus?: 'in_progress' | 'submitted' | 'approved' | 'rejected' | 'revision_requested' | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -1167,6 +1270,86 @@ export interface UpdateTourStopPayload {
   scheduledStartTime?: string;
   scheduledEndTime?: string;
   showPriceToCustomer?: boolean;
+}
+
+// ============================================
+// Auth Storage Helpers (role-based localStorage keys)
+// ============================================
+
+export function getAuthRolePrefix(): string {
+  if (typeof window === 'undefined') return 'restaurant';
+  const path = window.location.pathname;
+  if (path.startsWith('/customer') || path.startsWith('/login/customer')) return 'customer';
+  if (path.startsWith('/admin') || path.startsWith('/login/admin')) return 'admin';
+  if (path.startsWith('/agency')) return 'agency';
+  return 'restaurant';
+}
+
+export function getAuthStorageKeys(rolePrefix?: string) {
+  const prefix = rolePrefix || getAuthRolePrefix();
+  return {
+    token: `tourops_${prefix}_access_token`,
+    userData: `tourops_${prefix}_user_data`,
+  };
+}
+
+// ============================================
+// Notification Types
+// ============================================
+
+export type NotificationTargetType = 'ALL_CLIENTS' | 'ALL_AGENCIES' | 'ALL_ORGANIZATIONS' | 'SPECIFIC_ORGANIZATION' | 'SPECIFIC_AGENCY' | 'SPECIFIC_CLIENT' | 'ORGANIZATION_CATEGORY';
+
+export interface AdminNotificationDto {
+  id: number;
+  title: string;
+  body: string;
+  targetType: NotificationTargetType;
+  targetId?: number;
+  imageUrl?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PanelNotificationDto {
+  id: number;
+  title: string;
+  body: string;
+  imageUrl?: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
+// ============================================
+// System Commission Types
+// ============================================
+
+export type CommissionScope = 'global' | 'category' | 'organization';
+
+export interface SystemCommissionDto {
+  id: number;
+  scope: CommissionScope;
+  scopeId?: number;
+  value: number;
+  description?: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateSystemCommissionDto {
+  scope: string;
+  scopeId?: number;
+  value: number;
+  description?: string;
+  active?: boolean;
+}
+
+export interface UpdateSystemCommissionDto {
+  scope?: string;
+  scopeId?: number;
+  value?: number;
+  description?: string;
+  active?: boolean;
 }
 
 // ============================================
@@ -1192,9 +1375,9 @@ class ApiClient {
   }
 
   // Her zaman localStorage'dan güncel token'ı oku
-  private resolveToken(): string | null {
+  private resolveToken(rolePrefix?: string): string | null {
     if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('tourops_access_token');
+      const stored = localStorage.getItem(getAuthStorageKeys(rolePrefix).token);
       if (stored) {
         this.accessToken = stored;
       }
@@ -1202,13 +1385,14 @@ class ApiClient {
     return this.accessToken;
   }
 
-  setAccessToken(token: string | null) {
+  setAccessToken(token: string | null, rolePrefix?: string) {
     this.accessToken = token;
     if (typeof window !== 'undefined') {
+      const key = getAuthStorageKeys(rolePrefix).token;
       if (token) {
-        localStorage.setItem('tourops_access_token', token);
+        localStorage.setItem(key, token);
       } else {
-        localStorage.removeItem('tourops_access_token');
+        localStorage.removeItem(key);
       }
     }
   }
@@ -1226,7 +1410,14 @@ class ApiClient {
         // Fallback: clear tokens and hard redirect
         this.logout();
         if (typeof window !== 'undefined') {
-          window.location.href = '/login';
+          const prefix = getAuthRolePrefix();
+          const loginPaths: Record<string, string> = {
+            customer: '/login/customer',
+            admin: '/login/admin',
+            agency: '/agency/login',
+            restaurant: '/login',
+          };
+          window.location.href = loginPaths[prefix] || '/login';
         }
       }
       return true;
@@ -1317,7 +1508,7 @@ class ApiClient {
 
     // Store token on successful verification
     if (response.accessToken) {
-      this.setAccessToken(response.accessToken);
+      this.setAccessToken(response.accessToken, 'restaurant');
     }
 
     return response;
@@ -1353,7 +1544,7 @@ class ApiClient {
 
     // Store token on successful verification
     if (response.accessToken) {
-      this.setAccessToken(response.accessToken);
+      this.setAccessToken(response.accessToken, 'agency');
     }
 
     return response;
@@ -1371,7 +1562,7 @@ class ApiClient {
 
     // Store token on successful login
     if (response.accessToken) {
-      this.setAccessToken(response.accessToken);
+      this.setAccessToken(response.accessToken, 'customer');
     }
 
     return response;
@@ -1398,7 +1589,7 @@ class ApiClient {
     }, lang);
 
     if (response.accessToken) {
-      this.setAccessToken(response.accessToken);
+      this.setAccessToken(response.accessToken, 'customer');
     }
 
     return response;
@@ -1485,10 +1676,10 @@ class ApiClient {
   // Client - Reservations
   // ============================================
 
-  async getClientReservations(clientId: string, page = 1, limit = 10, lang: 'tr' | 'en' = 'tr') {
+  async getClientReservations(clientId: string, page = 1, limit = 10) {
     return this.request<PaginatedResponse<ClientReservationDto>>(`/reservations/client/${clientId}?page=${page}&limit=${limit}`, {
       method: 'GET',
-    }, lang);
+    }, 'tr', true);
   }
 
   async createReservation(data: CreateReservationDto, lang: 'tr' | 'en' = 'tr') {
@@ -1553,10 +1744,10 @@ class ApiClient {
     }, lang);
   }
 
-  async getServiceRequestsByTour(tourId: number, page = 1, limit = 10, lang: 'tr' | 'en' = 'tr') {
+  async getServiceRequestsByTour(tourId: number, page = 1, limit = 10) {
     return this.request<PaginatedResponse<ServiceRequestDto>>(`/service-requests/tour/${tourId}?page=${page}&limit=${limit}`, {
       method: 'GET',
-    }, lang);
+    }, 'tr', true);
   }
 
   async cancelServiceRequest(id: number, lang: 'tr' | 'en' = 'tr') {
@@ -1656,11 +1847,13 @@ class ApiClient {
   // Auth - Logout
   // ============================================
 
-  logout() {
-    this.setAccessToken(null);
+  logout(rolePrefix?: string) {
+    const prefix = rolePrefix || getAuthRolePrefix();
+    const keys = getAuthStorageKeys(prefix);
+    this.setAccessToken(null, prefix);
     if (typeof window !== 'undefined') {
       localStorage.removeItem('tourops_auth_user_id');
-      localStorage.removeItem('tourops_user_data');
+      localStorage.removeItem(keys.userData);
     }
   }
 
@@ -1689,7 +1882,7 @@ class ApiClient {
     // Store token on successful acceptance
     if (response?.accessToken) {
       console.log('acceptInvitation: Setting access token');
-      this.setAccessToken(response.accessToken);
+      this.setAccessToken(response.accessToken, 'restaurant');
     } else {
       console.warn('acceptInvitation: No accessToken in response');
     }
@@ -1776,7 +1969,7 @@ class ApiClient {
     // Registration returns accessToken - save it
     const responseData = jsonResponse.data as OrganizationRegisterResponseDto;
     if (responseData.accessToken) {
-      this.setAccessToken(responseData.accessToken);
+      this.setAccessToken(responseData.accessToken, 'restaurant');
     }
 
     return responseData;
@@ -1847,7 +2040,7 @@ class ApiClient {
     // Registration returns accessToken - save it
     const responseData = jsonResponse.data as AgencyRegisterResponseDto;
     if (responseData.accessToken) {
-      this.setAccessToken(responseData.accessToken);
+      this.setAccessToken(responseData.accessToken, 'agency');
     }
 
     return responseData;
@@ -2126,6 +2319,60 @@ class ApiClient {
 
   async deleteOrganizationPhoto(photoId: number, lang: 'tr' | 'en' = 'tr') {
     return this.request<{ message: string }>(`/organizations/my/photos/${photoId}`, {
+      method: 'DELETE',
+    }, lang);
+  }
+
+  // ============================================
+  // Agencies - Photos
+  // ============================================
+
+  async getAgencyPhotos(lang: 'tr' | 'en' = 'tr') {
+    return this.request<PhotoDto[]>('/agencies/my/photos', {
+      method: 'GET',
+    }, lang);
+  }
+
+  async addAgencyPhoto(image: File, lang: 'tr' | 'en' = 'tr') {
+    const formData = new FormData();
+    formData.append('image', image);
+
+    const url = `${this.baseUrl}/agencies/my/photos?lang=${lang}`;
+
+    const headers: HeadersInit = {};
+    const token = this.resolveToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    const jsonResponse = await response.json().catch(() => ({
+      message: 'Bir hata oluştu',
+      statusCode: response.status,
+    }));
+
+    if (!response.ok) {
+      if (this.checkUnauthorized(response.status)) {
+        throw new Error('Oturum süresi doldu');
+      }
+      const errorMessage =
+        jsonResponse.errorMessage?.client ||
+        jsonResponse.errorMessage?.system ||
+        jsonResponse.message ||
+        'API isteği başarısız';
+      throw new Error(errorMessage);
+    }
+
+    return jsonResponse.data as PhotoDto;
+  }
+
+  async deleteAgencyPhoto(photoId: number, lang: 'tr' | 'en' = 'tr') {
+    return this.request<{ message: string }>(`/agencies/my/photos/${photoId}`, {
       method: 'DELETE',
     }, lang);
   }
@@ -2613,6 +2860,38 @@ class ApiClient {
     }, lang);
   }
 
+  async getOrgChoices(id: number, lang: 'tr' | 'en' = 'tr') {
+    return this.request<AgencyStopChoicesDto[]>(`/organization/pre-reservations/${id}/choices`, {
+      method: 'GET',
+    }, lang);
+  }
+
+  async getOrgServiceSummary(id: number, lang: 'tr' | 'en' = 'tr') {
+    return this.request<AgencyStopServiceSummaryDto>(`/organization/pre-reservations/${id}/service-summary`, {
+      method: 'GET',
+    }, lang);
+  }
+
+  async approveOrgChoices(id: number, lang: 'tr' | 'en' = 'tr') {
+    return this.request<any>(`/organization/pre-reservations/${id}/approve-choices`, {
+      method: 'PUT',
+    }, lang);
+  }
+
+  async rejectOrgChoices(id: number, note: string, lang: 'tr' | 'en' = 'tr') {
+    return this.request<any>(`/organization/pre-reservations/${id}/reject-choices`, {
+      method: 'PUT',
+      body: JSON.stringify({ note }),
+    }, lang);
+  }
+
+  async requestOrgChoicesRevision(id: number, note: string, lang: 'tr' | 'en' = 'tr') {
+    return this.request<any>(`/organization/pre-reservations/${id}/request-choices-revision`, {
+      method: 'PUT',
+      body: JSON.stringify({ note }),
+    }, lang);
+  }
+
   // ============================================
   // Admin - Auth
   // ============================================
@@ -2632,7 +2911,7 @@ class ApiClient {
 
     // Store token on successful verification
     if (response.accessToken) {
-      this.setAccessToken(response.accessToken);
+      this.setAccessToken(response.accessToken, 'admin');
     }
 
     return response;
@@ -2720,6 +2999,174 @@ class ApiClient {
     }, lang);
   }
 
+  // Hızlı işletme oluşturma (oturma düzeni + menü dahil)
+  async adminQuickCreateOrganization(data: AdminQuickCreateOrganizationDto, lang: 'tr' | 'en' = 'tr') {
+    return this.request<AdminQuickCreateOrganizationResponseDto>('/admin/organizations/quick-create', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, lang);
+  }
+
+  // ============================================
+  // Admin - İşletme Hizmet Kategorileri Yönetimi
+  // ============================================
+
+  async getAdminOrgServiceCategories(orgId: number, lang: 'tr' | 'en' = 'tr') {
+    return this.request<ServiceCategoryDto[]>(`/admin/organizations/${orgId}/service-categories`, {
+      method: 'GET',
+    }, lang);
+  }
+
+  async createAdminOrgServiceCategory(orgId: number, data: CreateServiceCategoryDto, lang: 'tr' | 'en' = 'tr') {
+    return this.request<ServiceCategoryDto>(`/admin/organizations/${orgId}/service-categories`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, lang);
+  }
+
+  async updateAdminOrgServiceCategory(orgId: number, categoryId: number, data: UpdateServiceCategoryDto, lang: 'tr' | 'en' = 'tr') {
+    return this.request<ServiceCategoryDto>(`/admin/organizations/${orgId}/service-categories/${categoryId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }, lang);
+  }
+
+  async deleteAdminOrgServiceCategory(orgId: number, categoryId: number, lang: 'tr' | 'en' = 'tr') {
+    return this.request<{ message: string }>(`/admin/organizations/${orgId}/service-categories/${categoryId}`, {
+      method: 'DELETE',
+    }, lang);
+  }
+
+  // ============================================
+  // Admin - İşletme Hizmetleri Yönetimi
+  // ============================================
+
+  async getAdminOrgServices(orgId: number, page = 1, limit = 100, lang: 'tr' | 'en' = 'tr') {
+    return this.request<PaginatedResponse<ServiceDto>>(`/admin/organizations/${orgId}/services?page=${page}&limit=${limit}`, {
+      method: 'GET',
+    }, lang);
+  }
+
+  async getAdminOrgMenu(orgId: number, lang: 'tr' | 'en' | 'de' = 'tr') {
+    return this.request<ClientStopMenuCategoryDto[]>(`/admin/organizations/${orgId}/service-categories/menu?lang=${lang}`, {
+      method: 'GET',
+    }, 'tr', true);
+  }
+
+  async createAdminOrgService(orgId: number, data: CreateServiceDto, lang: 'tr' | 'en' = 'tr') {
+    return this.request<ServiceDto>(`/admin/organizations/${orgId}/services`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, lang);
+  }
+
+  async createAdminOrgServiceWithImage(orgId: number, data: CreateServiceDto, image?: File) {
+    const formData = new FormData();
+    formData.append('serviceCategoryId', String(data.serviceCategoryId));
+    formData.append('title', data.title);
+    formData.append('basePrice', String(data.basePrice));
+    formData.append('priceType', data.priceType);
+    if (data.subTitle) formData.append('subTitle', data.subTitle);
+    if (data.description) formData.append('description', data.description);
+    if (data.contentsDescription) formData.append('contentsDescription', data.contentsDescription);
+    if (data.estimatedDurationMinutes !== undefined) {
+      formData.append('estimatedDurationMinutes', String(data.estimatedDurationMinutes));
+    }
+    if (image) formData.append('image', image);
+
+    const url = `${this.baseUrl}/admin/organizations/${orgId}/services`;
+    const headers: HeadersInit = {};
+    const token = this.resolveToken();
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const response = await fetch(url, { method: 'POST', headers, body: formData });
+    const jsonResponse = await response.json().catch(() => ({ message: 'Bir hata oluştu', statusCode: response.status }));
+    if (!response.ok) {
+      if (this.checkUnauthorized(response.status)) {
+        throw new Error('Oturum süresi doldu');
+      }
+      const errorMessage = jsonResponse.errorMessage?.client || jsonResponse.errorMessage?.system || jsonResponse.message || 'API isteği başarısız';
+      throw new Error(errorMessage);
+    }
+    return (jsonResponse.data !== undefined ? jsonResponse.data : jsonResponse) as ServiceDto;
+  }
+
+  async updateAdminOrgService(orgId: number, serviceId: number, data: UpdateServiceDto, lang: 'tr' | 'en' = 'tr') {
+    return this.request<ServiceDto>(`/admin/organizations/${orgId}/services/${serviceId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }, lang);
+  }
+
+  async updateAdminOrgServiceWithImage(orgId: number, serviceId: number, data: UpdateServiceDto, image?: File) {
+    const formData = new FormData();
+    if (data.title !== undefined) formData.append('title', data.title);
+    if (data.subTitle !== undefined) formData.append('subTitle', data.subTitle);
+    if (data.description !== undefined) formData.append('description', data.description);
+    if (data.contentsDescription !== undefined) formData.append('contentsDescription', data.contentsDescription);
+    if (data.basePrice !== undefined) formData.append('basePrice', String(data.basePrice));
+    if (data.priceType !== undefined) formData.append('priceType', data.priceType);
+    if (data.estimatedDurationMinutes !== undefined) {
+      formData.append('estimatedDurationMinutes', String(data.estimatedDurationMinutes));
+    }
+    if (data.serviceCategoryId !== undefined) {
+      formData.append('serviceCategoryId', String(data.serviceCategoryId));
+    }
+    if (image) formData.append('image', image);
+
+    const url = `${this.baseUrl}/admin/organizations/${orgId}/services/${serviceId}`;
+    const headers: HeadersInit = {};
+    const token = this.resolveToken();
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const response = await fetch(url, { method: 'PUT', headers, body: formData });
+    const jsonResponse = await response.json().catch(() => ({ message: 'Bir hata oluştu', statusCode: response.status }));
+    if (!response.ok) {
+      if (this.checkUnauthorized(response.status)) {
+        throw new Error('Oturum süresi doldu');
+      }
+      const errorMessage = jsonResponse.errorMessage?.client || jsonResponse.errorMessage?.system || jsonResponse.message || 'API isteği başarısız';
+      throw new Error(errorMessage);
+    }
+    return (jsonResponse.data !== undefined ? jsonResponse.data : jsonResponse) as ServiceDto;
+  }
+
+  async deleteAdminOrgService(orgId: number, serviceId: number, lang: 'tr' | 'en' = 'tr') {
+    return this.request<{ message: string }>(`/admin/organizations/${orgId}/services/${serviceId}`, {
+      method: 'DELETE',
+    }, lang);
+  }
+
+  // ============================================
+  // Admin - İşletme Kaynakları/Yerleşim Yönetimi
+  // ============================================
+
+  async getAdminOrgResources(orgId: number) {
+    return this.request<ResourceDto[]>(`/admin/organizations/${orgId}/resources`, {
+      method: 'GET',
+    }, 'tr', true);
+  }
+
+  async createAdminOrgResource(orgId: number, data: CreateResourceDto) {
+    return this.request<ResourceDto>(`/admin/organizations/${orgId}/resources`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, 'tr', true);
+  }
+
+  async updateAdminOrgResource(orgId: number, resourceId: number, data: UpdateResourceDto) {
+    return this.request<ResourceDto>(`/admin/organizations/${orgId}/resources/${resourceId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }, 'tr', true);
+  }
+
+  async deleteAdminOrgResource(orgId: number, resourceId: number) {
+    return this.request<{ message: string }>(`/admin/organizations/${orgId}/resources/${resourceId}`, {
+      method: 'DELETE',
+    }, 'tr', true);
+  }
+
   // ============================================
   // Admin - Organization Roles
   // ============================================
@@ -2787,11 +3234,11 @@ class ApiClient {
   // Admin - Organization Categories
   // ============================================
 
-  async getAdminOrganizationCategories(page = 1, limit = 100, lang: 'tr' | 'en' = 'tr') {
+  async getAdminOrganizationCategories(page = 1, limit = 100) {
     const url = `/admin/organization-categories?page=${page}&limit=${limit}`;
     return this.request<PaginatedResponse<CategoryDto>>(url, {
       method: 'GET',
-    }, lang);
+    }, 'tr', true);
   }
 
   async createAdminOrganizationCategory(data: { name: string; description?: string }, lang: 'tr' | 'en' = 'tr') {
@@ -2818,12 +3265,12 @@ class ApiClient {
   // Admin - Resource Types
   // ============================================
 
-  async getAdminResourceTypes(page = 1, limit = 100, categoryId?: number, lang: 'tr' | 'en' = 'tr') {
+  async getAdminResourceTypes(page = 1, limit = 100, categoryId?: number) {
     let url = `/admin/resource-types?page=${page}&limit=${limit}`;
     if (categoryId) url += `&categoryId=${categoryId}`;
     return this.request<PaginatedResponse<ResourceTypeDto>>(url, {
       method: 'GET',
-    }, lang);
+    }, 'tr', true);
   }
 
   async createAdminResourceType(data: {
@@ -2868,34 +3315,34 @@ class ApiClient {
   // ============================================
 
   async getUsers(page = 1, limit = 100) {
-    const url = `/users?page=${page}&limit=${limit}`;
+    const url = `/admin/users?page=${page}&limit=${limit}`;
     return this.request<PaginatedResponse<AdminUserDto>>(url, {
       method: 'GET',
     }, 'tr', true); // skipLang - this endpoint doesn't accept lang param
   }
 
   async getUserById(id: number) {
-    return this.request<AdminUserDto>(`/users/${id}`, {
+    return this.request<AdminUserDto>(`/admin/users/${id}`, {
       method: 'GET',
     }, 'tr', true); // skipLang
   }
 
   async createUser(data: CreateAdminUserDto) {
-    return this.request<AdminUserDto>('/users', {
+    return this.request<AdminUserDto>('/admin/users', {
       method: 'POST',
       body: JSON.stringify(data),
     }, 'tr', true); // skipLang
   }
 
   async updateUser(id: number, data: UpdateAdminUserDto) {
-    return this.request<AdminUserDto>(`/users/${id}`, {
+    return this.request<AdminUserDto>(`/admin/users/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     }, 'tr', true); // skipLang
   }
 
   async deleteUser(id: number) {
-    return this.request<{ message: string }>(`/users/${id}`, {
+    return this.request<{ message: string }>(`/admin/users/${id}`, {
       method: 'DELETE',
     }, 'tr', true); // skipLang
   }
@@ -3116,6 +3563,12 @@ class ApiClient {
     }, lang);
   }
 
+  async submitTourStopChoices(stopId: number, lang: 'tr' | 'en' = 'tr') {
+    return this.request<{ message: string }>(`/tour-stops/${stopId}/submit-choices`, {
+      method: 'PUT',
+    }, lang);
+  }
+
   // ============================================
   // Client Panel - New Endpoints
   // ============================================
@@ -3138,11 +3591,11 @@ class ApiClient {
     }, lang);
   }
 
-  async getStopLayout(stopId: number, parentId?: number) {
+  async getStopLayout(stopId: number, parentId?: number, lang: 'tr' | 'en' = 'tr') {
     const params = parentId !== undefined ? `?parentId=${parentId}` : '';
     return this.request<ResourceDto[]>(`/client/tours/stops/${stopId}/layout${params}`, {
       method: 'GET',
-    }, 'tr', true);
+    }, lang);
   }
 
   // Resource choice (table/seat selection)
@@ -3200,6 +3653,133 @@ class ApiClient {
     return this.request<AgencyStopServiceSummaryDto>(`/agency/tours/stops/${stopId}/service-summary`, {
       method: 'GET',
     }, lang);
+  }
+
+  // ============================================
+  // Admin - Notifications (lang parametresi yok)
+  // ============================================
+
+  async createNotification(formData: FormData) {
+    const url = `${this.baseUrl}/admin/notifications`;
+    const headers: HeadersInit = {};
+    const token = this.resolveToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    const response = await fetch(url, { method: 'POST', headers, body: formData });
+    const jsonResponse = await response.json().catch(() => ({ message: 'Bir hata oluştu', statusCode: response.status }));
+    if (!response.ok) {
+      if (this.checkUnauthorized(response.status)) throw new Error('Oturum süresi doldu');
+      const errorMessage = jsonResponse.errorMessage?.client || jsonResponse.errorMessage?.system || jsonResponse.message || 'API isteği başarısız';
+      throw new Error(errorMessage);
+    }
+    return jsonResponse.data !== undefined ? jsonResponse.data as AdminNotificationDto : jsonResponse as AdminNotificationDto;
+  }
+
+  async listNotifications(page = 1, limit = 10) {
+    return this.request<{ data: AdminNotificationDto[]; meta: { total: number; totalCount?: number; page: number; limit: number } }>(`/admin/notifications?page=${page}&limit=${limit}`, { method: 'GET' }, 'tr', true);
+  }
+
+  async updateNotification(id: number, formData: FormData) {
+    const url = `${this.baseUrl}/admin/notifications/${id}`;
+    const headers: HeadersInit = {};
+    const token = this.resolveToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    const response = await fetch(url, { method: 'PUT', headers, body: formData });
+    const jsonResponse = await response.json().catch(() => ({ message: 'Bir hata oluştu', statusCode: response.status }));
+    if (!response.ok) {
+      if (this.checkUnauthorized(response.status)) throw new Error('Oturum süresi doldu');
+      const errorMessage = jsonResponse.errorMessage?.client || jsonResponse.errorMessage?.system || jsonResponse.message || 'API isteği başarısız';
+      throw new Error(errorMessage);
+    }
+    return jsonResponse.data !== undefined ? jsonResponse.data as AdminNotificationDto : jsonResponse as AdminNotificationDto;
+  }
+
+  async deleteNotification(id: number) {
+    return this.request<{ message: string }>(`/admin/notifications/${id}`, { method: 'DELETE' }, 'tr', true);
+  }
+
+  // ============================================
+  // Panel Notifications - Agency
+  // ============================================
+
+  async getAgencyNotifications(page = 1, limit = 10) {
+    return this.request<{ data: PanelNotificationDto[]; meta: { total: number; totalCount?: number; page: number; limit: number } }>(`/agencies/my/notifications?page=${page}&limit=${limit}`, { method: 'GET' }, 'tr', true);
+  }
+
+  async markAgencyNotificationRead(id: number) {
+    return this.request<PanelNotificationDto>(`/agencies/my/notifications/${id}/read`, { method: 'PATCH' }, 'tr', true);
+  }
+
+  async getAgencyUnreadCount() {
+    return this.request<{ unreadCount: number }>('/agencies/my/notifications/unread-count', { method: 'GET' }, 'tr', true);
+  }
+
+  // ============================================
+  // Panel Notifications - Organization
+  // ============================================
+
+  async getOrganizationNotifications(page = 1, limit = 10) {
+    return this.request<{ data: PanelNotificationDto[]; meta: { total: number; totalCount?: number; page: number; limit: number } }>(`/organizations/my/notifications?page=${page}&limit=${limit}`, { method: 'GET' }, 'tr', true);
+  }
+
+  async markOrganizationNotificationRead(id: number) {
+    return this.request<PanelNotificationDto>(`/organizations/my/notifications/${id}/read`, { method: 'PATCH' }, 'tr', true);
+  }
+
+  async getOrganizationUnreadCount() {
+    return this.request<{ unreadCount: number }>('/organizations/my/notifications/unread-count', { method: 'GET' }, 'tr', true);
+  }
+
+  // ============================================
+  // Panel Notifications - Client
+  // ============================================
+
+  async getClientNotifications(page = 1, limit = 10) {
+    return this.request<{ data: PanelNotificationDto[]; meta: { total: number; totalCount?: number; page: number; limit: number } }>(`/client/notifications?page=${page}&limit=${limit}`, { method: 'GET' }, 'tr', true);
+  }
+
+  async markClientNotificationRead(id: number) {
+    return this.request<PanelNotificationDto>(`/client/notifications/${id}/read`, { method: 'PATCH' }, 'tr', true);
+  }
+
+  async getClientUnreadCount() {
+    return this.request<{ unreadCount: number }>('/client/notifications/unread-count', { method: 'GET' }, 'tr', true);
+  }
+
+  // ============================================
+  // Admin - System Commissions (lang parametresi yok)
+  // ============================================
+
+  async listSystemCommissions(page = 1, limit = 10, scope?: string, scopeId?: number) {
+    let endpoint = `/admin/system-commissions?page=${page}&limit=${limit}`;
+    if (scope) endpoint += `&scope=${scope}`;
+    if (scopeId) endpoint += `&scopeId=${scopeId}`;
+    return this.request<{ data: SystemCommissionDto[]; meta: { total: number; totalCount?: number; page: number; limit: number } }>(endpoint, { method: 'GET' }, 'tr', true);
+  }
+
+  async getSystemCommission(id: number) {
+    return this.request<SystemCommissionDto>(`/admin/system-commissions/${id}`, { method: 'GET' }, 'tr', true);
+  }
+
+  async createSystemCommission(data: CreateSystemCommissionDto) {
+    return this.request<SystemCommissionDto>('/admin/system-commissions', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, 'tr', true);
+  }
+
+  async updateSystemCommission(id: number, data: UpdateSystemCommissionDto) {
+    return this.request<SystemCommissionDto>(`/admin/system-commissions/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }, 'tr', true);
+  }
+
+  async deleteSystemCommission(id: number) {
+    return this.request<{ message: string }>(`/admin/system-commissions/${id}`, { method: 'DELETE' }, 'tr', true);
   }
 }
 
@@ -3364,9 +3944,9 @@ export const realAuthApi = {
     }
   },
 
-  async getClientReservations(clientId: string, page = 1, limit = 10, lang: 'tr' | 'en' = 'tr') {
+  async getClientReservations(clientId: string, page = 1, limit = 10) {
     try {
-      const response = await apiClient.getClientReservations(clientId, page, limit, lang);
+      const response = await apiClient.getClientReservations(clientId, page, limit);
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
@@ -3912,6 +4492,36 @@ export const agencyApi = {
       return { success: false, error: (error as Error).message };
     }
   },
+
+  // Get agency photos
+  async getPhotos() {
+    try {
+      const response = await apiClient.getAgencyPhotos();
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  // Add agency photo
+  async addPhoto(image: File) {
+    try {
+      const response = await apiClient.addAgencyPhoto(image);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  // Delete agency photo
+  async deletePhoto(photoId: number) {
+    try {
+      await apiClient.deleteAgencyPhoto(photoId);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
 };
 
 // ============================================
@@ -4239,6 +4849,150 @@ export const adminApi = {
     }
   },
 
+  // Hızlı işletme oluşturma
+  async quickCreateOrganization(data: AdminQuickCreateOrganizationDto, lang: 'tr' | 'en' = 'tr') {
+    try {
+      const response = await apiClient.adminQuickCreateOrganization(data, lang);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  // ============================================
+  // İşletme Hizmet Kategorileri (Admin)
+  // ============================================
+
+  async getOrgServiceCategories(orgId: number, lang: 'tr' | 'en' = 'tr') {
+    try {
+      const response = await apiClient.getAdminOrgServiceCategories(orgId, lang);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async createOrgServiceCategory(orgId: number, data: CreateServiceCategoryDto, lang: 'tr' | 'en' = 'tr') {
+    try {
+      const response = await apiClient.createAdminOrgServiceCategory(orgId, data, lang);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async updateOrgServiceCategory(orgId: number, categoryId: number, data: UpdateServiceCategoryDto, lang: 'tr' | 'en' = 'tr') {
+    try {
+      const response = await apiClient.updateAdminOrgServiceCategory(orgId, categoryId, data, lang);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async deleteOrgServiceCategory(orgId: number, categoryId: number, lang: 'tr' | 'en' = 'tr') {
+    try {
+      await apiClient.deleteAdminOrgServiceCategory(orgId, categoryId, lang);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  // ============================================
+  // İşletme Hizmetleri (Admin)
+  // ============================================
+
+  async getOrgMenu(orgId: number, lang: 'tr' | 'en' | 'de' = 'tr') {
+    try {
+      const response = await apiClient.getAdminOrgMenu(orgId, lang);
+      const data = Array.isArray(response) ? response : (response as unknown as { data: ClientStopMenuCategoryDto[] }).data ?? [];
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async getOrgServices(orgId: number, page = 1, limit = 100, lang: 'tr' | 'en' = 'tr') {
+    try {
+      const response = await apiClient.getAdminOrgServices(orgId, page, limit, lang);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async createOrgService(orgId: number, data: CreateServiceDto, image?: File) {
+    try {
+      const response = image
+        ? await apiClient.createAdminOrgServiceWithImage(orgId, data, image)
+        : await apiClient.createAdminOrgService(orgId, data);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async updateOrgService(orgId: number, serviceId: number, data: UpdateServiceDto, image?: File) {
+    try {
+      const response = image
+        ? await apiClient.updateAdminOrgServiceWithImage(orgId, serviceId, data, image)
+        : await apiClient.updateAdminOrgService(orgId, serviceId, data);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async deleteOrgService(orgId: number, serviceId: number, lang: 'tr' | 'en' = 'tr') {
+    try {
+      await apiClient.deleteAdminOrgService(orgId, serviceId, lang);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  // ============================================
+  // İşletme Kaynakları/Yerleşim (Admin)
+  // ============================================
+
+  async getOrgResources(orgId: number) {
+    try {
+      const response = await apiClient.getAdminOrgResources(orgId);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async createOrgResource(orgId: number, data: CreateResourceDto) {
+    try {
+      const response = await apiClient.createAdminOrgResource(orgId, data);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async updateOrgResource(orgId: number, resourceId: number, data: UpdateResourceDto) {
+    try {
+      const response = await apiClient.updateAdminOrgResource(orgId, resourceId, data);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async deleteOrgResource(orgId: number, resourceId: number) {
+    try {
+      await apiClient.deleteAdminOrgResource(orgId, resourceId);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
   // ============================================
   // Organization Roles
   // ============================================
@@ -4499,6 +5253,101 @@ export const adminApi = {
         }));
       }
       return { success: true, data: response as ApiTourDto };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  // ============================================
+  // Notifications
+  // ============================================
+
+  async createNotification(formData: FormData) {
+    try {
+      const response = await apiClient.createNotification(formData);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async listNotifications(page = 1, limit = 10) {
+    try {
+      const response = await apiClient.listNotifications(page, limit);
+      if (response.meta && !response.meta.total && response.meta.totalCount) {
+        response.meta.total = response.meta.totalCount;
+      }
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async updateNotification(id: number, formData: FormData) {
+    try {
+      const response = await apiClient.updateNotification(id, formData);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async deleteNotification(id: number) {
+    try {
+      await apiClient.deleteNotification(id);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  // ============================================
+  // System Commissions
+  // ============================================
+
+  async listSystemCommissions(page = 1, limit = 10, scope?: string, scopeId?: number) {
+    try {
+      const response = await apiClient.listSystemCommissions(page, limit, scope, scopeId);
+      if (response.meta && !response.meta.total && response.meta.totalCount) {
+        response.meta.total = response.meta.totalCount;
+      }
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async getSystemCommission(id: number) {
+    try {
+      const response = await apiClient.getSystemCommission(id);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async createSystemCommission(data: CreateSystemCommissionDto) {
+    try {
+      const response = await apiClient.createSystemCommission(data);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async updateSystemCommission(id: number, data: UpdateSystemCommissionDto) {
+    try {
+      const response = await apiClient.updateSystemCommission(id, data);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async deleteSystemCommission(id: number) {
+    try {
+      await apiClient.deleteSystemCommission(id);
+      return { success: true };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
@@ -4807,6 +5656,15 @@ export const tourStopApi = {
       return { success: false, error: (error as Error).message };
     }
   },
+
+  async submitChoices(stopId: number, lang: 'tr' | 'en' = 'tr'): Promise<{ success: boolean; error?: string }> {
+    try {
+      await apiClient.submitTourStopChoices(stopId, lang);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
 };
 
 // ============================================
@@ -4828,10 +5686,13 @@ export interface PreReservationDto {
   tourId: number;
   organizationId: number;
   status: 'pending' | 'approved' | 'rejected';
+  choicesStatus?: 'in_progress' | 'submitted' | 'approved' | 'rejected' | 'revision_requested' | null;
   headcount?: number;
   note?: string;
   responseNote?: string;
   rejectionReason?: string;
+  scheduledStartTime?: string | null;
+  scheduledEndTime?: string | null;
   createdAt: string;
   updatedAt: string;
   tour?: {
@@ -4842,6 +5703,11 @@ export interface PreReservationDto {
     endDate?: string;
     description?: string;
     agency?: { id: number; name: string };
+  };
+  organization?: {
+    id: number;
+    name: string;
+    agencyCommissionRate?: number | null;
   };
 }
 
@@ -4873,6 +5739,52 @@ export const preReservationOrgApi = {
   async reject(id: number, rejectionReason: string, lang: 'tr' | 'en' = 'tr'): Promise<{ success: boolean; error?: string }> {
     try {
       await apiClient.rejectOrgPreReservation(id, rejectionReason, lang);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async getChoices(id: number, lang: 'tr' | 'en' = 'tr'): Promise<{ success: boolean; data?: AgencyStopChoicesDto[]; error?: string }> {
+    try {
+      const response = await apiClient.getOrgChoices(id, lang);
+      const data = Array.isArray(response) ? response : (response as any).data ?? [];
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async getServiceSummary(id: number, lang: 'tr' | 'en' = 'tr'): Promise<{ success: boolean; data?: AgencyStopServiceSummaryDto; error?: string }> {
+    try {
+      const response = await apiClient.getOrgServiceSummary(id, lang);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async approveChoices(id: number, lang: 'tr' | 'en' = 'tr'): Promise<{ success: boolean; error?: string }> {
+    try {
+      await apiClient.approveOrgChoices(id, lang);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async rejectChoices(id: number, note: string, lang: 'tr' | 'en' = 'tr'): Promise<{ success: boolean; error?: string }> {
+    try {
+      await apiClient.rejectOrgChoices(id, note, lang);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async requestChoicesRevision(id: number, note: string, lang: 'tr' | 'en' = 'tr'): Promise<{ success: boolean; error?: string }> {
+    try {
+      await apiClient.requestOrgChoicesRevision(id, note, lang);
       return { success: true };
     } catch (error) {
       return { success: false, error: (error as Error).message };

@@ -20,6 +20,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import type { ObjectKind, EditorTable, EditorObject, EditorRoom, UndoableSnapshot, UndoEntry, EditorAction } from './types';
 import { resourceApi } from '@/lib/api';
@@ -114,6 +115,7 @@ export function LayoutEditor({
   onResourceUpdated,
   onResourceDeleted,
   onReady,
+  apiAdapter,
 }: LayoutEditorProps) {
   const { t } = useLanguage();
   const { state, dispatch, getSelectedRoom, getSelectedTable, getSelectedObject } = useLayoutEditorState();
@@ -124,6 +126,7 @@ export function LayoutEditor({
     onResourceCreated,
     onResourceUpdated,
     onResourceDeleted,
+    apiAdapter,
   );
 
   const [saving, setSaving] = useState(false);
@@ -208,7 +211,7 @@ export function LayoutEditor({
         if (op.action === 'delete') {
           for (const id of op.resourceIds) {
             try {
-              await resourceApi.delete(id);
+              await (apiAdapter || resourceApi).delete(id);
             } catch (err) {
               console.error('[Undo] Failed to delete resource', id, err);
             }
@@ -676,9 +679,16 @@ export function LayoutEditor({
             <Button variant="outline" onClick={() => setAddDialog(null)}>
               {t.common.cancel}
             </Button>
-            <Button onClick={handleAddConfirm} disabled={!addName.trim() || creating}>
-              {creating ? t.common.loading : t.common.create}
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span tabIndex={0}>
+                  <Button onClick={handleAddConfirm} disabled={!addName.trim() || creating}>
+                    {creating ? t.common.loading : t.common.create}
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              {(!addName.trim() || creating) && <TooltipContent>{!addName.trim() ? t.tooltips.nameRequired : t.tooltips.formSubmitting}</TooltipContent>}
+            </Tooltip>
           </DialogFooter>
         </DialogContent>
       </Dialog>
