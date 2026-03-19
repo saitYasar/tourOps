@@ -41,6 +41,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { LoadingState, ConfirmDialog } from '@/components/shared';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 type AgencyDetail = AgencyResponseDto & {
   coverImageUrl?: string | null;
@@ -418,37 +419,55 @@ export default function AgencyDetailPage() {
             </div>
 
             <div className="flex gap-2 flex-wrap">
-              {status !== 'active' && (
-                <Button
-                  size="sm"
-                  className="bg-green-600 hover:bg-green-700"
-                  onClick={() => setStatusUpdateTarget('active')}
-                >
-                  <CheckCircle className="h-4 w-4 mr-1" />
-                  {a.agencyApprove}
-                </Button>
-              )}
-              {status !== 'suspended' && (
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => setStatusUpdateTarget('suspended')}
-                >
-                  <XCircle className="h-4 w-4 mr-1" />
-                  {a.agencySuspend}
-                </Button>
-              )}
-              {status !== 'pending' && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setStatusUpdateTarget('pending')}
-                  className="text-yellow-600 border-yellow-200 hover:bg-yellow-50"
-                >
-                  <Clock className="h-4 w-4 mr-1" />
-                  {a.setPending || 'Beklemeye Al'}
-                </Button>
-              )}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span tabIndex={0}>
+                    <Button
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700"
+                      disabled={status === 'active'}
+                      onClick={() => setStatusUpdateTarget('active')}
+                    >
+                      <CheckCircle className="h-4 w-4 mr-1" />
+                      {a.agencyApprove}
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {status === 'active' && <TooltipContent>{t.tooltips.alreadyActive}</TooltipContent>}
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span tabIndex={0}>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      disabled={status === 'suspended'}
+                      onClick={() => setStatusUpdateTarget('suspended')}
+                    >
+                      <XCircle className="h-4 w-4 mr-1" />
+                      {a.agencySuspend}
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {status === 'suspended' && <TooltipContent>{t.tooltips.alreadySuspended}</TooltipContent>}
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span tabIndex={0}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={status === 'pending'}
+                      onClick={() => setStatusUpdateTarget('pending')}
+                      className="text-yellow-600 border-yellow-200 hover:bg-yellow-50"
+                    >
+                      <Clock className="h-4 w-4 mr-1" />
+                      {a.setPending || 'Beklemeye Al'}
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {status === 'pending' && <TooltipContent>{t.tooltips.alreadyPending}</TooltipContent>}
+              </Tooltip>
             </div>
           </div>
         </CardContent>

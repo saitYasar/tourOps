@@ -36,6 +36,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { LoadingState, ConfirmDialog } from '@/components/shared';
 
 // Map backend roles to display info
@@ -209,14 +210,25 @@ export default function AdminUsersPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              className="text-red-600"
-                              onClick={() => setDeleteUserId(adminUser.id)}
-                              disabled={adminUser.role === 'system_admin' || String(adminUser.id) === user?.id}
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              {t.admin.deleteUser}
-                            </DropdownMenuItem>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span tabIndex={0}>
+                                  <DropdownMenuItem
+                                    className="text-red-600"
+                                    onClick={() => setDeleteUserId(adminUser.id)}
+                                    disabled={adminUser.role === 'system_admin' || String(adminUser.id) === user?.id}
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    {t.admin.deleteUser}
+                                  </DropdownMenuItem>
+                                </span>
+                              </TooltipTrigger>
+                              {(adminUser.role === 'system_admin' || String(adminUser.id) === user?.id) && (
+                                <TooltipContent>
+                                  {adminUser.role === 'system_admin' ? t.tooltips.cannotDeleteSystemAdmin : t.tooltips.cannotDeleteSelf}
+                                </TooltipContent>
+                              )}
+                            </Tooltip>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -234,22 +246,36 @@ export default function AdminUsersPage() {
                 {t.admin.paginationTotal} {meta.total} {t.admin.paginationUsers}, {t.admin.paginationPage} {meta.page} / {meta.totalPages}
               </p>
               <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage(p => Math.max(1, p - 1))}
-                  disabled={page <= 1}
-                >
-                  {t.admin.previous}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage(p => p + 1)}
-                  disabled={page >= meta.totalPages}
-                >
-                  {t.admin.nextPage}
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span tabIndex={0}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPage(p => Math.max(1, p - 1))}
+                        disabled={page <= 1}
+                      >
+                        {t.admin.previous}
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {page <= 1 && <TooltipContent>{t.tooltips.firstPage}</TooltipContent>}
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span tabIndex={0}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPage(p => p + 1)}
+                        disabled={page >= meta.totalPages}
+                      >
+                        {t.admin.nextPage}
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {page >= meta.totalPages && <TooltipContent>{t.tooltips.lastPage}</TooltipContent>}
+                </Tooltip>
               </div>
             </div>
           )}

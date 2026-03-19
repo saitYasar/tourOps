@@ -34,6 +34,17 @@ export function formatShortDate(dateString: string | undefined | null): string {
   }
 }
 
+export function formatShortDateTime(dateString: string | undefined | null): string {
+  if (!dateString) return '-';
+  try {
+    const date = parseISO(dateString);
+    if (!isValid(date)) return '-';
+    return format(date, 'dd.MM.yyyy HH:mm', { locale: tr });
+  } catch {
+    return '-';
+  }
+}
+
 export function formatTime(timeString: string | undefined | null): string {
   if (!timeString) return '-';
   return timeString;

@@ -225,16 +225,18 @@ export function useLayoutSync(
   // API adapter ref (stable across renders)
   const apiRef = useRef(apiAdapter);
   apiRef.current = apiAdapter;
-  const fetchRooms = createFetchRooms(apiAdapter);
-  const fetchTables = createFetchTables(apiAdapter);
-  const api = apiAdapter || resourceApi;
 
   const loadFloorData = useCallback(
     async (floorId: number) => {
       console.log('[LayoutEditor] loadFloorData START floorId:', floorId);
 
+      // Use apiRef.current to always get the latest adapter (avoids stale closure)
+      const currentApi = apiRef.current;
+      const fetchRoomsFn = createFetchRooms(currentApi);
+      const fetchTablesFn = createFetchTables(currentApi);
+
       // Step 1: GET /resources/layout?parentId=floorId → rooms (may include room.children = tables)
-      const rooms = await fetchRooms(floorId);
+      const rooms = await fetchRoomsFn(floorId);
       if (rooms.length === 0) {
         console.warn('[LayoutEditor] No rooms found for floor', floorId);
         dispatch({ type: 'LOAD_FLOOR', rooms: [], tables: [], objects: [], floorId });
@@ -263,7 +265,7 @@ export function useLayoutSync(
         } else {
           console.log('[LayoutEditor] Room', room.id, room.name, '→ children not populated, fetching...');
           await delay(300);
-          children = await fetchTables(room.id);
+          children = await fetchTablesFn(room.id);
           console.log('[LayoutEditor] Room', room.id, room.name, '→', children.length, 'children (from API)');
         }
 
@@ -287,7 +289,7 @@ export function useLayoutSync(
         await Promise.all(
           tableChildren.map(async (child) => {
             try {
-              child.children = await fetchTables(child.id);
+              child.children = await fetchTablesFn(child.id);
             } catch {
               child.children = [];
             }

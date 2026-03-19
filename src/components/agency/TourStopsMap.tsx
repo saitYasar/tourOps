@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { OrganizationPublicDto, ApiTourStopDto } from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { formatShortDateTime } from '@/lib/dateUtils';
 
 const loadLeafletCSS = () => {
   if (typeof window === 'undefined') return;
@@ -37,6 +38,8 @@ export function TourStopsMap({
   const polylineRef = useRef<L.Polyline | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [L, setL] = useState<typeof import('leaflet') | null>(null);
+  const [routeCoords, setRouteCoords] = useState<[number, number][] | null>(null);
+  const prevStopsKeyRef = useRef<string>('');
   const { t } = useLanguage();
 
   // Stop organization IDs for quick lookup
@@ -57,6 +60,38 @@ export function TourStopsMap({
   const availableOrgs = organizations.filter(
     (o) => o.lat && o.lng && !stopOrgIds.has(o.id)
   );
+
+  // Fetch real road route from OSRM
+  useEffect(() => {
+    if (stopCoords.length < 2) {
+      setRouteCoords(null);
+      return;
+    }
+
+    const coordsStr = stopCoords.map(({ lat, lng }) => `${lng},${lat}`).join(';');
+    const url = `https://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=full&geometries=geojson`;
+
+    let cancelled = false;
+    fetch(url)
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled) return;
+        if (data.code === 'Ok' && data.routes?.[0]?.geometry?.coordinates) {
+          const coords = data.routes[0].geometry.coordinates.map(
+            (c: [number, number]) => [c[1], c[0]] as [number, number]
+          );
+          setRouteCoords(coords);
+        } else {
+          setRouteCoords(null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setRouteCoords(null);
+      });
+
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stopCoords.map(c => `${c.lat},${c.lng}`).join('|')]);
 
   useEffect(() => {
     loadLeafletCSS();
@@ -132,7 +167,7 @@ export function TourStopsMap({
       }).addTo(map);
 
       const time = stop.scheduledStartTime
-        ? `${new Date(stop.scheduledStartTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${new Date(stop.scheduledEndTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+        ? `${formatShortDateTime(stop.scheduledStartTime)} - ${formatShortDateTime(stop.scheduledEndTime)}`
         : '';
 
       marker.bindPopup(`
@@ -154,15 +189,25 @@ export function TourStopsMap({
       allBounds.push([lat, lng]);
     });
 
-    // 2) Route polyline between stops
+    // 2) Route polyline between stops (real road route or fallback straight line)
     if (stopCoords.length > 1) {
-      const latLngs = stopCoords.map(({ lat, lng }) => L.latLng(lat, lng));
-      polylineRef.current = L.polyline(latLngs, {
-        color: '#2563eb',
-        weight: 3,
-        opacity: 0.7,
-        dashArray: '8, 8',
-      }).addTo(map);
+      if (routeCoords && routeCoords.length > 0) {
+        // Real road route from OSRM
+        polylineRef.current = L.polyline(routeCoords, {
+          color: '#2563eb',
+          weight: 4,
+          opacity: 0.8,
+        }).addTo(map);
+      } else {
+        // Fallback: straight line (dashed)
+        const latLngs = stopCoords.map(({ lat, lng }) => L.latLng(lat, lng));
+        polylineRef.current = L.polyline(latLngs, {
+          color: '#2563eb',
+          weight: 3,
+          opacity: 0.7,
+          dashArray: '8, 8',
+        }).addTo(map);
+      }
     }
 
     // 3) Available organization markers (gray/smaller, clickable)
@@ -211,11 +256,13 @@ export function TourStopsMap({
       allBounds.push([lat, lng]);
     });
 
-    // Fit bounds
-    if (allBounds.length > 0) {
+    // Fit bounds only when stops/orgs actually change, not on highlight
+    const stopsKey = stopCoords.map(c => `${c.lat},${c.lng}`).join('|') + '::' + availableOrgs.map(o => `${o.lat},${o.lng}`).join('|');
+    if (allBounds.length > 0 && stopsKey !== prevStopsKeyRef.current) {
+      prevStopsKeyRef.current = stopsKey;
       map.fitBounds(L.latLngBounds(allBounds), { padding: [40, 40], maxZoom: 14 });
     }
-  }, [stops, organizations, highlightedStopId, L, onOrganizationClick, onStopClick]);
+  }, [stops, organizations, highlightedStopId, L, onOrganizationClick, onStopClick, routeCoords]);
 
   // Pan to highlighted stop
   useEffect(() => {

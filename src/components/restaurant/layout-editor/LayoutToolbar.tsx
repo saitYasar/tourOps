@@ -19,6 +19,7 @@ import {
 import type { ResourceDto } from '@/lib/api';
 import type { ObjectKind } from './types';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 interface LayoutToolbarProps {
   floors: ResourceDto[];
@@ -79,39 +80,60 @@ export function LayoutToolbar({
       <div className="h-6 w-px bg-slate-300" />
 
       {/* Add room */}
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={onAddRoom}
-        disabled={!activeFloorId}
-      >
-        <SquarePlus className="h-4 w-4 mr-1" />
-        {t.venue.newRoom}
-      </Button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span tabIndex={0}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onAddRoom}
+              disabled={!activeFloorId}
+            >
+              <SquarePlus className="h-4 w-4 mr-1" />
+              {t.venue.newRoom}
+            </Button>
+          </span>
+        </TooltipTrigger>
+        {!activeFloorId && <TooltipContent>{t.tooltips.noFloorSelected}</TooltipContent>}
+      </Tooltip>
 
       {/* Add table */}
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={onAddTable}
-        disabled={!activeFloorId || roomCount === 0}
-      >
-        <Plus className="h-4 w-4 mr-1" />
-        {t.venue.newTable}
-      </Button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span tabIndex={0}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onAddTable}
+              disabled={!activeFloorId || roomCount === 0}
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              {t.venue.newTable}
+            </Button>
+          </span>
+        </TooltipTrigger>
+        {(!activeFloorId || roomCount === 0) && <TooltipContent>{!activeFloorId ? t.tooltips.noFloorSelected : t.tooltips.noRoomsYet}</TooltipContent>}
+      </Tooltip>
 
       {/* Add object (wall, window, column) */}
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={!activeFloorId || roomCount === 0}
-          >
-            <Columns className="h-4 w-4 mr-1" />
-            {t.layoutEditor?.newObject ?? 'Nesne Ekle'}
-          </Button>
-        </DropdownMenuTrigger>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span tabIndex={0}>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!activeFloorId || roomCount === 0}
+                >
+                  <Columns className="h-4 w-4 mr-1" />
+                  {t.layoutEditor?.newObject ?? 'Nesne Ekle'}
+                </Button>
+              </DropdownMenuTrigger>
+            </span>
+          </TooltipTrigger>
+          {(!activeFloorId || roomCount === 0) && <TooltipContent>{!activeFloorId ? t.tooltips.noFloorSelected : t.tooltips.noRoomsYet}</TooltipContent>}
+        </Tooltip>
         <DropdownMenuContent>
           <DropdownMenuItem onClick={() => onAddObject('window')}>
             <PanelTop className="h-4 w-4 mr-2" />
@@ -131,16 +153,23 @@ export function LayoutToolbar({
       <div className="h-6 w-px bg-slate-300" />
 
       {/* Undo */}
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={onUndo}
-        disabled={!canUndo}
-        title="Ctrl+Z"
-      >
-        <Undo2 className="h-4 w-4 mr-1" />
-        {t.layoutEditor?.undo ?? 'Geri Al'}
-      </Button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span tabIndex={0}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onUndo}
+              disabled={!canUndo}
+              title="Ctrl+Z"
+            >
+              <Undo2 className="h-4 w-4 mr-1" />
+              {t.layoutEditor?.undo ?? 'Geri Al'}
+            </Button>
+          </span>
+        </TooltipTrigger>
+        {!canUndo && <TooltipContent>{t.tooltips.noUndoHistory}</TooltipContent>}
+      </Tooltip>
 
       <div className="h-6 w-px bg-slate-300" />
 
@@ -163,14 +192,21 @@ export function LayoutToolbar({
           {t.layoutEditor?.unsaved ?? 'Kaydedilmemiş'}
         </Badge>
       )}
-      <Button
-        size="sm"
-        onClick={onSave}
-        disabled={!isDirty || saving}
-      >
-        <Save className="h-4 w-4 mr-1" />
-        {saving ? (t.layoutEditor?.saving ?? 'Kaydediliyor...') : (t.layoutEditor?.save ?? 'Kaydet')}
-      </Button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span tabIndex={0}>
+            <Button
+              size="sm"
+              onClick={onSave}
+              disabled={!isDirty || saving}
+            >
+              <Save className="h-4 w-4 mr-1" />
+              {saving ? (t.layoutEditor?.saving ?? 'Kaydediliyor...') : (t.layoutEditor?.save ?? 'Kaydet')}
+            </Button>
+          </span>
+        </TooltipTrigger>
+        {(!isDirty || saving) && <TooltipContent>{!isDirty ? t.tooltips.noChanges : t.tooltips.saving}</TooltipContent>}
+      </Tooltip>
     </div>
   );
 }

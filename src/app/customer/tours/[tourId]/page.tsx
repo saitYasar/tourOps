@@ -42,7 +42,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { LoadingState, ErrorState, LanguageSwitcher } from '@/components/shared';
+import { formatShortDateTime } from '@/lib/dateUtils';
+import { toast } from 'sonner';
 import { CustomerVenueSelector } from '@/components/customer/CustomerVenueSelector';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 // ============================================
 // Types
@@ -88,6 +91,9 @@ export default function CustomerTourDetailPage() {
   const [savingTable, setSavingTable] = useState(false);
   const [savingMenu, setSavingMenu] = useState(false);
 
+  // Pending chair for confirm dialog (replaces window.confirm)
+  const [pendingChair, setPendingChair] = useState<ResourceDto | null>(null);
+
   // Tour detail
   const {
     data: detail,
@@ -111,7 +117,7 @@ export default function CustomerTourDetailPage() {
   // Stop layout for table selection
   const { data: layoutData, isLoading: layoutLoading, error: layoutError } = useQuery({
     queryKey: ['client-stop-layout', tableStopId, apiLang],
-    queryFn: () => apiClient.getStopLayout(tableStopId!),
+    queryFn: () => apiClient.getStopLayout(tableStopId!, undefined, apiLang),
     enabled: !!tableStopId,
     retry: false,
   });
@@ -174,9 +180,11 @@ export default function CustomerTourDetailPage() {
         const choiceIdMap: Record<number, number> = {};
         const noteMap: Record<number, string> = {};
         for (const sc of choices.serviceChoices) {
-          menuItems[sc.serviceId] = sc.quantity;
-          choiceIdMap[sc.serviceId] = sc.id;
-          if (sc.note) noteMap[sc.serviceId] = sc.note;
+          const svcId = sc.serviceId || sc.service?.id;
+          if (!svcId) continue;
+          menuItems[svcId] = sc.quantity;
+          choiceIdMap[svcId] = sc.id;
+          if (sc.note) noteMap[svcId] = sc.note;
         }
         setSelectedMenuItems(prev => ({ ...prev, [stopId]: menuItems }));
         setServiceChoiceIds(prev => ({ ...prev, [stopId]: choiceIdMap }));
@@ -195,7 +203,7 @@ export default function CustomerTourDetailPage() {
     if (!tableStopId) return;
     setLoadingChildren(true);
     try {
-      const result = await apiClient.getStopLayout(tableStopId, parentId);
+      const result = await apiClient.getStopLayout(tableStopId, parentId, apiLang);
       const children = Array.isArray(result) ? result : (result as unknown as { data?: ResourceDto[] })?.data ?? [];
       const childArray = Array.isArray(children) ? children : [];
       setChildrenCache(prev => ({ ...prev, [parentId]: childArray }));
@@ -270,6 +278,7 @@ export default function CustomerTourDetailPage() {
   // Close table dialog
   const closeTableDialog = () => {
     setTableStopId(null);
+    setPendingChair(null);
   };
 
   // Trace parent hierarchy for a chair through childrenCache
@@ -297,8 +306,8 @@ export default function CustomerTourDetailPage() {
     // If user already has a seat and clicks a different empty seat, ask for confirmation
     const hasExisting = !!selectedTables[currentStopId];
     if (hasExisting && !skipConfirm && selectedTables[currentStopId]?.resourceId !== chair.id) {
-      const confirmed = window.confirm(t.customer.confirmSeatChange);
-      if (!confirmed) return;
+      setPendingChair(chair);
+      return;
     }
 
     const parentNames = findParentNames(chair.id);
@@ -327,7 +336,7 @@ export default function CustomerTourDetailPage() {
       // Auto-open menu dialog after selection
       setMenuStopId(currentStopId);
     } catch (err) {
-      alert(err instanceof Error ? err.message : t.customer.tableSaveError);
+      toast.error(err instanceof Error ? err.message : t.customer.tableSaveError);
     } finally {
       setSavingTable(false);
     }
@@ -361,7 +370,7 @@ export default function CustomerTourDetailPage() {
           });
         }
       } catch (err) {
-        console.error('Hizmet seçimi güncellenemedi:', err);
+        toast.error(err instanceof Error ? err.message : t.customer.menuUpdateError);
       }
     } else if (qty > 0) {
       // Create new choice
@@ -384,7 +393,7 @@ export default function CustomerTourDetailPage() {
           }
         }
       } catch (err) {
-        console.error('Hizmet seçimi oluşturulamadı:', err);
+        toast.error(err instanceof Error ? err.message : t.customer.menuSaveError);
       }
     }
   };
@@ -411,7 +420,7 @@ export default function CustomerTourDetailPage() {
         try {
           await apiClient.updateServiceChoice(choiceId, { note });
         } catch (err) {
-          console.error('Not kaydedilemedi:', err);
+          toast.error(err instanceof Error ? err.message : t.customer.noteSaveError);
         }
       }
     }, 800);
@@ -445,49 +454,53 @@ export default function CustomerTourDetailPage() {
     <div className="min-h-screen bg-gradient-to-br from-sky-50 via-orange-50 to-amber-50">
       {/* Top bar */}
       <nav className="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6">
-          <div className="flex items-center gap-3 h-14">
-            <Button variant="ghost" size="icon" onClick={() => router.push('/customer')} className="shrink-0">
-              <ArrowLeft className="h-5 w-5" />
+        <div className="max-w-5xl mx-auto px-2 sm:px-6">
+          <div className="flex items-center gap-1.5 sm:gap-3 h-12 sm:h-14">
+            <Button variant="ghost" size="icon" onClick={() => router.push('/customer')} className="shrink-0 h-8 w-8 sm:h-10 sm:w-10">
+              <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
             </Button>
             <div className="flex-1 min-w-0">
-              <h1 className="text-lg font-bold text-slate-800 truncate">{tour.tourName}</h1>
-              <div className="flex items-center gap-2 text-xs text-slate-500">
-                <Calendar className="h-3 w-3" />
-                {new Date(tour.startDate).toLocaleDateString('tr-TR')} - {new Date(tour.endDate).toLocaleDateString('tr-TR')}
+              <h1 className="text-sm sm:text-lg font-bold text-slate-800 truncate">{tour.tourName}</h1>
+              <div className="flex items-center gap-1.5 text-[10px] sm:text-xs text-slate-500">
+                <Calendar className="h-3 w-3 shrink-0" />
+                <span className="truncate">{new Date(tour.startDate).toLocaleDateString(locale)} - {new Date(tour.endDate).toLocaleDateString(locale)}</span>
               </div>
             </div>
             <div className="shrink-0">
               <LanguageSwitcher />
             </div>
-            <Badge variant="outline" className={`shrink-0 ${pStatusCfg.color}`}>
+            <Badge
+              variant="outline"
+              className={`shrink-0 text-[10px] sm:text-xs ${pStatusCfg.color} ${participantStatus !== 'confirmed' ? 'cursor-help' : ''}`}
+              title={participantStatus !== 'confirmed' ? t.customer.participantNotConfirmedTooltip : ''}
+            >
               {pStatusCfg.label}
             </Badge>
           </div>
         </div>
       </nav>
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+      <div className="max-w-5xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
         {/* Cover Image */}
         {tour.coverImageUrl && (
-          <div className="rounded-2xl overflow-hidden shadow-lg h-48 sm:h-64">
+          <div className="rounded-xl sm:rounded-2xl overflow-hidden shadow-lg h-36 sm:h-64">
             <img src={tour.coverImageUrl} alt={tour.tourName} className="w-full h-full object-cover" />
           </div>
         )}
 
         {/* Tour Info */}
         <Card className="border-0 shadow-md">
-          <CardContent className="p-5 space-y-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Building2 className="h-5 w-5 text-orange-500" />
-              <h3 className="text-lg font-bold text-slate-800">{t.customer.tourInfo}</h3>
+          <CardContent className="p-3 sm:p-5 space-y-3 sm:space-y-4">
+            <div className="flex items-center gap-2 mb-1 sm:mb-2">
+              <Building2 className="h-4 w-4 sm:h-5 sm:w-5 text-orange-500" />
+              <h3 className="text-base sm:text-lg font-bold text-slate-800">{t.customer.tourInfo}</h3>
             </div>
 
             {tour.description && (
-              <p className="text-sm text-slate-600">{tour.description}</p>
+              <p className="text-xs sm:text-sm text-slate-600">{tour.description}</p>
             )}
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+            <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 text-sm">
               {tour.tourCode && (
                 <InfoBadge icon={Ticket} label={t.customer.tourCode} value={tour.tourCode} />
               )}
@@ -499,12 +512,12 @@ export default function CustomerTourDetailPage() {
               <InfoBadge
                 icon={Calendar}
                 label={t.tours.startDate}
-                value={new Date(tour.startDate).toLocaleDateString('tr-TR')}
+                value={new Date(tour.startDate).toLocaleDateString(locale)}
               />
               <InfoBadge
                 icon={Calendar}
                 label={t.tours.endDate}
-                value={new Date(tour.endDate).toLocaleDateString('tr-TR')}
+                value={new Date(tour.endDate).toLocaleDateString(locale)}
               />
               {tour.agency && (
                 <InfoBadge icon={Building2} label={t.customer.agency} value={tour.agency.name} />
@@ -520,7 +533,7 @@ export default function CustomerTourDetailPage() {
               <ImageIcon className="h-5 w-5 text-orange-500" />
               <h3 className="text-lg font-bold text-slate-800">{t.customer.gallery}</h3>
             </div>
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {tour.photos.map((photo, i) => (
                 <div key={photo.id || i} className="aspect-square rounded-xl overflow-hidden bg-slate-100">
                   <img
@@ -569,10 +582,10 @@ export default function CustomerTourDetailPage() {
 
                 return (
                   <Card key={stop.id} className="border-0 shadow-sm hover:shadow-md transition-all bg-white">
-                    <CardContent className="p-4">
-                      <div className="flex gap-3">
+                    <CardContent className="p-3 sm:p-4">
+                      <div className="flex gap-2 sm:gap-3">
                         {/* Org photo */}
-                        <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-100 shrink-0">
+                        <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-lg sm:rounded-xl overflow-hidden bg-slate-100 shrink-0">
                           {org.coverImageUrl ? (
                             <img src={org.coverImageUrl} alt={org.name} className="w-full h-full object-cover" />
                           ) : org.photos?.[0] ? (
@@ -604,9 +617,9 @@ export default function CustomerTourDetailPage() {
                           {(stop.scheduledStartTime || stop.scheduledEndTime) && (
                             <div className="flex items-center gap-1 text-xs text-slate-500 mt-1">
                               <Clock className="h-3 w-3" />
-                              {stop.scheduledStartTime && new Date(stop.scheduledStartTime).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                              {stop.scheduledStartTime && formatShortDateTime(stop.scheduledStartTime)}
                               {stop.scheduledStartTime && stop.scheduledEndTime && ' - '}
-                              {stop.scheduledEndTime && new Date(stop.scheduledEndTime).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                              {stop.scheduledEndTime && formatShortDateTime(stop.scheduledEndTime)}
                             </div>
                           )}
 
@@ -640,41 +653,61 @@ export default function CustomerTourDetailPage() {
                           )}
 
                           {/* Action buttons */}
-                          <div className="flex gap-2 mt-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className={`text-xs ${isApproved
-                                ? 'text-orange-600 border-orange-200 hover:bg-orange-50'
-                                : 'text-slate-400 border-slate-200 cursor-not-allowed'
-                              }`}
-                              onClick={() => isApproved && openTableDialog(stop.id)}
-                              disabled={!isApproved}
-                              title={!isApproved ? t.customer.tableApprovalRequired : ''}
-                            >
-                              <Armchair className="h-3 w-3 mr-1" />
-                              {tableInfo ? t.customer.changeTable : t.customer.selectSeat}
-                            </Button>
-
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className={`text-xs ${isApproved && tableInfo
-                                ? 'text-orange-600 border-orange-200 hover:bg-orange-50'
-                                : 'text-slate-400 border-slate-200 cursor-not-allowed'
-                              }`}
-                              onClick={() => isApproved && tableInfo && setMenuStopId(stop.id)}
-                              disabled={!isApproved || !tableInfo}
-                              title={!isApproved ? t.customer.menuApprovalRequired : !tableInfo ? t.customer.selectTableFirst : ''}
-                            >
-                              <UtensilsCrossed className="h-3 w-3 mr-1" />
-                              {t.customer.selectMenuAction}
-                              {menuItemCount > 0 && (
-                                <span className="ml-1 bg-orange-100 text-orange-700 rounded-full px-1.5 text-[10px] font-bold">
-                                  {menuItemCount}
+                          <div className="flex flex-col sm:flex-row gap-1.5 sm:gap-2 mt-2">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span tabIndex={0}>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className={`text-[10px] sm:text-xs h-7 sm:h-8 px-2 sm:px-3 ${isApproved && participantStatus === 'confirmed'
+                                      ? 'text-orange-600 border-orange-200 hover:bg-orange-50'
+                                      : 'text-slate-400 border-slate-200 cursor-not-allowed'
+                                    }`}
+                                    onClick={() => isApproved && participantStatus === 'confirmed' && openTableDialog(stop.id)}
+                                    disabled={!isApproved || participantStatus !== 'confirmed'}
+                                  >
+                                    <Armchair className="h-3 w-3 mr-1 shrink-0" />
+                                    <span className="truncate">{tableInfo ? t.customer.changeTable : t.customer.selectSeat}</span>
+                                  </Button>
                                 </span>
+                              </TooltipTrigger>
+                              {(!isApproved || participantStatus !== 'confirmed') && (
+                                <TooltipContent>
+                                  {!isApproved ? t.tooltips.stopNotApproved : t.tooltips.notConfirmed}
+                                </TooltipContent>
                               )}
-                            </Button>
+                            </Tooltip>
+
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span tabIndex={0}>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className={`text-[10px] sm:text-xs h-7 sm:h-8 px-2 sm:px-3 ${isApproved && tableInfo && participantStatus === 'confirmed'
+                                      ? 'text-orange-600 border-orange-200 hover:bg-orange-50'
+                                      : 'text-slate-400 border-slate-200 cursor-not-allowed'
+                                    }`}
+                                    onClick={() => isApproved && tableInfo && participantStatus === 'confirmed' && setMenuStopId(stop.id)}
+                                    disabled={!isApproved || !tableInfo || participantStatus !== 'confirmed'}
+                                  >
+                                    <UtensilsCrossed className="h-3 w-3 mr-1 shrink-0" />
+                                    <span className="truncate">{t.customer.selectMenuAction}</span>
+                                    {menuItemCount > 0 && (
+                                      <span className="ml-1 bg-orange-100 text-orange-700 rounded-full px-1.5 text-[10px] font-bold shrink-0">
+                                        {menuItemCount}
+                                      </span>
+                                    )}
+                                  </Button>
+                                </span>
+                              </TooltipTrigger>
+                              {(!isApproved || !tableInfo || participantStatus !== 'confirmed') && (
+                                <TooltipContent>
+                                  {!isApproved ? t.tooltips.stopNotApproved : !tableInfo ? t.tooltips.selectTableFirst : t.tooltips.notConfirmed}
+                                </TooltipContent>
+                              )}
+                            </Tooltip>
                           </div>
                         </div>
                       </div>
@@ -694,7 +727,7 @@ export default function CustomerTourDetailPage() {
       {/* Table Selection Dialog */}
       {/* ============================================ */}
       <Dialog open={!!tableStopId} onOpenChange={() => closeTableDialog()}>
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
+        <DialogContent className="sm:max-w-2xl max-h-[95vh] sm:max-h-[90vh] w-[95vw] sm:w-auto flex flex-col">
           <DialogHeader className="flex-shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <Armchair className="h-5 w-5 text-orange-500" />
@@ -726,6 +759,28 @@ export default function CustomerTourDetailPage() {
               />
             )}
           </div>
+
+          {/* Seat change confirmation - inline within dialog */}
+          {pendingChair && (
+            <div className="flex-shrink-0 border-t bg-amber-50 rounded-b-lg -mx-6 -mb-6 px-6 py-4">
+              <p className="text-sm font-semibold text-amber-800 mb-1">{t.customer.seatChangeTitle}</p>
+              <p className="text-sm text-amber-700 mb-3">{t.customer.confirmSeatChange}</p>
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" size="sm" onClick={() => setPendingChair(null)}>
+                  {t.common.cancel}
+                </Button>
+                <Button size="sm" className="bg-orange-500 hover:bg-orange-600" onClick={() => {
+                  if (pendingChair) {
+                    const chair = pendingChair;
+                    setPendingChair(null);
+                    handleSelectChair(chair, true);
+                  }
+                }}>
+                  {t.common.confirm}
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
@@ -733,7 +788,7 @@ export default function CustomerTourDetailPage() {
       {/* Menu Selection Dialog */}
       {/* ============================================ */}
       <Dialog open={!!menuStopId} onOpenChange={() => setMenuStopId(null)}>
-        <DialogContent className="sm:max-w-lg max-h-[85vh] flex flex-col">
+        <DialogContent className="sm:max-w-lg max-h-[95vh] sm:max-h-[85vh] w-[95vw] sm:w-auto flex flex-col">
           <DialogHeader className="flex-shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <UtensilsCrossed className="h-5 w-5 text-orange-500" />
@@ -785,6 +840,7 @@ export default function CustomerTourDetailPage() {
           )}
         </DialogContent>
       </Dialog>
+
     </div>
   );
 }
@@ -795,11 +851,11 @@ export default function CustomerTourDetailPage() {
 
 function InfoBadge({ icon: Icon, label, value }: { icon: React.ComponentType<{ className?: string }>; label: string; value: string }) {
   return (
-    <div className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg">
-      <Icon className="h-4 w-4 text-slate-400 shrink-0" />
+    <div className="flex items-center gap-1.5 sm:gap-2 p-1.5 sm:p-2 bg-slate-50 rounded-lg">
+      <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-400 shrink-0" />
       <div className="min-w-0">
-        <p className="text-xs text-slate-500">{label}</p>
-        <p className="font-medium text-slate-800 text-sm truncate">{value}</p>
+        <p className="text-[10px] sm:text-xs text-slate-500">{label}</p>
+        <p className="font-medium text-slate-800 text-xs sm:text-sm truncate">{value}</p>
       </div>
     </div>
   );
@@ -840,8 +896,8 @@ function InteractiveMenuCategory({
       {/* Category header — matches restaurant preview */}
       {(category.services?.length > 0 || category.child_service_categories?.length > 0) && (
         depth === 0 ? (
-          <div className="bg-gradient-to-r from-stone-800 to-stone-700 px-4 py-3 rounded-xl mb-3">
-            <h3 className="text-lg font-bold text-white">{category.name}</h3>
+          <div className="bg-gradient-to-r from-stone-800 to-stone-700 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl mb-3">
+            <h3 className="text-base sm:text-lg font-bold text-white">{category.name}</h3>
           </div>
         ) : (
           <div className="px-4 py-2 mb-2">
@@ -858,12 +914,12 @@ function InteractiveMenuCategory({
             const note = getItemNote(stopId, svc.id);
             return (
               <div key={svc.id} className={`rounded-lg transition-colors ${qty > 0 ? 'bg-orange-50/80 ring-1 ring-orange-200' : 'hover:bg-white/60'}`}>
-                <div className="flex gap-3 p-2">
+                <div className="flex gap-2 sm:gap-3 p-2">
                   {svc.imageUrl ? (
-                    <img src={svc.imageUrl} alt={svc.title} className="w-14 h-14 rounded-md object-cover flex-shrink-0 shadow-sm" />
+                    <img src={svc.imageUrl} alt={svc.title} className="w-10 h-10 sm:w-14 sm:h-14 rounded-md object-cover flex-shrink-0 shadow-sm" />
                   ) : (
-                    <div className="w-14 h-14 rounded-md bg-stone-100 flex items-center justify-center flex-shrink-0">
-                      <ImageIcon className="h-5 w-5 text-stone-300" />
+                    <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-md bg-stone-100 flex items-center justify-center flex-shrink-0">
+                      <ImageIcon className="h-4 w-4 sm:h-5 sm:w-5 text-stone-300" />
                     </div>
                   )}
                   <div className="flex-1 min-w-0 py-0.5">
@@ -901,29 +957,40 @@ function InteractiveMenuCategory({
                     )}
                   </div>
                   {/* Quantity controls */}
-                  <div className="shrink-0 flex items-center gap-1 self-center">
-                    <button
-                      className="w-7 h-7 rounded-full border border-stone-300 flex items-center justify-center hover:bg-stone-100 disabled:opacity-30 transition-colors"
-                      onClick={() => setItemQty(stopId, svc.id, qty - 1)}
-                      disabled={qty === 0}
-                    >
-                      <Minus className="h-3 w-3" />
-                    </button>
-                    <span className={`w-6 text-center text-sm font-bold ${qty > 0 ? 'text-orange-600' : 'text-stone-400'}`}>
+                  <div className="shrink-0 flex items-center gap-0.5 sm:gap-1 self-center">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span tabIndex={0}>
+                          <button
+                            className="w-6 h-6 sm:w-7 sm:h-7 rounded-full border border-stone-300 flex items-center justify-center hover:bg-stone-100 disabled:opacity-30 transition-colors"
+                            onClick={() => setItemQty(stopId, svc.id, qty - 1)}
+                            disabled={qty === 0}
+                          >
+                            <Minus className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                          </button>
+                        </span>
+                      </TooltipTrigger>
+                      {qty === 0 && (
+                        <TooltipContent>
+                          {t.tooltips.quantityZero}
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
+                    <span className={`w-5 sm:w-6 text-center text-xs sm:text-sm font-bold ${qty > 0 ? 'text-orange-600' : 'text-stone-400'}`}>
                       {qty}
                     </span>
                     <button
-                      className="w-7 h-7 rounded-full border border-orange-300 bg-orange-50 flex items-center justify-center hover:bg-orange-100 transition-colors"
+                      className="w-6 h-6 sm:w-7 sm:h-7 rounded-full border border-orange-300 bg-orange-50 flex items-center justify-center hover:bg-orange-100 transition-colors"
                       onClick={() => setItemQty(stopId, svc.id, qty + 1)}
                     >
-                      <Plus className="h-3 w-3 text-orange-600" />
+                      <Plus className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-orange-600" />
                     </button>
                   </div>
                 </div>
                 {/* Note input — visible when item is selected */}
                 {qty > 0 && (
                   <div className="px-2 pb-2">
-                    <div className="flex items-start gap-2 ml-[68px]">
+                    <div className="flex items-start gap-2 ml-0 sm:ml-[68px]">
                       <MessageSquare className="h-3.5 w-3.5 text-stone-400 mt-1.5 shrink-0" />
                       <input
                         type="text"

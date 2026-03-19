@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { Building2, DoorOpen, Armchair, Users, ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { useLanguage } from '@/contexts/LanguageContext';
 import type { Floor, Room, Table } from '@/types';
 import { Canvas, useFrame } from '@react-three/fiber';
@@ -1039,12 +1040,17 @@ export function VenueModel3D({
 
       {/* UI Overlay */}
       <div className="absolute top-3 left-3 flex items-center gap-2 z-10">
-        {viewMode !== 'building' && (
-          <Button variant="outline" size="sm" onClick={handleBack} className="bg-white/90 backdrop-blur-sm shadow-sm">
-            <ChevronLeft className="h-4 w-4 mr-1" />
-            {t.common.back}
-          </Button>
-        )}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span tabIndex={0}>
+              <Button variant="outline" size="sm" onClick={handleBack} disabled={viewMode === 'building'} className="bg-white/90 backdrop-blur-sm shadow-sm">
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                {t.common.back}
+              </Button>
+            </span>
+          </TooltipTrigger>
+          {viewMode === 'building' && <TooltipContent>{t.tooltips.notInBuildingView}</TooltipContent>}
+        </Tooltip>
         <div className="flex items-center gap-1.5 bg-white/90 backdrop-blur-sm rounded-lg px-3 py-1.5 shadow-sm text-sm">
           <Building2 className="h-3.5 w-3.5 text-slate-500" />
           <span className="text-slate-600 font-medium">{t.venue.buildingModel}</span>

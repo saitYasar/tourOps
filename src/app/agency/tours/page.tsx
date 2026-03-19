@@ -43,6 +43,7 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { LoadingState, EmptyState, ErrorState, ConfirmDialog, TourStatusBadge } from '@/components/shared';
 import { formatDate } from '@/lib/dateUtils';
 
@@ -85,6 +86,7 @@ export default function ToursPage() {
   const coverInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
 
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<'tourCode' | 'tourName' | 'startDate' | 'endDate', string>>>({});
   // Status action confirm
   const [statusAction, setStatusAction] = useState<{ tour: ApiTourDto; action: 'publish' | 'cancel' | 'complete' } | null>(null);
 
@@ -216,8 +218,8 @@ export default function ToursPage() {
       tourCode: tour.tourCode,
       tourName: tour.tourName,
       description: tour.description || '',
-      startDate: tour.startDate ? tour.startDate.split('T')[0] : '',
-      endDate: tour.endDate ? tour.endDate.split('T')[0] : '',
+      startDate: tour.startDate ? tour.startDate.slice(0, 16) : '',
+      endDate: tour.endDate ? tour.endDate.slice(0, 16) : '',
       maxParticipants: tour.maxParticipants || 20,
       minParticipants: tour.minParticipants || 1,
     });
@@ -236,6 +238,7 @@ export default function ToursPage() {
     setCoverImagePreview(null);
     setGalleryFiles([]);
     setGalleryPreviews([]);
+    setFieldErrors({});
   };
 
   const handleCoverImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -259,14 +262,18 @@ export default function ToursPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.tourCode.trim() || !formData.tourName.trim()) {
+    const errors: Partial<Record<'tourCode' | 'tourName' | 'startDate' | 'endDate', string>> = {};
+    if (!formData.tourCode.trim()) errors.tourCode = t.common.required;
+    if (!formData.tourName.trim()) errors.tourName = t.common.required;
+    if (!formData.startDate) errors.startDate = t.common.required;
+    if (!formData.endDate) errors.endDate = t.common.required;
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
       toast.error(t.common.required);
       return;
     }
-    if (!formData.startDate || !formData.endDate) {
-      toast.error(t.common.required);
-      return;
-    }
+    setFieldErrors({});
 
     if (editingTour) {
       updateMutation.mutate();
@@ -386,54 +393,96 @@ export default function ToursPage() {
                             >
                               <Eye className="h-4 w-4" />
                             </Button>
-                            {tour.status === 'draft' && (
-                              <>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => openEditForm(tour)}
-                                  title={t.tours.edit}
-                                >
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => setStatusAction({ tour, action: 'publish' })}
-                                  title={t.tours.publish}
-                                >
-                                  <PlayCircle className="h-4 w-4 text-green-600" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => setDeleteTarget(tour)}
-                                  title={t.common.delete}
-                                >
-                                  <Trash2 className="h-4 w-4 text-red-500" />
-                                </Button>
-                              </>
-                            )}
-                            {tour.status === 'published' && (
-                              <>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => setStatusAction({ tour, action: 'complete' })}
-                                  title={t.tours.complete}
-                                >
-                                  <CheckCircle className="h-4 w-4 text-blue-600" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => setStatusAction({ tour, action: 'cancel' })}
-                                  title={t.tours.cancel}
-                                >
-                                  <Ban className="h-4 w-4 text-red-500" />
-                                </Button>
-                              </>
-                            )}
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span tabIndex={0}>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    disabled={tour.status !== 'draft' && tour.status !== 'published'}
+                                    onClick={() => openEditForm(tour)}
+                                    title={t.tours.edit}
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                </span>
+                              </TooltipTrigger>
+                              {tour.status !== 'draft' && tour.status !== 'published' && (
+                                <TooltipContent>{t.tooltips.tourNotDraftOrPublished}</TooltipContent>
+                              )}
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span tabIndex={0}>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    disabled={tour.status !== 'draft'}
+                                    onClick={() => setStatusAction({ tour, action: 'publish' })}
+                                    title={t.tours.publish}
+                                  >
+                                    <PlayCircle className="h-4 w-4 text-green-600" />
+                                  </Button>
+                                </span>
+                              </TooltipTrigger>
+                              {tour.status !== 'draft' && (
+                                <TooltipContent>{t.tooltips.tourNotDraft}</TooltipContent>
+                              )}
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span tabIndex={0}>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    disabled={tour.status !== 'draft'}
+                                    onClick={() => setDeleteTarget(tour)}
+                                    title={t.common.delete}
+                                  >
+                                    <Trash2 className="h-4 w-4 text-red-500" />
+                                  </Button>
+                                </span>
+                              </TooltipTrigger>
+                              {tour.status !== 'draft' && (
+                                <TooltipContent>{t.tooltips.tourNotDraft}</TooltipContent>
+                              )}
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span tabIndex={0}>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    disabled={tour.status !== 'published'}
+                                    onClick={() => setStatusAction({ tour, action: 'complete' })}
+                                    title={t.tours.complete}
+                                  >
+                                    <CheckCircle className="h-4 w-4 text-blue-600" />
+                                  </Button>
+                                </span>
+                              </TooltipTrigger>
+                              {tour.status !== 'published' && (
+                                <TooltipContent>{t.tooltips.tourNotPublished}</TooltipContent>
+                              )}
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span tabIndex={0}>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    disabled={tour.status !== 'published'}
+                                    onClick={() => setStatusAction({ tour, action: 'cancel' })}
+                                    title={t.tours.cancel}
+                                  >
+                                    <Ban className="h-4 w-4 text-red-500" />
+                                  </Button>
+                                </span>
+                              </TooltipTrigger>
+                              {tour.status !== 'published' && (
+                                <TooltipContent>{t.tooltips.tourNotPublished}</TooltipContent>
+                              )}
+                            </Tooltip>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -448,22 +497,36 @@ export default function ToursPage() {
                       {meta.total} tour, page {meta.page}/{meta.totalPages}
                     </p>
                     <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={page <= 1}
-                        onClick={() => setPage((p) => p - 1)}
-                      >
-                        {t.common.back}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={page >= meta.totalPages}
-                        onClick={() => setPage((p) => p + 1)}
-                      >
-                        {t.common.next}
-                      </Button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span tabIndex={0}>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={page <= 1}
+                              onClick={() => setPage((p) => p - 1)}
+                            >
+                              {t.common.back}
+                            </Button>
+                          </span>
+                        </TooltipTrigger>
+                        {page <= 1 && <TooltipContent>{t.tooltips.firstPage}</TooltipContent>}
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span tabIndex={0}>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={page >= meta.totalPages}
+                              onClick={() => setPage((p) => p + 1)}
+                            >
+                              {t.common.next}
+                            </Button>
+                          </span>
+                        </TooltipTrigger>
+                        {page >= meta.totalPages && <TooltipContent>{t.tooltips.lastPage}</TooltipContent>}
+                      </Tooltip>
                     </div>
                   </div>
                 )}
@@ -489,22 +552,28 @@ export default function ToursPage() {
                   <Input
                     id="tourCode"
                     value={formData.tourCode}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, tourCode: e.target.value }))
-                    }
+                    onChange={(e) => {
+                      setFormData((prev) => ({ ...prev, tourCode: e.target.value }));
+                      if (fieldErrors.tourCode) setFieldErrors((prev) => ({ ...prev, tourCode: undefined }));
+                    }}
                     placeholder="TR-001"
+                    className={fieldErrors.tourCode ? 'border-red-500' : ''}
                   />
+                  {fieldErrors.tourCode && <p className="text-xs text-red-500">{fieldErrors.tourCode}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="tourName">{t.tours.name} *</Label>
                   <Input
                     id="tourName"
                     value={formData.tourName}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, tourName: e.target.value }))
-                    }
+                    onChange={(e) => {
+                      setFormData((prev) => ({ ...prev, tourName: e.target.value }));
+                      if (fieldErrors.tourName) setFieldErrors((prev) => ({ ...prev, tourName: undefined }));
+                    }}
                     placeholder={t.tours.name}
+                    className={fieldErrors.tourName ? 'border-red-500' : ''}
                   />
+                  {fieldErrors.tourName && <p className="text-xs text-red-500">{fieldErrors.tourName}</p>}
                 </div>
               </div>
 
@@ -513,23 +582,29 @@ export default function ToursPage() {
                   <Label htmlFor="startDate">{t.tours.startDate} *</Label>
                   <Input
                     id="startDate"
-                    type="date"
+                    type="datetime-local"
                     value={formData.startDate}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, startDate: e.target.value }))
-                    }
+                    onChange={(e) => {
+                      setFormData((prev) => ({ ...prev, startDate: e.target.value }));
+                      if (fieldErrors.startDate) setFieldErrors((prev) => ({ ...prev, startDate: undefined }));
+                    }}
+                    className={fieldErrors.startDate ? 'border-red-500' : ''}
                   />
+                  {fieldErrors.startDate && <p className="text-xs text-red-500">{fieldErrors.startDate}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="endDate">{t.tours.endDate} *</Label>
                   <Input
                     id="endDate"
-                    type="date"
+                    type="datetime-local"
                     value={formData.endDate}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, endDate: e.target.value }))
-                    }
+                    onChange={(e) => {
+                      setFormData((prev) => ({ ...prev, endDate: e.target.value }));
+                      if (fieldErrors.endDate) setFieldErrors((prev) => ({ ...prev, endDate: undefined }));
+                    }}
+                    className={fieldErrors.endDate ? 'border-red-500' : ''}
                   />
+                  {fieldErrors.endDate && <p className="text-xs text-red-500">{fieldErrors.endDate}</p>}
                 </div>
               </div>
 
@@ -664,9 +739,16 @@ export default function ToursPage() {
               <Button type="button" variant="outline" onClick={closeForm}>
                 {t.common.cancel}
               </Button>
-              <Button type="submit" disabled={isPending}>
-                {isPending ? t.common.loading : editingTour ? t.common.update : t.common.create}
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span tabIndex={0}>
+                    <Button type="submit" disabled={isPending}>
+                      {isPending ? t.common.loading : editingTour ? t.common.update : t.common.create}
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {isPending && <TooltipContent>{t.tooltips.formSubmitting}</TooltipContent>}
+              </Tooltip>
             </DialogFooter>
           </form>
         </DialogContent>

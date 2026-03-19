@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Upload, Trash2, Image } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { organizationApi } from '@/lib/api';
+import { agencyApi } from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 import { Header } from '@/components/layout/Header';
@@ -14,7 +14,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { LoadingState, EmptyState, ConfirmDialog, ImageCropper, SprinterLoading } from '@/components/shared';
 
-export default function PhotosPage() {
+export default function AgencyPhotosPage() {
   const { t, locale } = useLanguage();
   const queryClient = useQueryClient();
   const [deletePhotoId, setDeletePhotoId] = useState<number | null>(null);
@@ -24,27 +24,27 @@ export default function PhotosPage() {
   const [cropperOpen, setCropperOpen] = useState(false);
   const [cropperImageSrc, setCropperImageSrc] = useState('');
 
-  const { data: orgResult } = useQuery({
-    queryKey: ['my-organization'],
-    queryFn: () => organizationApi.getMyOrganization(),
+  const { data: agencyResult } = useQuery({
+    queryKey: ['my-agency'],
+    queryFn: () => agencyApi.getMyAgency(),
   });
-  const orgStatus = orgResult?.success ? orgResult.data?.status : undefined;
+  const agencyStatus = agencyResult?.success ? agencyResult.data?.status : undefined;
 
-  // Fetch photos - sadece /organizations/my/photos endpoint'i
+  // Fetch photos - /agencies/my/photos endpoint
   const { data: photosResult, isLoading: photosLoading } = useQuery({
-    queryKey: ['organization-photos'],
-    queryFn: () => organizationApi.getPhotos(),
+    queryKey: ['agency-photos'],
+    queryFn: () => agencyApi.getPhotos(),
   });
 
   const photos = photosResult?.success ? photosResult.data || [] : [];
 
-  // Add photo mutation - POST /organizations/my/photos
+  // Add photo mutation - POST /agencies/my/photos
   const addPhotoMutation = useMutation({
-    mutationFn: (file: File) => organizationApi.addPhoto(file),
+    mutationFn: (file: File) => agencyApi.addPhoto(file),
     onSuccess: (result) => {
       if (result.success) {
         toast.success(t.common.success);
-        queryClient.invalidateQueries({ queryKey: ['organization-photos'] });
+        queryClient.invalidateQueries({ queryKey: ['agency-photos'] });
       } else {
         toast.error(result.error || t.common.error);
       }
@@ -56,13 +56,13 @@ export default function PhotosPage() {
     },
   });
 
-  // Delete photo mutation - DELETE /organizations/my/photos/{photoId}
+  // Delete photo mutation - DELETE /agencies/my/photos/{photoId}
   const deletePhotoMutation = useMutation({
-    mutationFn: (photoId: number) => organizationApi.deletePhoto(photoId),
+    mutationFn: (photoId: number) => agencyApi.deletePhoto(photoId),
     onSuccess: (result) => {
       if (result.success) {
         toast.success(t.common.success);
-        queryClient.invalidateQueries({ queryKey: ['organization-photos'] });
+        queryClient.invalidateQueries({ queryKey: ['agency-photos'] });
       } else {
         toast.error(result.error || t.common.error);
       }
@@ -117,7 +117,7 @@ export default function PhotosPage() {
   if (photosLoading) {
     return (
       <div className="flex flex-col h-full">
-        <Header title={t.restaurant.photosTitle} organizationStatus={orgStatus} lang={locale} />
+        <Header title={t.agency.photosTitle} organizationStatus={agencyStatus} lang={locale} />
         <div className="flex-1 p-6">
           <LoadingState message={t.common.loading} />
         </div>
@@ -127,7 +127,7 @@ export default function PhotosPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <Header title={t.restaurant.photosTitle} description={t.restaurant.photosDesc} organizationStatus={orgStatus} lang={locale} />
+      <Header title={t.agency.photosTitle} description={t.agency.photosDesc} organizationStatus={agencyStatus} lang={locale} />
 
       <div className="flex-1 p-6 overflow-auto">
         <div className="max-w-4xl mx-auto">
@@ -160,13 +160,12 @@ export default function PhotosPage() {
                           </>
                         )}
                       </Button>
-                      {photos.length < 5 && (
+                      {!(photos.length >= 5 || uploading) && (
                         <input
                           type="file"
                           accept="image/jpeg,image/png,image/webp"
                           onChange={handleFileChange}
-                          disabled={uploading}
-                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                         />
                       )}
                     </div>
@@ -184,7 +183,7 @@ export default function PhotosPage() {
                 <EmptyState
                   icon={Image}
                   title={t.common.noData}
-                  description={t.restaurant.addPhotosDesc}
+                  description={t.agency.addPhotosDesc}
                   actionLabel={t.menu.uploadImage}
                   onAction={() => document.querySelector<HTMLInputElement>('input[type="file"]')?.click()}
                 />
@@ -222,15 +221,15 @@ export default function PhotosPage() {
         imageSrc={cropperImageSrc}
         onCropComplete={handleCropComplete}
         aspectRatio={1}
-        title={t.restaurant.photosTitle}
+        title={t.agency.photosTitle}
       />
 
       {/* Delete Confirmation */}
       <ConfirmDialog
         open={!!deletePhotoId}
         onOpenChange={(open) => !open && setDeletePhotoId(null)}
-        title={t.restaurant.deletePhoto}
-        description={t.restaurant.deletePhoto}
+        title={t.agency.deletePhoto}
+        description={t.agency.deletePhoto}
         confirmLabel={t.common.delete}
         onConfirm={handleDelete}
         variant="destructive"

@@ -35,8 +35,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { LoadingState, EmptyState, ErrorState, ConfirmDialog } from '@/components/shared';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { VenueModel3D } from '@/components/restaurant/VenueModel3D';
-import { LayoutEditor } from '@/components/restaurant/layout-editor';
+import { LayoutEditor, TablePreview } from '@/components/restaurant/layout-editor';
 
 interface FormState {
   isOpen: boolean;
@@ -426,13 +427,15 @@ export default function VenuePage() {
       }
     }
 
+    // Tables always default to 4-person (matching visual editor), others use defaultCapacity
+    const isTable = type?.code === 'table';
     setForm({
       isOpen: true,
       editId: null,
       parentId,
       resourceTypeId,
       name: '',
-      capacity: type?.defaultCapacity || 4,
+      capacity: isTable ? 4 : (type?.defaultCapacity || 4),
       order: 0,
       serviceStartAt: '09:00',
       serviceEndAt: '23:00',
@@ -1150,41 +1153,56 @@ export default function VenuePage() {
                 </div>
               )}
 
-              <div className="space-y-2">
-                <Label htmlFor="capacity">
-                  {(() => {
-                    const code = form.resourceTypeId ? getTypeById(form.resourceTypeId)?.code : '';
-                    switch (code) {
-                      case 'floor': return t.venue.floorCapacity;
-                      case 'room': return t.venue.roomCapacity;
-                      case 'table': return t.venue.personCount;
-                      default: return t.venue.capacityLabel;
+              {/* Capacity — visual picker for tables, number input for others */}
+              {form.resourceTypeId && getTypeById(form.resourceTypeId)?.code === 'table' ? (
+                <div className="space-y-2">
+                  <Label>{t.venue.personCount}</Label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {[2, 4, 6, 8].map((cap) => (
+                      <TablePreview
+                        key={cap}
+                        capacity={cap}
+                        selected={form.capacity === cap}
+                        onClick={() => setForm((prev) => ({ ...prev, capacity: cap }))}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label htmlFor="capacity">
+                    {(() => {
+                      const code = form.resourceTypeId ? getTypeById(form.resourceTypeId)?.code : '';
+                      switch (code) {
+                        case 'floor': return t.venue.floorCapacity;
+                        case 'room': return t.venue.roomCapacity;
+                        default: return t.venue.capacityLabel;
+                      }
+                    })()}
+                  </Label>
+                  <Input
+                    id="capacity"
+                    type="number"
+                    min={1}
+                    value={form.capacity || ''}
+                    onFocus={(e) => e.target.select()}
+                    placeholder={(() => {
+                      const code = form.resourceTypeId ? getTypeById(form.resourceTypeId)?.code : '';
+                      switch (code) {
+                        case 'floor': return `${t.venue.examplePrefix} 100`;
+                        case 'room': return `${t.venue.examplePrefix} 30`;
+                        default: return `${t.venue.examplePrefix} 1`;
+                      }
+                    })()}
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        capacity: parseInt(e.target.value) || 1,
+                      }))
                     }
-                  })()}
-                </Label>
-                <Input
-                  id="capacity"
-                  type="number"
-                  min={1}
-                  value={form.capacity || ''}
-                  onFocus={(e) => e.target.select()}
-                  placeholder={(() => {
-                    const code = form.resourceTypeId ? getTypeById(form.resourceTypeId)?.code : '';
-                    switch (code) {
-                      case 'floor': return `${t.venue.examplePrefix} 100`;
-                      case 'room': return `${t.venue.examplePrefix} 30`;
-                      case 'table': return `${t.venue.examplePrefix} 4`;
-                      default: return `${t.venue.examplePrefix} 1`;
-                    }
-                  })()}
-                  onChange={(e) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      capacity: parseInt(e.target.value) || 1,
-                    }))
-                  }
-                />
-              </div>
+                  />
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -1243,9 +1261,16 @@ export default function VenuePage() {
               <Button type="button" variant="outline" onClick={closeForm}>
                 {t.common.cancel}
               </Button>
-              <Button type="submit" disabled={isPending}>
-                {isPending ? t.common.loading : form.editId ? t.common.update : t.common.create}
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span tabIndex={0}>
+                    <Button type="submit" disabled={isPending}>
+                      {isPending ? t.common.loading : form.editId ? t.common.update : t.common.create}
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {isPending && <TooltipContent>{t.tooltips.formSubmitting}</TooltipContent>}
+              </Tooltip>
             </DialogFooter>
           </form>
         </DialogContent>

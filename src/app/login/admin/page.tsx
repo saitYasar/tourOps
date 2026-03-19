@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
-import { adminApi } from '@/lib/api';
+import { adminApi, apiClient, getAuthStorageKeys } from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { LanguageSwitcher } from '@/components/shared';
 import { Button } from '@/components/ui/button';
@@ -85,8 +85,14 @@ export default function AdminLoginPage() {
       const result = await adminApi.verifyOtp(loginEmail, otp);
 
       if (result.success && result.data) {
+        const adminKeys = getAuthStorageKeys('admin');
+        // Ensure token is stored under admin key
+        const accessToken = apiClient.getAccessToken();
+        if (accessToken) {
+          localStorage.setItem(adminKeys.token, accessToken);
+        }
         // Save user data to localStorage
-        localStorage.setItem('tourops_user_data', JSON.stringify({
+        localStorage.setItem(adminKeys.userData, JSON.stringify({
           ...result.data.user,
           userType: 'admin',
         }));

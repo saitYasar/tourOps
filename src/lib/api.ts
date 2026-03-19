@@ -700,17 +700,17 @@ export interface AdminUpdateOrganizationDto {
 export interface AdminQuickCreateOrganizationDto {
   // İşletme bilgileri
   name: string;
-  categoryId: number;
-  address: string;
-  countryId: number;
-  cityId: number;
-  districtId: number;
-  phoneCountryCode: number;
-  phone: string;
-  email: string;
-  legalName: string;
-  taxNumber: string;
-  taxOffice: string;
+  categoryId?: number;
+  address?: string;
+  countryId?: number;
+  cityId?: number;
+  districtId?: number;
+  phoneCountryCode?: number;
+  phone?: string;
+  email?: string;
+  legalName?: string;
+  taxNumber?: string;
+  taxOffice?: string;
   description?: string;
   lat?: string;
   lng?: string;
@@ -957,6 +957,7 @@ export interface ClientStopMenuServiceDto {
   imageUrl: string | null;
   estimatedDurationMinutes?: number | null;
   serviceCategoryId?: number;
+  serviceCategoryName?: string;
   active?: boolean;
 }
 
@@ -3148,23 +3149,231 @@ class ApiClient {
   }
 
   async createAdminOrgResource(orgId: number, data: CreateResourceDto) {
-    return this.request<ResourceDto>(`/admin/organizations/${orgId}/resources`, {
+    // Use FormData like the restaurant endpoint to ensure backend accepts all fields
+    const formData = new FormData();
+
+    formData.append('name', data.name);
+    formData.append('resourceTypeId', String(data.resourceTypeId));
+
+    if (data.parentId !== undefined && data.parentId !== null) {
+      formData.append('parentId', String(data.parentId));
+    }
+    if (data.capacity !== undefined) formData.append('capacity', String(data.capacity));
+    if (data.order !== undefined) formData.append('order', String(data.order));
+    if (data.coordinates) {
+      if (typeof data.coordinates === 'string') {
+        formData.append('coordinates', data.coordinates);
+      } else {
+        formData.append('coordinates', `${data.coordinates.x},${data.coordinates.y}`);
+      }
+    }
+    if (data.serviceStartAt) formData.append('serviceStartAt', data.serviceStartAt);
+    if (data.serviceEndAt) formData.append('serviceEndAt', data.serviceEndAt);
+    if (data.serviceDurationMinutes !== undefined) formData.append('serviceDurationMinutes', String(data.serviceDurationMinutes));
+    if (data.width !== undefined) formData.append('width', String(data.width));
+    if (data.height !== undefined) formData.append('height', String(data.height));
+    if (data.rotation !== undefined) formData.append('rotation', String(data.rotation));
+    if (data.color) formData.append('color', data.color);
+    if (data.approvePreReservationAutomatically !== undefined) formData.append('approvePreReservationAutomatically', String(data.approvePreReservationAutomatically));
+
+    const url = `${this.baseUrl}/admin/organizations/${orgId}/resources`;
+    const headers: HeadersInit = {};
+    const token = this.resolveToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(url, {
       method: 'POST',
-      body: JSON.stringify(data),
-    }, 'tr', true);
+      headers,
+      body: formData,
+    });
+
+    const jsonResponse = await response.json().catch(() => ({
+      message: 'Bir hata oluştu',
+      statusCode: response.status,
+    }));
+
+    if (!response.ok || jsonResponse.statusCode >= 400) {
+      const errorMessage =
+        jsonResponse.errorMessage?.client ||
+        jsonResponse.errorMessage?.system ||
+        jsonResponse.message ||
+        'API isteği başarısız';
+      throw new Error(errorMessage);
+    }
+
+    return jsonResponse.data as ResourceDto;
   }
 
   async updateAdminOrgResource(orgId: number, resourceId: number, data: UpdateResourceDto) {
-    return this.request<ResourceDto>(`/admin/organizations/${orgId}/resources/${resourceId}`, {
+    // Use FormData like the restaurant endpoint to ensure backend accepts all fields
+    const formData = new FormData();
+
+    if (data.name !== undefined) formData.append('name', data.name);
+    if (data.capacity !== undefined) formData.append('capacity', String(data.capacity));
+    if (data.order !== undefined) formData.append('order', String(data.order));
+    if (data.coordinates) {
+      if (typeof data.coordinates === 'string') {
+        formData.append('coordinates', data.coordinates);
+      } else {
+        formData.append('coordinates', `${data.coordinates.x},${data.coordinates.y}`);
+      }
+    }
+    if (data.serviceStartAt !== undefined) formData.append('serviceStartAt', data.serviceStartAt);
+    if (data.serviceEndAt !== undefined) formData.append('serviceEndAt', data.serviceEndAt);
+    if (data.serviceDurationMinutes !== undefined) formData.append('serviceDurationMinutes', String(data.serviceDurationMinutes));
+    if (data.width !== undefined) formData.append('width', String(data.width));
+    if (data.height !== undefined) formData.append('height', String(data.height));
+    if (data.rotation !== undefined) formData.append('rotation', String(data.rotation));
+    if (data.color !== undefined) formData.append('color', data.color);
+    if (data.approvePreReservationAutomatically !== undefined) formData.append('approvePreReservationAutomatically', String(data.approvePreReservationAutomatically));
+    if (data.active !== undefined) formData.append('active', String(data.active));
+
+    const url = `${this.baseUrl}/admin/organizations/${orgId}/resources/${resourceId}`;
+    const headers: HeadersInit = {};
+    const token = this.resolveToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(url, {
       method: 'PUT',
-      body: JSON.stringify(data),
-    }, 'tr', true);
+      headers,
+      body: formData,
+    });
+
+    const jsonResponse = await response.json().catch(() => ({
+      message: 'Bir hata oluştu',
+      statusCode: response.status,
+    }));
+
+    if (!response.ok || jsonResponse.statusCode >= 400) {
+      const errorMessage =
+        jsonResponse.errorMessage?.client ||
+        jsonResponse.errorMessage?.system ||
+        jsonResponse.message ||
+        'API isteği başarısız';
+      throw new Error(errorMessage);
+    }
+
+    return jsonResponse.data as ResourceDto;
   }
 
   async deleteAdminOrgResource(orgId: number, resourceId: number) {
     return this.request<{ message: string }>(`/admin/organizations/${orgId}/resources/${resourceId}`, {
       method: 'DELETE',
     }, 'tr', true);
+  }
+
+  // ============================================
+  // Admin - İşletme Fotoğraf Yönetimi
+  // ============================================
+
+  async adminUpdateOrganizationWithFormData(
+    id: number,
+    data: AdminUpdateOrganizationDto,
+    coverImage?: File,
+    lang: 'tr' | 'en' = 'tr'
+  ) {
+    const formData = new FormData();
+
+    Object.entries(data).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        if (key === 'socialMediaUrls' && typeof value === 'object') {
+          formData.append(key, JSON.stringify(value));
+        } else {
+          formData.append(key, String(value));
+        }
+      }
+    });
+
+    if (coverImage) {
+      formData.append('coverImage', coverImage);
+    }
+
+    const url = `${this.baseUrl}/organizations/${id}?lang=${lang}`;
+
+    const headers: HeadersInit = {};
+    const token = this.resolveToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers,
+      body: formData,
+    });
+
+    const jsonResponse = await response.json().catch(() => ({
+      message: 'Bir hata oluştu',
+      statusCode: response.status,
+    }));
+
+    if (!response.ok) {
+      if (this.checkUnauthorized(response.status)) {
+        throw new Error('Oturum süresi doldu');
+      }
+      const errorMessage =
+        jsonResponse.errorMessage?.client ||
+        jsonResponse.errorMessage?.system ||
+        jsonResponse.message ||
+        'API isteği başarısız';
+      throw new Error(errorMessage);
+    }
+
+    return (jsonResponse.data !== undefined ? jsonResponse.data : jsonResponse) as OrganizationDto;
+  }
+
+  async getAdminOrgPhotos(orgId: number, lang: 'tr' | 'en' = 'tr') {
+    return this.request<PhotoDto[]>(`/admin/organizations/${orgId}/photos`, {
+      method: 'GET',
+    }, lang);
+  }
+
+  async addAdminOrgPhoto(orgId: number, image: File, lang: 'tr' | 'en' = 'tr') {
+    const formData = new FormData();
+    formData.append('image', image);
+
+    const url = `${this.baseUrl}/admin/organizations/${orgId}/photos?lang=${lang}`;
+
+    const headers: HeadersInit = {};
+    const token = this.resolveToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    const jsonResponse = await response.json().catch(() => ({
+      message: 'Bir hata oluştu',
+      statusCode: response.status,
+    }));
+
+    if (!response.ok) {
+      if (this.checkUnauthorized(response.status)) {
+        throw new Error('Oturum süresi doldu');
+      }
+      const errorMessage =
+        jsonResponse.errorMessage?.client ||
+        jsonResponse.errorMessage?.system ||
+        jsonResponse.message ||
+        'API isteği başarısız';
+      throw new Error(errorMessage);
+    }
+
+    return (jsonResponse.data !== undefined ? jsonResponse.data : jsonResponse) as PhotoDto;
+  }
+
+  async deleteAdminOrgPhoto(orgId: number, photoId: number, lang: 'tr' | 'en' = 'tr') {
+    return this.request<{ message: string }>(`/admin/organizations/${orgId}/photos/${photoId}`, {
+      method: 'DELETE',
+    }, lang);
   }
 
   // ============================================
@@ -3359,6 +3568,18 @@ class ApiClient {
 
   async getAdminTourById(id: number, lang: 'tr' | 'en' = 'tr') {
     return this.request<ApiTourDto>(`/admin/tours/${id}`, {}, lang);
+  }
+
+  async getAdminStopChoices(stopId: number, lang: 'tr' | 'en' = 'tr') {
+    return this.request<AgencyStopChoicesDto[]>(`/admin/tour-stops/${stopId}/choices`, {
+      method: 'GET',
+    }, lang);
+  }
+
+  async getAdminStopServiceSummary(stopId: number, lang: 'tr' | 'en' = 'tr') {
+    return this.request<AgencyStopServiceSummaryDto>(`/admin/tour-stops/${stopId}/service-summary`, {
+      method: 'GET',
+    }, lang);
   }
 
   // ============================================
@@ -4831,6 +5052,42 @@ export const adminApi = {
     }
   },
 
+  async updateOrganizationWithCover(id: number, data: AdminUpdateOrganizationDto, coverImage?: File, lang: 'tr' | 'en' = 'tr') {
+    try {
+      const response = await apiClient.adminUpdateOrganizationWithFormData(id, data, coverImage, lang);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async getOrgPhotos(orgId: number, lang: 'tr' | 'en' = 'tr') {
+    try {
+      const response = await apiClient.getAdminOrgPhotos(orgId, lang);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async addOrgPhoto(orgId: number, image: File, lang: 'tr' | 'en' = 'tr') {
+    try {
+      const response = await apiClient.addAdminOrgPhoto(orgId, image, lang);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async deleteOrgPhoto(orgId: number, photoId: number, lang: 'tr' | 'en' = 'tr') {
+    try {
+      await apiClient.deleteAdminOrgPhoto(orgId, photoId, lang);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
   async deleteAgency(id: number, lang: 'tr' | 'en' = 'tr') {
     try {
       const response = await apiClient.adminDeleteAgency(id, lang);
@@ -5253,6 +5510,25 @@ export const adminApi = {
         }));
       }
       return { success: true, data: response as ApiTourDto };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async getStopChoices(stopId: number, lang: 'tr' | 'en' = 'tr'): Promise<{ success: boolean; data?: AgencyStopChoicesDto[]; error?: string }> {
+    try {
+      const response = await apiClient.getAdminStopChoices(stopId, lang);
+      const data = Array.isArray(response) ? response : (response as any).data ?? [];
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async getStopServiceSummary(stopId: number, lang: 'tr' | 'en' = 'tr'): Promise<{ success: boolean; data?: AgencyStopServiceSummaryDto; error?: string }> {
+    try {
+      const response = await apiClient.getAdminStopServiceSummary(stopId, lang);
+      return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }

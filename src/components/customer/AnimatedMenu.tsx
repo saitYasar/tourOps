@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { UtensilsCrossed, Plus, Minus, MessageSquare, ChevronDown, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import { useLanguage } from '@/contexts/LanguageContext';
 import type { MenuCategory, MenuItem, OrderItem } from '@/types';
 
 interface AnimatedMenuProps {
@@ -32,6 +34,7 @@ export function AnimatedMenu({
   getItemExcludeIngredients,
   translations: t,
 }: AnimatedMenuProps) {
+  const { t: lang } = useLanguage();
   const [expandedCategory, setExpandedCategory] = useState<string | null>(
     categories.length > 0 ? categories[0].id : null
   );
@@ -205,24 +208,28 @@ export function AnimatedMenu({
                           <Plus className="h-4 w-4" />
                         </Button>
 
-                        {qty > 0 && (
-                          <>
-                            <span className="font-bold text-orange-600 text-lg animate-pop-in">
-                              {qty}
+                        <span className={`font-bold text-orange-600 text-lg ${qty > 0 ? 'animate-pop-in' : 'opacity-50'}`}>
+                          {qty}
+                        </span>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span tabIndex={0}>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                disabled={qty === 0}
+                                className="h-9 w-9 rounded-full border-orange-300 text-orange-500 hover:bg-orange-50"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onRemoveItem(item.id);
+                                }}
+                              >
+                                <Minus className="h-4 w-4" />
+                              </Button>
                             </span>
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              className="h-9 w-9 rounded-full border-orange-300 text-orange-500 hover:bg-orange-50"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onRemoveItem(item.id);
-                              }}
-                            >
-                              <Minus className="h-4 w-4" />
-                            </Button>
-                          </>
-                        )}
+                          </TooltipTrigger>
+                          {qty === 0 && <TooltipContent>{lang.tooltips.quantityZero}</TooltipContent>}
+                        </Tooltip>
                       </div>
 
                       {/* Seçili Göstergesi */}

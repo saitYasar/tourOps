@@ -32,14 +32,14 @@ export function LanguageSwitcher({ variant = 'default' }: LanguageSwitcherProps)
           variant="outline"
           size="sm"
           className={cn(
-            'gap-2 w-full justify-start',
+            'gap-1.5',
             variant === 'dark' && 'bg-slate-800 border-slate-600 text-white hover:bg-slate-700 hover:text-white'
           )}
         >
           <Globe className="h-4 w-4" />
           <span className="font-medium">{flags[locale]}</span>
           <span className={cn(
-            'text-xs ml-auto',
+            'text-xs hidden sm:inline',
             variant === 'dark' ? 'text-slate-400' : 'text-slate-500'
           )}>
             {localeNames[locale]}

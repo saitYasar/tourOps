@@ -39,6 +39,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 interface InviteFormData {
   email: string;
@@ -548,21 +549,27 @@ export default function AgencyTeamPage() {
                         </div>
                         <div className="flex flex-col items-end gap-2">
                           {getStatusBadge(invitation.status)}
-                          {invitation.status === 'pending' && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50 h-7 text-xs"
-                              onClick={() => cancelMutation.mutate(invitation.id)}
-                              disabled={cancelMutation.isPending}
-                            >
-                              {cancelMutation.isPending ? (
-                                <SprinterLoading size="xs" />
-                              ) : (
-                                t.team.cancelInvite
-                              )}
-                            </Button>
-                          )}
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span tabIndex={0}>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-red-600 hover:text-red-700 hover:bg-red-50 h-7 text-xs"
+                                  onClick={() => cancelMutation.mutate(invitation.id)}
+                                  disabled={invitation.status !== 'pending' || cancelMutation.isPending}
+                                >
+                                  {cancelMutation.isPending ? (
+                                    <SprinterLoading size="xs" />
+                                  ) : (
+                                    t.team.cancelInvite
+                                  )}
+                                </Button>
+                              </span>
+                            </TooltipTrigger>
+                            {invitation.status !== 'pending' && <TooltipContent>{t.tooltips.invitationNotPending}</TooltipContent>}
+                            {invitation.status === 'pending' && cancelMutation.isPending && <TooltipContent>{t.tooltips.formSubmitting}</TooltipContent>}
+                          </Tooltip>
                         </div>
                       </div>
                       <p className="text-xs text-slate-400 mt-2">
@@ -772,23 +779,30 @@ export default function AgencyTeamPage() {
                 </div>
 
                 {/* Submit Button */}
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={inviteMutation.isPending}
-                >
-                  {inviteMutation.isPending ? (
-                    <>
-                      <span className="animate-spin mr-2">&#9696;</span>
-                      {t.team.sending}
-                    </>
-                  ) : (
-                    <>
-                      <UserPlus className="h-4 w-4 mr-2" />
-                      {t.team.sendInvite}
-                    </>
-                  )}
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span tabIndex={0}>
+                      <Button
+                        type="submit"
+                        className="w-full"
+                        disabled={inviteMutation.isPending}
+                      >
+                        {inviteMutation.isPending ? (
+                          <>
+                            <span className="animate-spin mr-2">&#9696;</span>
+                            {t.team.sending}
+                          </>
+                        ) : (
+                          <>
+                            <UserPlus className="h-4 w-4 mr-2" />
+                            {t.team.sendInvite}
+                          </>
+                        )}
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {inviteMutation.isPending && <TooltipContent>{t.tooltips.formSubmitting}</TooltipContent>}
+                </Tooltip>
               </form>
             </CardContent>
           </Card>

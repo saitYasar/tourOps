@@ -34,6 +34,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { LoadingState, ErrorState } from '@/components/shared';
 import type { RequestStatus } from '@/types';
 
@@ -215,32 +216,46 @@ export default function AdminRequestsPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      {request.status === 'Pending' && (
                         <div className="flex gap-2 justify-end">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-green-600 border-green-200 hover:bg-green-50"
-                            onClick={() =>
-                              updateStatusMutation.mutate({ id: request.id, status: 'Approved' })
-                            }
-                            disabled={updateStatusMutation.isPending}
-                          >
-                            <CheckCircle2 className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-red-600 border-red-200 hover:bg-red-50"
-                            onClick={() =>
-                              updateStatusMutation.mutate({ id: request.id, status: 'Rejected' })
-                            }
-                            disabled={updateStatusMutation.isPending}
-                          >
-                            <XCircle className="h-4 w-4" />
-                          </Button>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span tabIndex={0}>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-green-600 border-green-200 hover:bg-green-50"
+                                  onClick={() =>
+                                    updateStatusMutation.mutate({ id: request.id, status: 'Approved' })
+                                  }
+                                  disabled={request.status !== 'Pending' || updateStatusMutation.isPending}
+                                >
+                                  <CheckCircle2 className="h-4 w-4" />
+                                </Button>
+                              </span>
+                            </TooltipTrigger>
+                            {request.status !== 'Pending' && <TooltipContent>{t.tooltips.requestNotPending}</TooltipContent>}
+                            {request.status === 'Pending' && updateStatusMutation.isPending && <TooltipContent>{t.tooltips.formSubmitting}</TooltipContent>}
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span tabIndex={0}>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-red-600 border-red-200 hover:bg-red-50"
+                                  onClick={() =>
+                                    updateStatusMutation.mutate({ id: request.id, status: 'Rejected' })
+                                  }
+                                  disabled={request.status !== 'Pending' || updateStatusMutation.isPending}
+                                >
+                                  <XCircle className="h-4 w-4" />
+                                </Button>
+                              </span>
+                            </TooltipTrigger>
+                            {request.status !== 'Pending' && <TooltipContent>{t.tooltips.requestNotPending}</TooltipContent>}
+                            {request.status === 'Pending' && updateStatusMutation.isPending && <TooltipContent>{t.tooltips.formSubmitting}</TooltipContent>}
+                          </Tooltip>
                         </div>
-                      )}
                     </TableCell>
                   </TableRow>
                 );

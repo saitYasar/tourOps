@@ -100,7 +100,7 @@ import {
 } from '@/components/ui/collapsible';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { useAutoSelect } from '@/hooks/useAutoSelect';
-import { LayoutEditor, type LayoutApiAdapter } from '@/components/restaurant/layout-editor';
+import { LayoutEditor, TablePreview, type LayoutApiAdapter } from '@/components/restaurant/layout-editor';
 import { CardDescription } from '@/components/ui/card';
 
 function resolveImageUrl(url?: string | null): string | null {
@@ -132,6 +132,16 @@ export default function OrganizationDetailPage() {
   const [statusUpdateTarget, setStatusUpdateTarget] = useState<CompanyStatus | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState<number | null>(null);
+
+  // Cover image edit state
+  const [editCoverImage, setEditCoverImage] = useState<File | null>(null);
+  const [editCoverPreview, setEditCoverPreview] = useState<string | null>(null);
+  const [cropperOpen, setCropperOpen] = useState(false);
+  const [cropperImageSrc, setCropperImageSrc] = useState('');
+  const [cropperType, setCropperType] = useState<'cover' | 'gallery'>('cover');
+  const coverInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+  const [deletePhotoId, setDeletePhotoId] = useState<number | null>(null);
 
   const a = t.admin as Record<string, string>;
 
@@ -233,6 +243,92 @@ export default function OrganizationDetailPage() {
     },
   });
 
+  // Photo mutations
+  const addPhotoMutation = useMutation({
+    mutationFn: (image: File) => adminApi.addOrgPhoto(id, image),
+    onSuccess: (result) => {
+      if (result.success) {
+        queryClient.invalidateQueries({ queryKey: ['admin-org-detail', id] });
+        toast.success(a.photoAdded || 'Fotoğraf eklendi');
+      } else {
+        toast.error(result.error || a.saveError);
+      }
+    },
+    onError: (error) => {
+      toast.error((error as Error).message || a.saveError);
+    },
+  });
+
+  const deletePhotoMutation = useMutation({
+    mutationFn: (photoId: number) => adminApi.deleteOrgPhoto(id, photoId),
+    onSuccess: (result) => {
+      if (result.success) {
+        queryClient.invalidateQueries({ queryKey: ['admin-org-detail', id] });
+        toast.success(a.photoDeleted || 'Fotoğraf silindi');
+        setDeletePhotoId(null);
+      } else {
+        toast.error(result.error || a.deleteError);
+      }
+    },
+    onError: (error) => {
+      toast.error((error as Error).message || a.deleteError);
+    },
+  });
+
+  // Cover image handlers
+  const handleCoverFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      toast.error(t.common.error);
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error(t.common.error);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCropperImageSrc(reader.result as string);
+      setCropperType('cover');
+      setCropperOpen(true);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const handleGalleryFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      toast.error(t.common.error);
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error(t.common.error);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCropperImageSrc(reader.result as string);
+      setCropperType('gallery');
+      setCropperOpen(true);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const handleCropComplete = (croppedBlob: Blob) => {
+    if (cropperType === 'cover') {
+      const file = new File([croppedBlob], 'cover.jpg', { type: 'image/jpeg' });
+      setEditCoverImage(file);
+      setEditCoverPreview(URL.createObjectURL(croppedBlob));
+    } else {
+      const file = new File([croppedBlob], `gallery_${Date.now()}.jpg`, { type: 'image/jpeg' });
+      addPhotoMutation.mutate(file);
+    }
+  };
+
   if (isLoading) return <LoadingState message={t.common.loading} />;
 
   if (!result?.success || !result.data) {
@@ -282,11 +378,29 @@ export default function OrganizationDetailPage() {
         twitter: org.socialMediaUrls?.twitter || '',
       },
     });
+    setEditCoverImage(null);
+    setEditCoverPreview(null);
     setEditMode(true);
   };
 
   const handleSave = () => {
-    updateMutation.mutate(form);
+    if (editCoverImage) {
+      adminApi.updateOrganizationWithCover(id, form, editCoverImage).then((result) => {
+        if (result.success) {
+          queryClient.invalidateQueries({ queryKey: ['admin-org-detail', id] });
+          queryClient.invalidateQueries({ queryKey: ['admin-organizations'] });
+          queryClient.invalidateQueries({ queryKey: ['admin-organizations-counts'] });
+          toast.success(a.saveSuccess);
+          setEditMode(false);
+          setEditCoverImage(null);
+          setEditCoverPreview(null);
+        } else {
+          toast.error(result.error || a.saveError);
+        }
+      });
+    } else {
+      updateMutation.mutate(form);
+    }
   };
 
   const InfoRow = ({
@@ -389,37 +503,102 @@ export default function OrganizationDetailPage() {
         <TabsContent value="general" className="space-y-6">
 
       {/* Cover Image */}
-      {coverUrl && !imgError && (
-        <Card>
-          <CardContent className="p-4">
-            <h3 className="text-sm font-semibold text-slate-700 mb-3">{a.coverImage}</h3>
-            <div className="h-48 rounded-xl overflow-hidden bg-slate-100">
-              <img
-                src={coverUrl}
-                alt={org.name}
-                className="h-full w-full object-cover"
-                onError={() => setImgError(true)}
+      <Card>
+        <CardContent className="p-4">
+          <h3 className="text-sm font-semibold text-slate-700 mb-3">{a.coverImage}</h3>
+          {editMode ? (
+            <>
+              <div
+                className="relative w-full h-48 rounded-xl overflow-hidden border-2 border-dashed border-slate-300 hover:border-orange-400 transition-colors cursor-pointer group bg-slate-100"
+                onClick={() => coverInputRef.current?.click()}
+              >
+                {editCoverPreview || (coverUrl && !imgError) ? (
+                  <>
+                    <img
+                      src={editCoverPreview || coverUrl!}
+                      alt={org.name}
+                      className="absolute inset-0 w-full h-full object-cover"
+                      onError={() => setImgError(true)}
+                    />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <div className="text-white text-sm font-medium flex items-center gap-2">
+                        <Upload className="h-4 w-4" />
+                        {t.menu.changeImage}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full text-slate-400">
+                    <ImageIcon className="h-8 w-8 mb-2" />
+                    <span className="text-sm">{t.menu.uploadImage} (16:9)</span>
+                  </div>
+                )}
+              </div>
+              <input
+                ref={coverInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={handleCoverFileChange}
               />
-            </div>
-          </CardContent>
-        </Card>
-      )}
+            </>
+          ) : (
+            coverUrl && !imgError ? (
+              <div className="h-48 rounded-xl overflow-hidden bg-slate-100">
+                <img
+                  src={coverUrl}
+                  alt={org.name}
+                  className="h-full w-full object-cover"
+                  onError={() => setImgError(true)}
+                />
+              </div>
+            ) : (
+              <div className="h-48 rounded-xl overflow-hidden bg-slate-100 flex items-center justify-center text-slate-400">
+                <div className="text-center">
+                  <ImageIcon className="h-8 w-8 mx-auto mb-2" />
+                  <span className="text-sm">{a.noCoverImage || 'Kapak fotoğrafı yok'}</span>
+                </div>
+              </div>
+            )
+          )}
+        </CardContent>
+      </Card>
 
       {/* Photo Gallery */}
-      {photos.length > 0 && (
-        <Card>
-          <CardContent className="p-4">
-            <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
               <ImageIcon className="h-4 w-4 text-orange-500" />
               {a.gallery} ({photos.length})
             </h3>
+            {editMode && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => galleryInputRef.current?.click()}
+                disabled={addPhotoMutation.isPending}
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                {addPhotoMutation.isPending ? t.common.loading : (a.addPhoto || 'Fotoğraf Ekle')}
+              </Button>
+            )}
+          </div>
+          <input
+            ref={galleryInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={handleGalleryFileChange}
+          />
+          {photos.length > 0 ? (
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
               {photos.map((photo, idx) => {
                 const photoUrl = resolveImageUrl(photo.imageUrl);
                 return (
                   <div
                     key={photo.id}
-                    className="aspect-square rounded-lg overflow-hidden bg-slate-100 cursor-pointer hover:opacity-80 transition-opacity"
+                    className="relative aspect-square rounded-lg overflow-hidden bg-slate-100 cursor-pointer hover:opacity-80 transition-opacity group"
                     onClick={() => setGalleryIndex(idx)}
                   >
                     {photoUrl && (
@@ -429,13 +608,30 @@ export default function OrganizationDetailPage() {
                         className="h-full w-full object-cover"
                       />
                     )}
+                    {editMode && (
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeletePhotoId(photo.id);
+                        }}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    )}
                   </div>
                 );
               })}
             </div>
-          </CardContent>
-        </Card>
-      )}
+          ) : (
+            <div className="h-24 flex items-center justify-center text-slate-400 text-sm">
+              {a.noPhotos || 'Henüz fotoğraf eklenmemiş'}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Gallery Lightbox */}
       {galleryIndex !== null && photos[galleryIndex] && (
@@ -1007,6 +1203,28 @@ export default function OrganizationDetailPage() {
         onConfirm={() => deleteMutation.mutate()}
         variant="destructive"
         confirmLabel={deleteMutation.isPending ? a.deleting : a.deleteButton}
+      />
+
+      {/* Delete Photo Confirmation */}
+      <ConfirmDialog
+        open={deletePhotoId !== null}
+        onOpenChange={() => setDeletePhotoId(null)}
+        title={a.deletePhotoTitle || 'Fotoğrafı Sil'}
+        description={a.deletePhotoDesc || 'Bu fotoğrafı silmek istediğinize emin misiniz?'}
+        onConfirm={() => deletePhotoId && deletePhotoMutation.mutate(deletePhotoId)}
+        variant="destructive"
+        confirmLabel={deletePhotoMutation.isPending ? a.deleting : (a.deleteButton || 'Sil')}
+      />
+
+      {/* Image Cropper */}
+      <ImageCropper
+        open={cropperOpen}
+        onOpenChange={setCropperOpen}
+        imageSrc={cropperImageSrc}
+        onCropComplete={handleCropComplete}
+        aspectRatio={cropperType === 'cover' ? 16 / 9 : 1}
+        title={cropperType === 'cover' ? (a.coverImage || 'Kapak Fotoğrafı') : (a.gallery || 'Galeri Fotoğrafı')}
+        cropShape="rect"
       />
     </div>
   );
@@ -2343,13 +2561,15 @@ function ResourcesTab({ orgId }: { orgId: number }) {
 
   const openCreateForm = (parentId: number | null, resourceTypeId: number) => {
     const type = getTypeById(resourceTypeId);
+    // Tables always default to 4-person (matching visual editor), others use defaultCapacity
+    const isTable = type?.code === 'table';
     setForm({
       isOpen: true,
       editId: null,
       parentId,
       resourceTypeId,
       name: '',
-      capacity: type?.defaultCapacity || 4,
+      capacity: isTable ? 4 : (type?.defaultCapacity || 4),
       order: 0,
       serviceStartAt: '09:00',
       serviceEndAt: '23:00',
@@ -2722,36 +2942,51 @@ function ResourcesTab({ orgId }: { orgId: number }) {
                 </div>
               )}
 
-              <div className="space-y-2">
-                <Label htmlFor="resCapacity">
-                  {(() => {
-                    const code = form.resourceTypeId ? getTypeById(form.resourceTypeId)?.code : '';
-                    switch (code) {
-                      case 'floor': return t.venue.floorCapacity;
-                      case 'room': return t.venue.roomCapacity;
-                      case 'table': return t.venue.personCount;
-                      default: return t.venue.capacityLabel;
-                    }
-                  })()}
-                </Label>
-                <Input
-                  id="resCapacity"
-                  type="number"
-                  min={1}
-                  value={form.capacity || ''}
-                  onFocus={(e) => e.target.select()}
-                  placeholder={(() => {
-                    const code = form.resourceTypeId ? getTypeById(form.resourceTypeId)?.code : '';
-                    switch (code) {
-                      case 'floor': return `${t.venue.examplePrefix} 100`;
-                      case 'room': return `${t.venue.examplePrefix} 30`;
-                      case 'table': return `${t.venue.examplePrefix} 4`;
-                      default: return `${t.venue.examplePrefix} 1`;
-                    }
-                  })()}
-                  onChange={(e) => setForm((prev) => ({ ...prev, capacity: parseInt(e.target.value) || 1 }))}
-                />
-              </div>
+              {/* Capacity — visual picker for tables, number input for others */}
+              {form.resourceTypeId && getTypeById(form.resourceTypeId)?.code === 'table' ? (
+                <div className="space-y-2">
+                  <Label>{t.venue.personCount}</Label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {[2, 4, 6, 8].map((cap) => (
+                      <TablePreview
+                        key={cap}
+                        capacity={cap}
+                        selected={form.capacity === cap}
+                        onClick={() => setForm((prev) => ({ ...prev, capacity: cap }))}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label htmlFor="resCapacity">
+                    {(() => {
+                      const code = form.resourceTypeId ? getTypeById(form.resourceTypeId)?.code : '';
+                      switch (code) {
+                        case 'floor': return t.venue.floorCapacity;
+                        case 'room': return t.venue.roomCapacity;
+                        default: return t.venue.capacityLabel;
+                      }
+                    })()}
+                  </Label>
+                  <Input
+                    id="resCapacity"
+                    type="number"
+                    min={1}
+                    value={form.capacity || ''}
+                    onFocus={(e) => e.target.select()}
+                    placeholder={(() => {
+                      const code = form.resourceTypeId ? getTypeById(form.resourceTypeId)?.code : '';
+                      switch (code) {
+                        case 'floor': return `${t.venue.examplePrefix} 100`;
+                        case 'room': return `${t.venue.examplePrefix} 30`;
+                        default: return `${t.venue.examplePrefix} 1`;
+                      }
+                    })()}
+                    onChange={(e) => setForm((prev) => ({ ...prev, capacity: parseInt(e.target.value) || 1 }))}
+                  />
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">

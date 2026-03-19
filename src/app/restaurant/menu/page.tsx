@@ -8,15 +8,12 @@ import {
   Trash2,
   ImageIcon,
   FolderTree,
-  Clock,
   Upload,
   X,
   Eye,
   GripVertical,
   ChevronRight,
   ChevronDown,
-  Globe,
-  Info,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -26,8 +23,6 @@ import {
   organizationApi,
 } from '@/lib/api';
 import type {
-  ServiceCategoryDto,
-  ServiceDto,
   ClientStopMenuCategoryDto,
   ClientStopMenuServiceDto,
   CreateServiceCategoryDto,
@@ -59,6 +54,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { LoadingState, EmptyState, ErrorState, ConfirmDialog, ImageCropper } from '@/components/shared';
 
 // ============================================
@@ -73,12 +69,9 @@ interface CategoryFormData {
 
 interface ServiceFormData {
   title: string;
-  subTitle: string;
   description: string;
-  contentsDescription: string;
   basePrice: number;
   priceType: PriceType;
-  estimatedDurationMinutes: number;
   serviceCategoryId: number;
 }
 
@@ -89,12 +82,9 @@ const initialCategoryForm: CategoryFormData = {
 
 const initialServiceForm: ServiceFormData = {
   title: '',
-  subTitle: '',
   description: '',
-  contentsDescription: '',
   basePrice: 0,
   priceType: 'fixed',
-  estimatedDurationMinutes: 0,
   serviceCategoryId: 0,
 };
 
@@ -157,9 +147,6 @@ function PreviewServiceList({
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-stone-800 leading-tight truncate" title={s.title}>{s.title}</p>
-                {s.subTitle && (
-                  <p className="text-xs text-stone-500 mt-0.5 leading-tight">{s.subTitle}</p>
-                )}
               </div>
               <div className="text-right flex-shrink-0">
                 <p className="text-sm font-bold text-emerald-700">{Number(s.basePrice).toFixed(2)} ₺</p>
@@ -171,15 +158,57 @@ function PreviewServiceList({
             {s.description && (
               <p className="text-[11px] text-stone-400 mt-1 line-clamp-2 leading-snug">{s.description}</p>
             )}
-            {s.contentsDescription && (
-              <div className="mt-1.5 p-1.5 bg-amber-50/60 rounded border border-amber-100">
-                <p className="text-[10px] font-medium text-amber-700 mb-0.5">{t.menu.serviceContentsDescription}</p>
-                <p className="text-[11px] text-stone-500 leading-snug whitespace-pre-line">{s.contentsDescription}</p>
-              </div>
-            )}
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+// Single collapsible category item
+function PreviewCategoryItem({
+  cat,
+  depth,
+  t,
+}: {
+  cat: ClientStopMenuCategoryDto;
+  depth: number;
+  t: ReturnType<typeof useLanguage>['t'];
+}) {
+  const [open, setOpen] = useState(depth === 0);
+  const hasServices = cat.services?.length > 0;
+  const hasChildren = cat.child_service_categories?.length > 0;
+  if (!hasServices && !hasChildren) return null;
+
+  return (
+    <div>
+      {depth === 0 ? (
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="w-full bg-gradient-to-r from-stone-800 to-stone-700 px-4 py-3 rounded-xl mb-3 flex items-center justify-between cursor-pointer"
+        >
+          <h3 className="text-lg font-bold text-white">{cat.name}</h3>
+          <ChevronDown className={`h-4 w-4 text-white/70 transition-transform ${open ? '' : '-rotate-90'}`} />
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="w-full px-4 py-2 mb-2 flex items-center justify-between cursor-pointer"
+        >
+          <h4 className="text-sm font-semibold text-stone-600 border-b border-stone-200 pb-1 flex-1 text-left">{cat.name}</h4>
+          <ChevronDown className={`h-3.5 w-3.5 text-stone-400 transition-transform ml-2 ${open ? '' : '-rotate-90'}`} />
+        </button>
+      )}
+      {open && (
+        <>
+          {hasServices && <PreviewServiceList services={cat.services} t={t} />}
+          {hasChildren && (
+            <PreviewCategoryTree categories={cat.child_service_categories} depth={depth + 1} t={t} />
+          )}
+        </>
+      )}
     </div>
   );
 }
@@ -197,25 +226,7 @@ function PreviewCategoryTree({
   return (
     <>
       {categories.map((cat) => (
-        <div key={cat.id}>
-          {cat.services?.length > 0 && (
-            <>
-              {depth === 0 ? (
-                <div className="bg-gradient-to-r from-stone-800 to-stone-700 px-4 py-3 rounded-xl mb-3">
-                  <h3 className="text-lg font-bold text-white">{cat.name}</h3>
-                </div>
-              ) : (
-                <div className="px-4 py-2 mb-2">
-                  <h4 className="text-sm font-semibold text-stone-600 border-b border-stone-200 pb-1">{cat.name}</h4>
-                </div>
-              )}
-              <PreviewServiceList services={cat.services} t={t} />
-            </>
-          )}
-          {cat.child_service_categories?.length > 0 && (
-            <PreviewCategoryTree categories={cat.child_service_categories} depth={depth + 1} t={t} />
-          )}
-        </div>
+        <PreviewCategoryItem key={cat.id} cat={cat} depth={depth} t={t} />
       ))}
     </>
   );
@@ -237,10 +248,10 @@ function CategoryTreeItem({
   setDragOverId,
   handleCategoryReorder,
 }: {
-  cat: ServiceCategoryDto;
+  cat: ClientStopMenuCategoryDto;
   depth: number;
-  selectedCategory: ServiceCategoryDto | null;
-  setSelectedCategory: (c: ServiceCategoryDto) => void;
+  selectedCategory: ClientStopMenuCategoryDto | null;
+  setSelectedCategory: (c: ClientStopMenuCategoryDto) => void;
   expandedCategories: Set<number>;
   setExpandedCategories: React.Dispatch<React.SetStateAction<Set<number>>>;
   draggedId: number | null;
@@ -360,11 +371,11 @@ export default function MenuPage() {
   const orgStatus = orgResult?.success ? orgResult.data?.status : undefined;
 
   // State
-  const [selectedCategory, setSelectedCategory] = useState<ServiceCategoryDto | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<ClientStopMenuCategoryDto | null>(null);
   const [isCategoryFormOpen, setIsCategoryFormOpen] = useState(false);
   const [isServiceFormOpen, setIsServiceFormOpen] = useState(false);
-  const [editingCategory, setEditingCategory] = useState<ServiceCategoryDto | null>(null);
-  const [editingService, setEditingService] = useState<ServiceDto | null>(null);
+  const [editingCategory, setEditingCategory] = useState<ClientStopMenuCategoryDto | null>(null);
+  const [editingService, setEditingService] = useState<ClientStopMenuServiceDto | null>(null);
   const [categoryForm, setCategoryForm] = useState<CategoryFormData>(initialCategoryForm);
   const [serviceForm, setServiceForm] = useState<ServiceFormData>(initialServiceForm);
   const [deleteTarget, setDeleteTarget] = useState<{
@@ -390,44 +401,48 @@ export default function MenuPage() {
   const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set());
 
   // ============================================
-  // Queries
+  // Queries — single menu endpoint returns categories + services
   // ============================================
 
   const {
-    data: categories,
-    isLoading: categoriesLoading,
-    error: categoriesError,
-    refetch: refetchCategories,
+    data: menuData,
+    isLoading: menuLoading,
+    error: menuError,
+    refetch: refetchMenu,
   } = useQuery({
-    queryKey: ['serviceCategories', locale],
+    queryKey: ['menuData', locale],
     queryFn: async () => {
-      const res = await serviceCategoryApi.getAll(locale);
+      const res = await serviceCategoryApi.getMenu(locale);
       if (!res.success) throw new Error(res.error);
       return res.data!;
     },
   });
 
-  // Load services when a category is selected
-  const {
-    data: services,
-    isLoading: servicesLoading,
-  } = useQuery({
-    queryKey: ['servicesByCategory', selectedCategory?.id, locale],
-    queryFn: async () => {
-      if (!selectedCategory) return [];
-      const res = await serviceApi.getByCategory(selectedCategory.id, 1, 100, locale);
-      if (!res.success) throw new Error(res.error);
-      return res.data!;
-    },
-    enabled: !!selectedCategory,
-  });
+  // Derive categories (same structure, used for tree)
+  const categories = menuData;
 
-  // Load full menu for preview via single API call (with lang)
+  // Helper: find services for a given category id in the menu tree
+  const findServicesInTree = (categoryId: number, tree: ClientStopMenuCategoryDto[]): ClientStopMenuServiceDto[] => {
+    for (const cat of tree) {
+      if (cat.id === categoryId) return cat.services || [];
+      const found = findServicesInTree(categoryId, cat.child_service_categories || []);
+      if (found.length) return found;
+    }
+    return [];
+  };
+
+  // Services derived from selected category in menu data
+  const services = selectedCategory && menuData
+    ? findServicesInTree(selectedCategory.id, menuData)
+    : [];
+
+  // Load menu for preview with different language
   const {
     data: previewMenu,
   } = useQuery({
     queryKey: ['menuPreview', previewLang],
     queryFn: async () => {
+      if (previewLang === locale && menuData) return menuData;
       const res = await serviceCategoryApi.getMenu(previewLang);
       if (!res.success) throw new Error(res.error);
       return res.data!;
@@ -446,7 +461,8 @@ export default function MenuPage() {
       return res.data!;
     },
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['serviceCategories'] });
+      queryClient.invalidateQueries({ queryKey: ['menuData'] });
+      queryClient.invalidateQueries({ queryKey: ['menuPreview'] });
       toast.success(`${t.menu.categories} ${t.menu.created}`);
       if (variables.data.parentId) {
         setExpandedCategories((prev) => new Set([...prev, variables.data.parentId!]));
@@ -462,12 +478,10 @@ export default function MenuPage() {
       if (!res.success) throw new Error(res.error);
       return res.data!;
     },
-    onSuccess: (updated) => {
-      queryClient.invalidateQueries({ queryKey: ['serviceCategories'] });
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['menuData'] });
+      queryClient.invalidateQueries({ queryKey: ['menuPreview'] });
       toast.success(`${t.menu.categories} ${t.menu.updated}`);
-      if (selectedCategory?.id === updated.id) {
-        setSelectedCategory(updated);
-      }
       closeCategoryForm();
     },
     onError: (error: Error) => toast.error(error.message),
@@ -479,7 +493,8 @@ export default function MenuPage() {
       if (!res.success) throw new Error(res.error);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['serviceCategories'] });
+      queryClient.invalidateQueries({ queryKey: ['menuData'] });
+      queryClient.invalidateQueries({ queryKey: ['menuPreview'] });
       toast.success(`${t.menu.categories} ${t.menu.deleted}`);
       if (selectedCategory && deleteTarget?.id === selectedCategory.id) {
         setSelectedCategory(null);
@@ -500,7 +515,8 @@ export default function MenuPage() {
       return res.data!;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['servicesByCategory', selectedCategory?.id] });
+      queryClient.invalidateQueries({ queryKey: ['menuData'] });
+      queryClient.invalidateQueries({ queryKey: ['menuPreview'] });
       toast.success(`${t.menu.services} ${t.menu.created}`);
       closeServiceForm();
     },
@@ -514,7 +530,8 @@ export default function MenuPage() {
       return res.data!;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['servicesByCategory', selectedCategory?.id] });
+      queryClient.invalidateQueries({ queryKey: ['menuData'] });
+      queryClient.invalidateQueries({ queryKey: ['menuPreview'] });
       toast.success(`${t.menu.services} ${t.menu.updated}`);
       closeServiceForm();
     },
@@ -527,7 +544,8 @@ export default function MenuPage() {
       if (!res.success) throw new Error(res.error);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['servicesByCategory', selectedCategory?.id] });
+      queryClient.invalidateQueries({ queryKey: ['menuData'] });
+      queryClient.invalidateQueries({ queryKey: ['menuPreview'] });
       toast.success(`${t.menu.services} ${t.menu.deleted}`);
       setDeleteTarget(null);
     },
@@ -544,7 +562,7 @@ export default function MenuPage() {
     setIsCategoryFormOpen(true);
   };
 
-  const openEditCategoryForm = (category: ServiceCategoryDto) => {
+  const openEditCategoryForm = (category: ClientStopMenuCategoryDto) => {
     setEditingCategory(category);
     setCategoryForm({
       name: category.name,
@@ -601,17 +619,14 @@ export default function MenuPage() {
     setIsServiceFormOpen(true);
   };
 
-  const openEditServiceForm = (service: ServiceDto) => {
+  const openEditServiceForm = (service: ClientStopMenuServiceDto) => {
     setEditingService(service);
     setServiceForm({
       title: service.title,
-      subTitle: service.subTitle || '',
       description: service.description || '',
-      contentsDescription: service.contentsDescription || '',
       basePrice: Number(service.basePrice),
-      priceType: service.priceType,
-      estimatedDurationMinutes: service.estimatedDurationMinutes || 0,
-      serviceCategoryId: service.serviceCategoryId,
+      priceType: service.priceType as PriceType,
+      serviceCategoryId: service.serviceCategoryId || selectedCategory?.id || 0,
     });
     setServiceImageFile(null);
     setServiceImagePreview(service.imageUrl || null);
@@ -642,12 +657,9 @@ export default function MenuPage() {
         id: editingService.id,
         data: {
           title: serviceForm.title,
-          subTitle: serviceForm.subTitle || undefined,
           description: serviceForm.description || undefined,
-          contentsDescription: serviceForm.contentsDescription || undefined,
           basePrice: serviceForm.basePrice,
           priceType: serviceForm.priceType,
-          estimatedDurationMinutes: serviceForm.estimatedDurationMinutes || undefined,
           serviceCategoryId: serviceForm.serviceCategoryId,
         },
         image: serviceImageFile || undefined,
@@ -656,12 +668,9 @@ export default function MenuPage() {
       createServiceMutation.mutate({
         data: {
           title: serviceForm.title,
-          subTitle: serviceForm.subTitle || undefined,
           description: serviceForm.description || undefined,
-          contentsDescription: serviceForm.contentsDescription || undefined,
           basePrice: serviceForm.basePrice,
           priceType: serviceForm.priceType,
-          estimatedDurationMinutes: serviceForm.estimatedDurationMinutes || undefined,
           serviceCategoryId: serviceForm.serviceCategoryId,
         },
         image: serviceImageFile || undefined,
@@ -713,7 +722,7 @@ export default function MenuPage() {
     if (!categories) return;
 
     // Helper: find the sibling list that contains a given id
-    const findSiblingList = (id: number): ServiceCategoryDto[] | null => {
+    const findSiblingList = (id: number): ClientStopMenuCategoryDto[] | null => {
       // Check top-level
       if (categories.some((c) => c.id === id)) return categories;
       // Check each parent's children
@@ -750,14 +759,15 @@ export default function MenuPage() {
         )
       );
 
-      queryClient.invalidateQueries({ queryKey: ['serviceCategories'] });
+      queryClient.invalidateQueries({ queryKey: ['menuData'] });
+      queryClient.invalidateQueries({ queryKey: ['menuPreview'] });
     } catch {
       toast.error(t.common.error);
     }
   };
 
   // Helper: find category by id in tree
-  const findCategoryInTree = (id: number, list?: ServiceCategoryDto[]): ServiceCategoryDto | null => {
+  const findCategoryInTree = (id: number, list?: ClientStopMenuCategoryDto[]): ClientStopMenuCategoryDto | null => {
     for (const cat of list || []) {
       if (cat.id === id) return cat;
       const found = findCategoryInTree(id, cat.child_service_categories);
@@ -776,10 +786,17 @@ export default function MenuPage() {
   return (
     <div className="flex flex-col h-full">
       <Header title={t.menu.title} description={t.menu.description} organizationStatus={orgStatus} lang={locale}>
-        <Button variant="outline" onClick={() => setIsPreviewOpen(true)} disabled={!categories?.length}>
-          <Eye className="h-4 w-4 mr-2" />
-          {t.menu.preview}
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span tabIndex={0}>
+              <Button variant="outline" onClick={() => setIsPreviewOpen(true)} disabled={!categories?.length}>
+                <Eye className="h-4 w-4 mr-2" />
+                {t.menu.preview}
+              </Button>
+            </span>
+          </TooltipTrigger>
+          {!categories?.length && <TooltipContent>{t.tooltips.noCategoriesYet}</TooltipContent>}
+        </Tooltip>
       </Header>
 
       <div className="flex-1 p-6">
@@ -794,10 +811,10 @@ export default function MenuPage() {
               </Button>
             </CardHeader>
             <CardContent className="flex-1 overflow-auto">
-              {categoriesLoading ? (
+              {menuLoading ? (
                 <LoadingState message={t.common.loading} />
-              ) : categoriesError ? (
-                <ErrorState onRetry={() => refetchCategories()} />
+              ) : menuError ? (
+                <ErrorState onRetry={() => refetchMenu()} />
               ) : !categories?.length ? (
                 <EmptyState
                   icon={FolderTree}
@@ -899,9 +916,7 @@ export default function MenuPage() {
 
                 {/* Services Section */}
                 <CardContent className="flex-1 overflow-auto">
-                  {servicesLoading ? (
-                    <LoadingState message={t.common.loading} />
-                  ) : !services?.length ? (
+                  {!services?.length ? (
                     <EmptyState
                       icon={FolderTree}
                       title={t.menu.noServices}
@@ -927,31 +942,23 @@ export default function MenuPage() {
                                 </div>
                               )}
                             </div>
-                            <CardContent className="flex-1 p-0">
-                              <div className="flex items-start justify-between">
+                            <CardContent className="flex-1 p-0 overflow-hidden">
+                              <div className="flex items-start justify-between gap-1">
                                 <div className="min-w-0 flex-1">
                                   <h4 className="font-medium text-sm truncate" title={service.title}>{service.title}</h4>
-                                  {service.subTitle && (
-                                    <p className="text-xs text-slate-500 line-clamp-1">
-                                      {service.subTitle}
+                                  {service.description && (
+                                    <p className="text-xs text-slate-500 line-clamp-2 mt-0.5">
+                                      {service.description}
                                     </p>
                                   )}
                                   <div className="flex items-center gap-1.5 mt-1">
                                     <span className="text-sm font-semibold text-primary">
                                       {Number(service.basePrice).toFixed(2)} TL
                                     </span>
-                                    <PriceTypeBadge priceType={service.priceType} t={t} />
+                                    <PriceTypeBadge priceType={service.priceType as PriceType} t={t} />
                                   </div>
-                                  {service.estimatedDurationMinutes && service.estimatedDurationMinutes > 0 && (
-                                    <div className="flex items-center gap-1 mt-0.5">
-                                      <Clock className="h-3 w-3 text-slate-400" />
-                                      <span className="text-xs text-slate-500">
-                                        {service.estimatedDurationMinutes} dk
-                                      </span>
-                                    </div>
-                                  )}
                                 </div>
-                                <div className="flex gap-1">
+                                <div className="flex gap-1 flex-shrink-0">
                                   <Button
                                     variant="ghost"
                                     size="icon"
@@ -1048,13 +1055,20 @@ export default function MenuPage() {
               <Button type="button" variant="outline" onClick={closeCategoryForm}>
                 {t.common.cancel}
               </Button>
-              <Button type="submit" disabled={isCategoryPending}>
-                {isCategoryPending
-                  ? t.common.loading
-                  : editingCategory
-                  ? t.common.update
-                  : t.common.create}
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span tabIndex={0}>
+                    <Button type="submit" disabled={isCategoryPending}>
+                      {isCategoryPending
+                        ? t.common.loading
+                        : editingCategory
+                        ? t.common.update
+                        : t.common.create}
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {isCategoryPending && <TooltipContent>{t.tooltips.formSubmitting}</TooltipContent>}
+              </Tooltip>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -1085,33 +1099,8 @@ export default function MenuPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="serviceSubTitle">{t.menu.serviceSubTitle}</Label>
-                <Input
-                  id="serviceSubTitle"
-                  value={serviceForm.subTitle}
-                  onChange={(e) =>
-                    setServiceForm((prev) => ({ ...prev, subTitle: e.target.value }))
-                  }
-                  placeholder={t.menu.serviceSubTitle}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="serviceDesc">{t.menu.serviceDescription}</Label>
-                <Textarea
-                  id="serviceDesc"
-                  value={serviceForm.description}
-                  onChange={(e) =>
-                    setServiceForm((prev) => ({ ...prev, description: e.target.value }))
-                  }
-                  placeholder={t.menu.serviceDescription}
-                  rows={3}
-                />
-              </div>
-
-              <div className="space-y-2">
                 <div className="flex items-center gap-1.5">
-                  <Label htmlFor="serviceContentsDesc">{t.menu.serviceContentsDescription}</Label>
+                  <Label htmlFor="serviceDesc">{t.menu.serviceContentsDescription}</Label>
                   <div className="relative group">
                     <span className="text-amber-500 cursor-help font-bold text-sm">*</span>
                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-800 text-white text-xs rounded-lg whitespace-normal w-64 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 leading-relaxed">
@@ -1120,10 +1109,10 @@ export default function MenuPage() {
                   </div>
                 </div>
                 <Textarea
-                  id="serviceContentsDesc"
-                  value={serviceForm.contentsDescription}
+                  id="serviceDesc"
+                  value={serviceForm.description}
                   onChange={(e) =>
-                    setServiceForm((prev) => ({ ...prev, contentsDescription: e.target.value }))
+                    setServiceForm((prev) => ({ ...prev, description: e.target.value }))
                   }
                   placeholder={t.menu.serviceContentsDescription}
                   rows={3}
@@ -1228,13 +1217,20 @@ export default function MenuPage() {
               <Button type="button" variant="outline" onClick={closeServiceForm}>
                 {t.common.cancel}
               </Button>
-              <Button type="submit" disabled={isServicePending}>
-                {isServicePending
-                  ? t.common.loading
-                  : editingService
-                  ? t.common.update
-                  : t.common.create}
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span tabIndex={0}>
+                    <Button type="submit" disabled={isServicePending}>
+                      {isServicePending
+                        ? t.common.loading
+                        : editingService
+                        ? t.common.update
+                        : t.common.create}
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {isServicePending && <TooltipContent>{t.tooltips.formSubmitting}</TooltipContent>}
+              </Tooltip>
             </DialogFooter>
           </form>
         </DialogContent>

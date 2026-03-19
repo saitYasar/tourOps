@@ -50,6 +50,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { LoadingState, ConfirmDialog } from '@/components/shared';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 // Map loading placeholder (uses useLanguage hook)
 function MapLoadingPlaceholder() {
@@ -422,49 +423,73 @@ function CompanyDetailCard({
 
               {/* Action Buttons */}
               <div className="mt-4 pt-4 border-t flex gap-2 flex-wrap">
-                {company.status !== 'active' && (
-                  <Button
-                    size="sm"
-                    className="bg-green-600 hover:bg-green-700"
-                    onClick={() => onStatusUpdate(company, 'active')}
-                  >
-                    <CheckCircle className="h-4 w-4 mr-1" />
-                    {t.admin.approve}
-                  </Button>
-                )}
-                {company.status !== 'suspended' && (
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => onStatusUpdate(company, 'suspended')}
-                  >
-                    <XCircle className="h-4 w-4 mr-1" />
-                    {t.admin.suspend}
-                  </Button>
-                )}
-                {company.status !== 'pending' && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onStatusUpdate(company, 'pending')}
-                    className="text-yellow-600 border-yellow-200 hover:bg-yellow-50"
-                  >
-                    <Clock className="h-4 w-4 mr-1" />
-                    {t.admin.setPending}
-                  </Button>
-                )}
-                {hasLocation && (
-                  <a
-                    href={`https://www.google.com/maps?q=${company.lat},${company.lng}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <Button variant="outline" size="sm">
-                      <Globe className="h-4 w-4 mr-1" />
-                      {t.admin.viewOnMap}
-                    </Button>
-                  </a>
-                )}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span tabIndex={0}>
+                      <Button
+                        size="sm"
+                        className="bg-green-600 hover:bg-green-700"
+                        disabled={company.status === 'active'}
+                        onClick={() => onStatusUpdate(company, 'active')}
+                      >
+                        <CheckCircle className="h-4 w-4 mr-1" />
+                        {t.admin.approve}
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {company.status === 'active' && <TooltipContent>{t.tooltips.alreadyActive}</TooltipContent>}
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span tabIndex={0}>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        disabled={company.status === 'suspended'}
+                        onClick={() => onStatusUpdate(company, 'suspended')}
+                      >
+                        <XCircle className="h-4 w-4 mr-1" />
+                        {t.admin.suspend}
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {company.status === 'suspended' && <TooltipContent>{t.tooltips.alreadySuspended}</TooltipContent>}
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span tabIndex={0}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={company.status === 'pending'}
+                        onClick={() => onStatusUpdate(company, 'pending')}
+                        className="text-yellow-600 border-yellow-200 hover:bg-yellow-50"
+                      >
+                        <Clock className="h-4 w-4 mr-1" />
+                        {t.admin.setPending}
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {company.status === 'pending' && <TooltipContent>{t.tooltips.alreadyPending}</TooltipContent>}
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span tabIndex={0}>
+                      <a
+                        href={hasLocation ? `https://www.google.com/maps?q=${company.lat},${company.lng}` : undefined}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => { if (!hasLocation) e.preventDefault(); }}
+                      >
+                        <Button variant="outline" size="sm" disabled={!hasLocation}>
+                          <Globe className="h-4 w-4 mr-1" />
+                          {t.admin.viewOnMap}
+                        </Button>
+                      </a>
+                    </span>
+                  </TooltipTrigger>
+                  {!hasLocation && <TooltipContent>{t.tooltips.noLocation}</TooltipContent>}
+                </Tooltip>
               </div>
             </div>
           </>
@@ -592,6 +617,12 @@ export default function AdminRestaurantsPage() {
             <p className="text-slate-500 text-sm">{t.admin.manageAndApprove}</p>
           </div>
         </div>
+        <Link href="/admin/restaurants/create">
+          <Button className="bg-orange-600 hover:bg-orange-700">
+            <Building2 className="h-4 w-4 mr-2" />
+            {(t.admin as Record<string, string>).quickCreate}
+          </Button>
+        </Link>
       </div>
 
       {/* Status Summary Cards */}
@@ -730,22 +761,36 @@ export default function AdminRestaurantsPage() {
                   {t.admin.paginationPage} {meta.page} / {meta.totalPages} ({t.admin.paginationTotal} {meta.total} {t.admin.paginationRecords})
                 </p>
                 <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                  >
-                    {t.admin.previous}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setPage((p) => Math.min(meta.totalPages, p + 1))}
-                    disabled={page === meta.totalPages}
-                  >
-                    {t.admin.nextPage}
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span tabIndex={0}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setPage((p) => Math.max(1, p - 1))}
+                          disabled={page === 1}
+                        >
+                          {t.admin.previous}
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    {page === 1 && <TooltipContent>{t.tooltips.firstPage}</TooltipContent>}
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span tabIndex={0}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setPage((p) => Math.min(meta.totalPages, p + 1))}
+                          disabled={page === meta.totalPages}
+                        >
+                          {t.admin.nextPage}
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    {page === meta.totalPages && <TooltipContent>{t.tooltips.lastPage}</TooltipContent>}
+                  </Tooltip>
                 </div>
               </div>
             )}
@@ -890,26 +935,38 @@ export default function AdminRestaurantsPage() {
                     </div>
 
                     <div className="pt-2 flex gap-2 flex-wrap">
-                      {selectedCompany.status !== 'active' && (
-                        <Button
-                          size="sm"
-                          className="bg-green-600 hover:bg-green-700"
-                          onClick={() => handleStatusUpdate(selectedCompany, 'active')}
-                        >
-                          <CheckCircle className="h-4 w-4 mr-1" />
-                          {t.admin.approve}
-                        </Button>
-                      )}
-                      {selectedCompany.status !== 'suspended' && (
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => handleStatusUpdate(selectedCompany, 'suspended')}
-                        >
-                          <XCircle className="h-4 w-4 mr-1" />
-                          {t.admin.suspend}
-                        </Button>
-                      )}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span tabIndex={0}>
+                            <Button
+                              size="sm"
+                              className="bg-green-600 hover:bg-green-700"
+                              disabled={selectedCompany.status === 'active'}
+                              onClick={() => handleStatusUpdate(selectedCompany, 'active')}
+                            >
+                              <CheckCircle className="h-4 w-4 mr-1" />
+                              {t.admin.approve}
+                            </Button>
+                          </span>
+                        </TooltipTrigger>
+                        {selectedCompany.status === 'active' && <TooltipContent>{t.tooltips.alreadyActive}</TooltipContent>}
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span tabIndex={0}>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              disabled={selectedCompany.status === 'suspended'}
+                              onClick={() => handleStatusUpdate(selectedCompany, 'suspended')}
+                            >
+                              <XCircle className="h-4 w-4 mr-1" />
+                              {t.admin.suspend}
+                            </Button>
+                          </span>
+                        </TooltipTrigger>
+                        {selectedCompany.status === 'suspended' && <TooltipContent>{t.tooltips.alreadySuspended}</TooltipContent>}
+                      </Tooltip>
                     </div>
                   </div>
                 ) : (

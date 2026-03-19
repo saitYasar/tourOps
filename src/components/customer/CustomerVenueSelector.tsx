@@ -3,6 +3,7 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { Building2, Armchair, Check, Loader2, ChevronLeft, ChevronRight, Layers, DoorOpen, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { useLanguage } from '@/contexts/LanguageContext';
 import type { ResourceDto } from '@/lib/api';
 import dynamic from 'next/dynamic';
@@ -118,24 +119,24 @@ export function CustomerVenueSelector({
     return (
       <div className="space-y-4">
         {/* Breadcrumb + Back */}
-        <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={handleBackToTables}>
-            <ChevronLeft className="h-4 w-4 mr-1" />
-            {t.customer.back}
+        <div className="flex items-center gap-2 sm:gap-3">
+          <Button variant="outline" size="sm" onClick={handleBackToTables} className="shrink-0">
+            <ChevronLeft className="h-4 w-4 mr-0.5 sm:mr-1" />
+            <span className="hidden sm:inline">{t.customer.back}</span>
           </Button>
-          <div>
-            <h3 className="font-bold text-lg flex items-center gap-2">
-              <Armchair className="h-5 w-5 text-orange-500" />
-              {t.customer.selectChair}
+          <div className="min-w-0">
+            <h3 className="font-bold text-base sm:text-lg flex items-center gap-2">
+              <Armchair className="h-4 w-4 sm:h-5 sm:w-5 text-orange-500 shrink-0" />
+              <span className="truncate">{t.customer.selectChair}</span>
             </h3>
-            <p className="text-sm text-slate-500">
+            <p className="text-xs sm:text-sm text-slate-500 truncate">
               {activeFloor?.name} &gt; {activeRoom?.name} &gt; {activeTable?.name}
             </p>
           </div>
         </div>
 
         {/* Legend */}
-        <div className="flex flex-wrap gap-3 text-xs">
+        <div className="flex flex-wrap gap-2 sm:gap-3 text-xs">
           <div className="flex items-center gap-1.5">
             <div className="w-3 h-3 rounded-sm bg-slate-100 border border-slate-300" />
             <span className="text-slate-500">{t.customer.seatEmpty}</span>
@@ -169,7 +170,7 @@ export function CustomerVenueSelector({
             <p className="text-slate-500">{t.customer.noChairs}</p>
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
             {chairResources.map(chair => {
               const occupant = chair.client;
               const isOwnSeat = !!(currentClientId && occupant && occupant.id === currentClientId);
@@ -179,51 +180,55 @@ export function CustomerVenueSelector({
 
               return (
                 <div key={chair.id} className="relative group">
-                  <button
-                    disabled={savingTable || isOccupiedByOther}
-                    className={`relative w-full p-4 rounded-xl border-2 transition-all text-center ${
-                      savingTable ? 'opacity-50 cursor-wait' :
-                      isOccupiedByOther
-                        ? 'border-red-300 bg-red-50 cursor-not-allowed opacity-80'
-                        : isOwnSeat || isSelected
-                          ? 'border-emerald-400 bg-emerald-50 ring-2 ring-emerald-200'
-                          : 'border-slate-200 hover:border-orange-300 hover:bg-orange-50/50'
-                    }`}
-                    onClick={() => {
-                      if (!isOccupiedByOther) onSelectChair(chair);
-                    }}
-                  >
-                    {(isOwnSeat || isSelected) && (
-                      <div className="absolute top-1.5 right-1.5">
-                        <Check className="h-3.5 w-3.5 text-emerald-600" />
-                      </div>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span tabIndex={0}>
+                        <button
+                          disabled={savingTable || isOccupiedByOther}
+                          className={`relative w-full p-3 sm:p-4 rounded-xl border-2 transition-all text-center ${
+                            savingTable ? 'opacity-50 cursor-wait' :
+                            isOccupiedByOther
+                              ? 'border-red-300 bg-red-50 cursor-not-allowed opacity-80'
+                              : isOwnSeat || isSelected
+                                ? 'border-emerald-400 bg-emerald-50 ring-2 ring-emerald-200'
+                                : 'border-slate-200 hover:border-orange-300 hover:bg-orange-50/50'
+                          }`}
+                          onClick={() => {
+                            if (!isOccupiedByOther) onSelectChair(chair);
+                          }}
+                        >
+                          {(isOwnSeat || isSelected) && (
+                            <div className="absolute top-1.5 right-1.5">
+                              <Check className="h-3.5 w-3.5 text-emerald-600" />
+                            </div>
+                          )}
+                          {savingTable ? (
+                            <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 mx-auto mb-1 text-orange-500 animate-spin" />
+                          ) : (
+                            <Armchair className={`h-6 w-6 sm:h-8 sm:w-8 mx-auto mb-1 ${
+                              isOccupiedByOther ? 'text-red-400' :
+                              isOwnSeat || isSelected ? 'text-emerald-600' : 'text-slate-400'
+                            }`} />
+                          )}
+                          <p className={`font-bold text-xs sm:text-sm truncate ${
+                            isOccupiedByOther ? 'text-red-600' :
+                            isOwnSeat ? 'text-emerald-700' : 'text-slate-800'
+                          }`}>{chair.name}</p>
+                          {isOwnSeat && (
+                            <p className="text-[10px] text-emerald-600 font-medium mt-0.5">{t.customer.yourSeat}</p>
+                          )}
+                          {isOccupiedByOther && (
+                            <p className="text-[10px] text-red-500 font-medium mt-0.5 truncate">{occupantName}</p>
+                          )}
+                        </button>
+                      </span>
+                    </TooltipTrigger>
+                    {(savingTable || isOccupiedByOther) && (
+                      <TooltipContent>
+                        {savingTable ? t.tooltips.savingInProgress : t.tooltips.seatOccupied}
+                      </TooltipContent>
                     )}
-                    {savingTable ? (
-                      <Loader2 className="h-8 w-8 mx-auto mb-1 text-orange-500 animate-spin" />
-                    ) : (
-                      <Armchair className={`h-8 w-8 mx-auto mb-1 ${
-                        isOccupiedByOther ? 'text-red-400' :
-                        isOwnSeat || isSelected ? 'text-emerald-600' : 'text-slate-400'
-                      }`} />
-                    )}
-                    <p className={`font-bold text-sm ${
-                      isOccupiedByOther ? 'text-red-600' :
-                      isOwnSeat ? 'text-emerald-700' : 'text-slate-800'
-                    }`}>{chair.name}</p>
-                    {isOwnSeat && (
-                      <p className="text-[10px] text-emerald-600 font-medium mt-0.5">{t.customer.yourSeat}</p>
-                    )}
-                    {isOccupiedByOther && (
-                      <p className="text-[10px] text-red-500 font-medium mt-0.5 truncate">{occupantName}</p>
-                    )}
-                  </button>
-                  {/* Tooltip on hover for occupied chairs */}
-                  {isOccupiedByOther && (
-                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-slate-800 text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                      {occupantName}
-                      <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800" />
-                    </div>
-                  )}
+                  </Tooltip>
                 </div>
               );
             })}
@@ -242,14 +247,14 @@ export function CustomerVenueSelector({
     return (
       <div className="space-y-3">
         {/* Breadcrumb + Back */}
-        <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={handleBackToRooms}>
-            <ChevronLeft className="h-4 w-4 mr-1" />
-            {t.customer.back}
+        <div className="flex items-center gap-2 sm:gap-3">
+          <Button variant="outline" size="sm" onClick={handleBackToRooms} className="shrink-0">
+            <ChevronLeft className="h-4 w-4 mr-0.5 sm:mr-1" />
+            <span className="hidden sm:inline">{t.customer.back}</span>
           </Button>
-          <div>
-            <h3 className="font-bold text-lg">{activeRoom?.name}</h3>
-            <p className="text-sm text-slate-500">
+          <div className="min-w-0">
+            <h3 className="font-bold text-base sm:text-lg truncate">{activeRoom?.name}</h3>
+            <p className="text-xs sm:text-sm text-slate-500 truncate">
               {activeFloor?.name} &gt; {activeRoom?.name}
             </p>
           </div>
@@ -299,19 +304,19 @@ export function CustomerVenueSelector({
 
       {/* Floor tabs */}
       {floorResources.length > 1 && (
-        <div className="flex gap-1 overflow-x-auto">
+        <div className="flex gap-1 overflow-x-auto pb-1 -mb-1">
           {floorResources.map(floor => (
             <button
               key={floor.id}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${
+              className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all ${
                 activeFloorId === floor.id
                   ? 'bg-orange-100 text-orange-700 border border-orange-300'
                   : 'bg-white text-slate-600 border border-slate-200 hover:border-orange-200'
               }`}
               onClick={() => handleFloorChange(floor.id)}
             >
-              <Layers className="h-3.5 w-3.5" />
-              {floor.name}
+              <Layers className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />
+              <span className="truncate max-w-[100px] sm:max-w-none">{floor.name}</span>
             </button>
           ))}
         </div>
@@ -347,7 +352,7 @@ export function CustomerVenueSelector({
                 <DoorOpen className="h-6 w-6 text-orange-500" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-bold text-slate-800">{room.name}</p>
+                <p className="font-bold text-slate-800 truncate">{room.name}</p>
                 {room.capacity > 0 && (
                   <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
                     <Users className="h-3 w-3" />

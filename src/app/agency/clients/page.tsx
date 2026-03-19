@@ -2,14 +2,15 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2, User, Search, Users, Eye, EyeOff } from 'lucide-react';
+import { Plus, Trash2, User, Search, Users, Eye, EyeOff, Navigation, Calendar, Hash, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { agencyApi, type AgencyClientDto, type CreateAgencyClientDto } from '@/lib/api';
+import { agencyApi, tourApi, type AgencyClientDto, type CreateAgencyClientDto } from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -42,6 +43,9 @@ export default function AgencyClientsPage() {
   const [search, setSearch] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<AgencyClientDto | null>(null);
+  const [addToTourTarget, setAddToTourTarget] = useState<AgencyClientDto | null>(null);
+  const [selectedTourId, setSelectedTourId] = useState<number | null>(null);
+  const [tourSearch, setTourSearch] = useState('');
   const [formData, setFormData] = useState<ClientFormData>(initialFormData);
   const [errors, setErrors] = useState<Partial<Record<keyof ClientFormData, string>>>({});
   const [showPassword, setShowPassword] = useState(false);
@@ -64,6 +68,39 @@ export default function AgencyClientsPage() {
   });
 
   const clients = clientsData?.success ? clientsData.data?.data || [] : [];
+
+  // Fetch tours and their participants to map clientId -> tour names
+  const { data: toursData } = useQuery({
+    queryKey: ['agency-tours-for-clients'],
+    queryFn: async () => {
+      const toursResult = await tourApi.list(1, 100);
+      if (!toursResult.success || !toursResult.data) return new Map<number, string[]>();
+
+      const map = new Map<number, string[]>();
+      const participantResults = await Promise.allSettled(
+        toursResult.data.map(async (tour) => {
+          const res = await tourApi.getClients(tour.id);
+          return { tourName: tour.tourName, clients: res.success ? res.data || [] : [] };
+        })
+      );
+
+      for (const result of participantResults) {
+        if (result.status === 'fulfilled') {
+          const { tourName, clients: tourClients } = result.value;
+          for (const tc of tourClients) {
+            const existing = map.get(tc.clientId) || [];
+            if (!existing.includes(tourName)) {
+              existing.push(tourName);
+            }
+            map.set(tc.clientId, existing);
+          }
+        }
+      }
+      return map;
+    },
+  });
+
+  const clientTourMap = toursData || new Map<number, string[]>();
 
   const createMutation = useMutation({
     mutationFn: (data: CreateAgencyClientDto) => agencyApi.createClient(data),
@@ -94,6 +131,33 @@ export default function AgencyClientsPage() {
     },
     onError: () => {
       toast.error(t.invitations.clientDeleteFailed);
+    },
+  });
+
+  // Fetch tours list for "Add to Tour" dialog
+  const { data: toursList } = useQuery({
+    queryKey: ['agency-tours-list'],
+    queryFn: async () => {
+      const result = await tourApi.list(1, 100);
+      return result.success ? result.data || [] : [];
+    },
+  });
+
+  const addToTourMutation = useMutation({
+    mutationFn: ({ tourId, clientId }: { tourId: number; clientId: number }) =>
+      tourApi.addParticipant(tourId, clientId),
+    onSuccess: (result) => {
+      if (result.success) {
+        toast.success('Müşteri tura başarıyla eklendi');
+        queryClient.invalidateQueries({ queryKey: ['agency-tours-for-clients'] });
+        setAddToTourTarget(null);
+        setSelectedTourId(null);
+      } else {
+        toast.error(result.error || 'Tura ekleme başarısız');
+      }
+    },
+    onError: () => {
+      toast.error('Tura ekleme başarısız');
     },
   });
 
@@ -235,6 +299,7 @@ export default function AgencyClientsPage() {
                         <th className="pb-3 font-medium">Müşteri</th>
                         <th className="pb-3 font-medium">Kullanıcı Adı</th>
                         <th className="pb-3 font-medium">Durum</th>
+                        <th className="pb-3 font-medium">Tur</th>
                         <th className="pb-3 font-medium">Kayıt Tarihi</th>
                         <th className="pb-3 font-medium text-right">İşlem</th>
                       </tr>
@@ -273,20 +338,60 @@ export default function AgencyClientsPage() {
                               </span>
                             )}
                           </td>
+                          <td className="py-3 max-w-[200px]">
+                            {(() => {
+                              const tours = clientTourMap.get(client.clientId);
+                              if (!tours || tours.length === 0) {
+                                return <span className="text-xs text-slate-400">-</span>;
+                              }
+                              return (
+                                <div className="flex flex-wrap gap-1">
+                                  {tours.map((name, i) => (
+                                    <span key={i} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                                      {name}
+                                    </span>
+                                  ))}
+                                </div>
+                              );
+                            })()}
+                          </td>
                           <td className="py-3">
                             <span className="text-xs text-slate-500 whitespace-nowrap">
                               {new Date(client.createdAt).toLocaleDateString('tr-TR')}
                             </span>
                           </td>
                           <td className="py-3 text-right">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-                              onClick={() => setDeleteTarget(client)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            <div className="flex items-center justify-end gap-1">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span tabIndex={0}>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-8 px-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                                      disabled={!!(clientTourMap.get(client.clientId)?.length)}
+                                      onClick={() => {
+                                        setAddToTourTarget(client);
+                                        setSelectedTourId(null);
+                                      }}
+                                      title="Tura Ekle"
+                                    >
+                                      <UserPlus className="h-4 w-4 mr-1" />
+                                      <span className="text-xs">Tura Ekle</span>
+                                    </Button>
+                                  </span>
+                                </TooltipTrigger>
+                                {!!(clientTourMap.get(client.clientId)?.length) && <TooltipContent>{t.tooltips.clientHasTours}</TooltipContent>}
+                              </Tooltip>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                onClick={() => setDeleteTarget(client)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -373,19 +478,26 @@ export default function AgencyClientsPage() {
               <Button type="button" variant="outline" onClick={closeForm}>
                 İptal
               </Button>
-              <Button type="submit" disabled={createMutation.isPending}>
-                {createMutation.isPending ? (
-                  <>
-                    <span className="animate-spin mr-2">&#9696;</span>
-                    Oluşturuluyor...
-                  </>
-                ) : (
-                  <>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Oluştur
-                  </>
-                )}
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span tabIndex={0}>
+                    <Button type="submit" disabled={createMutation.isPending}>
+                      {createMutation.isPending ? (
+                        <>
+                          <span className="animate-spin mr-2">&#9696;</span>
+                          Oluşturuluyor...
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="h-4 w-4 mr-2" />
+                          Oluştur
+                        </>
+                      )}
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {createMutation.isPending && <TooltipContent>{t.tooltips.formSubmitting}</TooltipContent>}
+              </Tooltip>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -404,6 +516,134 @@ export default function AgencyClientsPage() {
         onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
         variant="destructive"
       />
+
+      {/* Add to Tour Dialog */}
+      <Dialog open={!!addToTourTarget} onOpenChange={(open) => { if (!open) { setAddToTourTarget(null); setSelectedTourId(null); setTourSearch(''); } }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Navigation className="h-5 w-5 text-blue-600" />
+              Tura Ekle
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 p-2.5 bg-slate-50 rounded-lg">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-sky-500 to-blue-500 flex items-center justify-center text-white font-medium text-xs flex-shrink-0">
+                {getInitials(addToTourTarget?.client?.firstName, addToTourTarget?.client?.lastName)}
+              </div>
+              <div>
+                <p className="font-medium text-sm">{addToTourTarget?.client?.firstName} {addToTourTarget?.client?.lastName}</p>
+                <p className="text-xs text-slate-500">Hangi tura eklemek istiyorsunuz?</p>
+              </div>
+            </div>
+
+            {/* Tour search */}
+            {toursList && toursList.length > 3 && (
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Input
+                  placeholder="Tur ara..."
+                  value={tourSearch}
+                  onChange={(e) => setTourSearch(e.target.value)}
+                  className="pl-9 h-9 text-sm"
+                />
+              </div>
+            )}
+
+            {!toursList || toursList.length === 0 ? (
+              <div className="text-center py-6">
+                <Navigation className="h-10 w-10 mx-auto mb-2 text-slate-300" />
+                <p className="text-sm text-slate-400">Henüz tur bulunmuyor</p>
+              </div>
+            ) : (
+              <div className="space-y-1.5 max-h-[280px] overflow-y-auto pr-1 -mr-1">
+                {toursList
+                  .filter((tour) => !tourSearch || tour.tourName.toLowerCase().includes(tourSearch.toLowerCase()) || tour.tourCode.toLowerCase().includes(tourSearch.toLowerCase()))
+                  .map((tour) => {
+                    const isSelected = selectedTourId === tour.id;
+                    const statusColors: Record<string, string> = {
+                      draft: 'bg-yellow-100 text-yellow-700',
+                      published: 'bg-green-100 text-green-700',
+                      cancelled: 'bg-red-100 text-red-700',
+                      completed: 'bg-slate-100 text-slate-700',
+                    };
+                    const statusLabels: Record<string, string> = {
+                      draft: 'Taslak',
+                      published: 'Yayında',
+                      cancelled: 'İptal',
+                      completed: 'Tamamlandı',
+                    };
+                    return (
+                      <button
+                        key={tour.id}
+                        type="button"
+                        onClick={() => setSelectedTourId(tour.id)}
+                        className={`w-full text-left p-3 rounded-lg border-2 transition-all ${
+                          isSelected
+                            ? 'border-blue-500 bg-blue-50 shadow-sm'
+                            : 'border-transparent bg-white hover:bg-slate-50 shadow-sm ring-1 ring-slate-200'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium text-sm truncate">{tour.tourName}</p>
+                            <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
+                              <span className="inline-flex items-center gap-1">
+                                <Hash className="h-3 w-3" />
+                                {tour.tourCode}
+                              </span>
+                              <span className="inline-flex items-center gap-1">
+                                <Calendar className="h-3 w-3" />
+                                {new Date(tour.startDate).toLocaleDateString('tr-TR')} - {new Date(tour.endDate).toLocaleDateString('tr-TR')}
+                              </span>
+                            </div>
+                          </div>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium flex-shrink-0 ${statusColors[tour.status] || 'bg-slate-100 text-slate-600'}`}>
+                            {statusLabels[tour.status] || tour.status}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => { setAddToTourTarget(null); setSelectedTourId(null); setTourSearch(''); }}>
+              İptal
+            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span tabIndex={0}>
+                  <Button
+                    disabled={!selectedTourId || addToTourMutation.isPending}
+                    onClick={() => {
+                      if (selectedTourId && addToTourTarget) {
+                        addToTourMutation.mutate({ tourId: selectedTourId, clientId: addToTourTarget.clientId });
+                      }
+                    }}
+                  >
+                    {addToTourMutation.isPending ? (
+                      <>
+                        <span className="animate-spin mr-2">&#9696;</span>
+                        Ekleniyor...
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus className="h-4 w-4 mr-2" />
+                        Onayla
+                      </>
+                    )}
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              {(!selectedTourId || addToTourMutation.isPending) && (
+                <TooltipContent>{!selectedTourId ? t.tooltips.selectTourFirst : t.tooltips.formSubmitting}</TooltipContent>
+              )}
+            </Tooltip>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

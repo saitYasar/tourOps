@@ -12,12 +12,15 @@ import {
   LogOut,
   User,
   Users,
+  UsersRound,
   Calendar,
   Compass,
   Plane,
   Image,
   Code2,
   LifeBuoy,
+  Bell,
+  Percent,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -38,6 +41,7 @@ const agencyNavItems: NavItem[] = [
   { labelKey: 'tours', href: '/agency/tours', icon: Route },
   { labelKey: 'team', href: '/agency/team', icon: Users },
   { labelKey: 'clients', href: '/agency/clients', icon: User },
+  { labelKey: 'photos', href: '/agency/photos', icon: Image },
   { labelKey: 'externalApi', href: '/agency/external-api', icon: Code2 },
   { labelKey: 'support', href: '/agency/support', icon: LifeBuoy },
 ];
@@ -45,6 +49,7 @@ const agencyNavItems: NavItem[] = [
 const restaurantNavItems: NavItem[] = [
   { labelKey: 'dashboard', href: '/restaurant', icon: LayoutGrid },
   { labelKey: 'requests', href: '/restaurant/requests', icon: ClipboardList },
+  { labelKey: 'guests', href: '/restaurant/guests', icon: UsersRound },
   { labelKey: 'venue', href: '/restaurant/venue', icon: Building2 },
   { labelKey: 'menu', href: '/restaurant/menu', icon: UtensilsCrossed },
   { labelKey: 'photos', href: '/restaurant/photos', icon: Image },
@@ -70,6 +75,8 @@ const adminNavItems: AdminNavItem[] = [
   { label: 'agencies', href: '/admin/agencies', icon: Briefcase },
   { label: 'customers', href: '/admin/customers', icon: User },
   { label: 'requests', href: '/admin/requests', icon: ClipboardList },
+  { label: 'notifications', href: '/admin/notifications', icon: Bell },
+  { label: 'commissions', href: '/admin/commissions', icon: Percent },
 ];
 
 const roleBadgeColors: Record<UserRole, string> = {
@@ -120,6 +127,8 @@ export function Sidebar() {
     agencies: t.admin.agencies,
     customers: t.admin.customers,
     requests: t.admin.requests,
+    notifications: t.admin.notifications,
+    commissions: t.admin.commissions,
   };
 
   return (

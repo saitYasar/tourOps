@@ -29,9 +29,7 @@ import { LanguageSwitcher } from '@/components/shared';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { realAuthApi } from '@/lib/api';
-
-const AUTH_USER_DATA_KEY = 'tourops_user_data';
+import { realAuthApi, apiClient, getAuthStorageKeys } from '@/lib/api';
 
 type PageMode = 'login' | 'register';
 type LoginMethod = 'username' | 'email';
@@ -87,8 +85,14 @@ function CustomerLoginContent() {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleSuccess = (data: any, isNewUser = false) => {
+    const customerKeys = getAuthStorageKeys('customer');
+    // Ensure token is stored under customer key
+    const accessToken = apiClient.getAccessToken();
+    if (accessToken) {
+      localStorage.setItem(customerKeys.token, accessToken);
+    }
     if (data.user) {
-      localStorage.setItem(AUTH_USER_DATA_KEY, JSON.stringify({
+      localStorage.setItem(customerKeys.userData, JSON.stringify({
         ...data.user,
         userType: 'customer',
         isNewUser,

@@ -4,10 +4,7 @@ import { createContext, useContext, useState, useEffect, useCallback, type React
 import { useRouter, usePathname } from 'next/navigation';
 
 import type { User, UserRole } from '@/types';
-import { realAuthApi, type OrganizationLoginRegisterDto, type AgencyLoginRegisterDto, type LoginResponseDto } from '@/lib/api';
-
-const AUTH_TOKEN_KEY = 'tourops_access_token';
-const AUTH_USER_DATA_KEY = 'tourops_user_data';
+import { realAuthApi, apiClient, getAuthStorageKeys, getAuthRolePrefix, type OrganizationLoginRegisterDto, type AgencyLoginRegisterDto, type LoginResponseDto } from '@/lib/api';
 
 // Parse JWT to extract organizationId/agencyId
 function parseJwtPayload(token: string): Record<string, unknown> | null {
@@ -59,8 +56,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         // Check for saved token and user data
-        const token = localStorage.getItem(AUTH_TOKEN_KEY);
-        const savedUserData = localStorage.getItem(AUTH_USER_DATA_KEY);
+        const keys = getAuthStorageKeys();
+        const token = localStorage.getItem(keys.token);
+        const savedUserData = localStorage.getItem(keys.userData);
 
         if (token && savedUserData) {
           try {
@@ -96,14 +94,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             };
             setUser(loadedUser);
           } catch {
-            localStorage.removeItem(AUTH_TOKEN_KEY);
-            localStorage.removeItem(AUTH_USER_DATA_KEY);
+            localStorage.removeItem(keys.token);
+            localStorage.removeItem(keys.userData);
           }
         }
       } catch (error) {
         console.error('Auth kontrol hatasi:', error);
-        localStorage.removeItem(AUTH_TOKEN_KEY);
-        localStorage.removeItem(AUTH_USER_DATA_KEY);
+        const keys = getAuthStorageKeys();
+        localStorage.removeItem(keys.token);
+        localStorage.removeItem(keys.userData);
       } finally {
         setIsLoading(false);
       }
@@ -223,9 +222,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (result.success && result.data) {
         const userData = result.data.user;
         const role: UserRole = type === 'organization' ? 'restaurant' : 'agency';
+        const rolePrefix = type === 'organization' ? 'restaurant' : 'agency';
+        const correctKeys = getAuthStorageKeys(rolePrefix);
+
+        // Ensure token is stored under the correct role-specific key
+        // (login page pathname may differ from dashboard pathname)
+        const accessToken = apiClient.getAccessToken();
+        if (accessToken) {
+          localStorage.setItem(correctKeys.token, accessToken);
+        }
 
         // Extract organizationId/agencyId from JWT or response
-        const token = localStorage.getItem(AUTH_TOKEN_KEY);
+        const token = accessToken || localStorage.getItem(correctKeys.token);
         const jwtPayload = token ? parseJwtPayload(token) : null;
         const organizationId = (jwtPayload?.organizationId as number) || result.data.organization?.id;
         const agencyId = (jwtPayload?.agencyId as number) || result.data.agency?.id;
@@ -241,11 +249,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           restaurantId: organizationId ? String(organizationId) : undefined,
         };
 
-        // Token is already stored by apiClient in verifyOtp
         setUser(loadedUser);
 
-        // Save user data with type for session restore (include organizationId/agencyId)
-        localStorage.setItem(AUTH_USER_DATA_KEY, JSON.stringify({
+        // Save user data under the correct role-specific key
+        localStorage.setItem(correctKeys.userData, JSON.stringify({
           ...userData,
           userType: type,
           isNewUser: result.data.isNewUser,
@@ -274,9 +281,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     type: 'organization' | 'agency'
   ) => {
     const role: UserRole = type === 'organization' ? 'restaurant' : 'agency';
+    const rolePrefix = type === 'organization' ? 'restaurant' : 'agency';
+    const correctKeys = getAuthStorageKeys(rolePrefix);
 
     // Extract organizationId/agencyId from current JWT
-    const token = typeof window !== 'undefined' ? localStorage.getItem(AUTH_TOKEN_KEY) : null;
+    const token = typeof window !== 'undefined' ? localStorage.getItem(correctKeys.token) : null;
     const jwtPayload = token ? parseJwtPayload(token) : null;
     const organizationId = jwtPayload?.organizationId as number | undefined;
 
@@ -294,7 +303,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(loadedUser);
 
     // Save user data for session restore
-    localStorage.setItem(AUTH_USER_DATA_KEY, JSON.stringify({
+    localStorage.setItem(correctKeys.userData, JSON.stringify({
       ...userData,
       userType: type,
       isNewUser: false,
@@ -304,11 +313,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
+    const keys = getAuthStorageKeys();
     setUser(null);
-    localStorage.removeItem(AUTH_TOKEN_KEY);
-    localStorage.removeItem(AUTH_USER_DATA_KEY);
+    localStorage.removeItem(keys.token);
+    localStorage.removeItem(keys.userData);
     realAuthApi.logout();
-    router.replace('/login');
+    const prefix = getAuthRolePrefix();
+    const loginPaths: Record<string, string> = {
+      customer: '/login/customer',
+      admin: '/login/admin',
+      agency: '/agency/login',
+      restaurant: '/login',
+    };
+    router.replace(loginPaths[prefix] || '/login');
   }, [router]);
 
   // Register logout callback with API client for 401 handling

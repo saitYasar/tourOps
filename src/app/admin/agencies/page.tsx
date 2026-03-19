@@ -37,6 +37,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { LoadingState, ConfirmDialog } from '@/components/shared';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 function resolveImageUrl(company: CompanyDto): string | null {
   return company.coverImageUrl || null;
@@ -332,49 +333,73 @@ function AgencyDetailCard({
 
               {/* Action Buttons */}
               <div className="mt-4 pt-4 border-t flex gap-2 flex-wrap">
-                {company.status !== 'active' && (
-                  <Button
-                    size="sm"
-                    className="bg-green-600 hover:bg-green-700"
-                    onClick={() => onStatusUpdate(company, 'active')}
-                  >
-                    <CheckCircle className="h-4 w-4 mr-1" />
-                    {t.admin.agencyApprove}
-                  </Button>
-                )}
-                {company.status !== 'suspended' && (
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => onStatusUpdate(company, 'suspended')}
-                  >
-                    <XCircle className="h-4 w-4 mr-1" />
-                    {t.admin.agencySuspend}
-                  </Button>
-                )}
-                {company.status !== 'pending' && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onStatusUpdate(company, 'pending')}
-                    className="text-yellow-600 border-yellow-200 hover:bg-yellow-50"
-                  >
-                    <Clock className="h-4 w-4 mr-1" />
-                    Beklemeye Al
-                  </Button>
-                )}
-                {hasLocation && (
-                  <a
-                    href={`https://www.google.com/maps?q=${company.lat},${company.lng}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <Button variant="outline" size="sm">
-                      <Globe className="h-4 w-4 mr-1" />
-                      Haritada Gör
-                    </Button>
-                  </a>
-                )}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span tabIndex={0}>
+                      <Button
+                        size="sm"
+                        className="bg-green-600 hover:bg-green-700"
+                        disabled={company.status === 'active'}
+                        onClick={() => onStatusUpdate(company, 'active')}
+                      >
+                        <CheckCircle className="h-4 w-4 mr-1" />
+                        {t.admin.agencyApprove}
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {company.status === 'active' && <TooltipContent>{t.tooltips.alreadyActive}</TooltipContent>}
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span tabIndex={0}>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        disabled={company.status === 'suspended'}
+                        onClick={() => onStatusUpdate(company, 'suspended')}
+                      >
+                        <XCircle className="h-4 w-4 mr-1" />
+                        {t.admin.agencySuspend}
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {company.status === 'suspended' && <TooltipContent>{t.tooltips.alreadySuspended}</TooltipContent>}
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span tabIndex={0}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={company.status === 'pending'}
+                        onClick={() => onStatusUpdate(company, 'pending')}
+                        className="text-yellow-600 border-yellow-200 hover:bg-yellow-50"
+                      >
+                        <Clock className="h-4 w-4 mr-1" />
+                        Beklemeye Al
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {company.status === 'pending' && <TooltipContent>{t.tooltips.alreadyPending}</TooltipContent>}
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span tabIndex={0}>
+                      <a
+                        href={hasLocation ? `https://www.google.com/maps?q=${company.lat},${company.lng}` : undefined}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={!hasLocation ? { pointerEvents: 'none' } : undefined}
+                      >
+                        <Button variant="outline" size="sm" disabled={!hasLocation}>
+                          <Globe className="h-4 w-4 mr-1" />
+                          Haritada Gör
+                        </Button>
+                      </a>
+                    </span>
+                  </TooltipTrigger>
+                  {!hasLocation && <TooltipContent>{t.tooltips.noLocation}</TooltipContent>}
+                </Tooltip>
               </div>
             </div>
           </>
@@ -611,22 +636,36 @@ export default function AdminAgenciesPage() {
               {`${t.admin.agencyPage} ${meta.page} / ${meta.totalPages} (${t.admin.agencyTotalRecords} ${meta.total})`}
             </p>
             <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-              >
-                Önceki
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((p) => Math.min(meta.totalPages, p + 1))}
-                disabled={page === meta.totalPages}
-              >
-                Sonraki
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span tabIndex={0}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                    >
+                      Önceki
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {page === 1 && <TooltipContent>{t.tooltips.firstPage}</TooltipContent>}
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span tabIndex={0}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage((p) => Math.min(meta.totalPages, p + 1))}
+                      disabled={page === meta.totalPages}
+                    >
+                      Sonraki
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {page === meta.totalPages && <TooltipContent>{t.tooltips.lastPage}</TooltipContent>}
+              </Tooltip>
             </div>
           </div>
         )}

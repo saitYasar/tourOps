@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { LoadingState, ErrorState } from '@/components/shared';
+import { toast } from 'sonner';
 
 export default function CustomerProfilePage() {
   const { t, locale } = useLanguage();
@@ -75,6 +76,12 @@ export default function CustomerProfilePage() {
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      const MAX_SIZE = 5 * 1024 * 1024; // 5MB
+      if (file.size > MAX_SIZE) {
+        toast.error(t.common.fileTooLarge);
+        e.target.value = '';
+        return;
+      }
       setProfilePhoto(file);
       const reader = new FileReader();
       reader.onload = () => setPhotoPreview(reader.result as string);
@@ -138,7 +145,7 @@ export default function CustomerProfilePage() {
             {/* Profile Photo */}
             <div className="flex justify-center mb-8">
               <div className="relative">
-                <div className="w-24 h-24 rounded-full bg-gradient-to-r from-sky-400 to-orange-400 flex items-center justify-center text-white text-3xl font-bold overflow-hidden">
+                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-r from-sky-400 to-orange-400 flex items-center justify-center text-white text-2xl sm:text-3xl font-bold overflow-hidden">
                   {photoPreview ? (
                     <img src={photoPreview} alt="" className="w-full h-full object-cover" />
                   ) : (
@@ -203,7 +210,7 @@ export default function CustomerProfilePage() {
                   {t.common.phone}
                 </Label>
                 <div className="flex gap-2">
-                  <div className="w-24">
+                  <div className="w-16 sm:w-24">
                     <Input
                       value={phoneCountryCode}
                       onChange={(e) => setPhoneCountryCode(e.target.value.replace(/\D/g, ''))}

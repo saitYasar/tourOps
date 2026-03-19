@@ -2,13 +2,13 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Calendar, Users, CheckCircle, XCircle, MessageSquare, Building2, Clock, ChevronDown, ChevronUp, FileText, Timer } from 'lucide-react';
+import { Calendar, Users, CheckCircle, XCircle, MessageSquare, Building2, Clock, ChevronDown, ChevronUp, FileText, Timer, Percent } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { preReservationOrgApi, organizationApi, type PreReservationDto } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { formatDate } from '@/lib/dateUtils';
+import { formatDate, formatDateTime, formatShortDateTime } from '@/lib/dateUtils';
 
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
@@ -31,6 +31,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { LoadingState, EmptyState, ErrorState, RequestStatusBadge } from '@/components/shared';
 
 type PreReservationStatus = 'pending' | 'approved' | 'rejected';
@@ -221,6 +222,14 @@ export default function RestaurantRequestsPage() {
                                   {getTourDate(request)}
                                 </span>
                               )}
+                              {(request.scheduledStartTime || request.scheduledEndTime) && (
+                                <span className="flex items-center gap-1">
+                                  <Clock className="h-4 w-4" />
+                                  {request.scheduledStartTime && formatShortDateTime(request.scheduledStartTime)}
+                                  {request.scheduledStartTime && request.scheduledEndTime && ' - '}
+                                  {request.scheduledEndTime && formatShortDateTime(request.scheduledEndTime)}
+                                </span>
+                              )}
                               {request.headcount != null && (
                                 <span className="flex items-center gap-1">
                                   <Users className="h-4 w-4" />
@@ -231,6 +240,12 @@ export default function RestaurantRequestsPage() {
                                 <span className="flex items-center gap-1">
                                   <Building2 className="h-4 w-4" />
                                   {request.tour.agency.name}
+                                </span>
+                              )}
+                              {request.organization?.agencyCommissionRate != null && (
+                                <span className="flex items-center gap-1">
+                                  <Percent className="h-4 w-4" />
+                                  {t.tours.commissionRate}: %{request.organization.agencyCommissionRate}
                                 </span>
                               )}
                               {request.createdAt && (
@@ -305,22 +320,43 @@ export default function RestaurantRequestsPage() {
                             )}
                           </div>
 
-                          {(!request.status || request.status.toLowerCase() === 'pending') && (
-                            <div className="flex items-center gap-2 shrink-0">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => openRejectDialog(request)}
-                              >
-                                <XCircle className="h-4 w-4 mr-1 text-red-500" />
-                                {t.requests.reject}
-                              </Button>
-                              <Button size="sm" onClick={() => openApproveDialog(request)}>
-                                <CheckCircle className="h-4 w-4 mr-1" />
-                                {t.requests.approve}
-                              </Button>
-                            </div>
-                          )}
+                          <div className="flex items-center gap-2 shrink-0">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span tabIndex={0}>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={!(!request.status || request.status.toLowerCase() === 'pending')}
+                                    onClick={() => openRejectDialog(request)}
+                                  >
+                                    <XCircle className="h-4 w-4 mr-1 text-red-500" />
+                                    {t.requests.reject}
+                                  </Button>
+                                </span>
+                              </TooltipTrigger>
+                              {request.status && request.status.toLowerCase() !== 'pending' && (
+                                <TooltipContent>{t.tooltips.requestNotPending}</TooltipContent>
+                              )}
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span tabIndex={0}>
+                                  <Button
+                                    size="sm"
+                                    disabled={!(!request.status || request.status.toLowerCase() === 'pending')}
+                                    onClick={() => openApproveDialog(request)}
+                                  >
+                                    <CheckCircle className="h-4 w-4 mr-1" />
+                                    {t.requests.approve}
+                                  </Button>
+                                </span>
+                              </TooltipTrigger>
+                              {request.status && request.status.toLowerCase() !== 'pending' && (
+                                <TooltipContent>{t.tooltips.requestNotPending}</TooltipContent>
+                              )}
+                            </Tooltip>
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
@@ -356,6 +392,14 @@ export default function RestaurantRequestsPage() {
                     {getTourDate(selectedRequest)}
                   </p>
                 )}
+                {(selectedRequest.scheduledStartTime || selectedRequest.scheduledEndTime) && (
+                  <p className="text-sm text-slate-600 flex items-center gap-1">
+                    <Clock className="h-3.5 w-3.5" />
+                    {selectedRequest.scheduledStartTime && formatShortDateTime(selectedRequest.scheduledStartTime)}
+                    {selectedRequest.scheduledStartTime && selectedRequest.scheduledEndTime && ' - '}
+                    {selectedRequest.scheduledEndTime && formatShortDateTime(selectedRequest.scheduledEndTime)}
+                  </p>
+                )}
                 {selectedRequest.headcount != null && (
                   <p className="text-sm text-slate-600">{selectedRequest.headcount} {t.venue.persons}</p>
                 )}
@@ -363,6 +407,12 @@ export default function RestaurantRequestsPage() {
                   <p className="text-sm text-slate-600">
                     <Building2 className="h-3.5 w-3.5 inline mr-1" />
                     {selectedRequest.tour.agency.name}
+                  </p>
+                )}
+                {selectedRequest.organization?.agencyCommissionRate != null && (
+                  <p className="text-sm text-slate-600">
+                    <Percent className="h-3.5 w-3.5 inline mr-1" />
+                    {t.tours.commissionRate}: %{selectedRequest.organization.agencyCommissionRate}
                   </p>
                 )}
               </div>
@@ -414,17 +464,28 @@ export default function RestaurantRequestsPage() {
             <Button type="button" variant="outline" onClick={closeDialog}>
               {t.common.cancel}
             </Button>
-            <Button
-              type="submit"
-              disabled={isPending || (actionType === 'reject' && !responseNote.trim())}
-              variant={actionType === 'reject' ? 'destructive' : 'default'}
-            >
-              {isPending
-                ? t.common.loading
-                : actionType === 'approve'
-                ? t.requests.approve
-                : t.requests.reject}
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span tabIndex={0}>
+                  <Button
+                    type="submit"
+                    disabled={isPending || (actionType === 'reject' && !responseNote.trim())}
+                    variant={actionType === 'reject' ? 'destructive' : 'default'}
+                  >
+                    {isPending
+                      ? t.common.loading
+                      : actionType === 'approve'
+                      ? t.requests.approve
+                      : t.requests.reject}
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              {(isPending || (actionType === 'reject' && !responseNote.trim())) && (
+                <TooltipContent>
+                  {isPending ? t.tooltips.formSubmitting : t.tooltips.rejectNeedsReason}
+                </TooltipContent>
+              )}
+            </Tooltip>
           </DialogFooter>
           </form>
         </DialogContent>

@@ -36,6 +36,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { LoadingState, SprinterLoading, ImageCropper } from '@/components/shared';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 // Map is loaded client-side only
 const RestaurantMap = dynamic(
@@ -766,19 +767,27 @@ export default function RestaurantDashboard() {
               >
                 {t.common.cancel}
               </Button>
-              <Button
-                type="submit"
-                disabled={updateLocationMutation.isPending || !selectedDistrictId || countriesLoading}
-              >
-                {updateLocationMutation.isPending ? (
-                  <>
-                    <SprinterLoading size="xs" className="mr-2" />
-                    {t.common.loading}
-                  </>
-                ) : (
-                  t.common.save
-                )}
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span tabIndex={0}>
+                    <Button
+                      type="submit"
+                      disabled={updateLocationMutation.isPending || !selectedDistrictId || countriesLoading}
+                    >
+                      {updateLocationMutation.isPending ? (
+                        <>
+                          <SprinterLoading size="xs" className="mr-2" />
+                          {t.common.loading}
+                        </>
+                      ) : (
+                        t.common.save
+                      )}
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {updateLocationMutation.isPending && <TooltipContent>{t.tooltips.formSubmitting}</TooltipContent>}
+                {!updateLocationMutation.isPending && !selectedDistrictId && <TooltipContent>{t.tooltips.fillRequired}</TooltipContent>}
+              </Tooltip>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -933,19 +942,26 @@ export default function RestaurantDashboard() {
             >
               {t.common.cancel}
             </Button>
-            <Button
-              type="submit"
-              disabled={updateInfoMutation.isPending}
-            >
-              {updateInfoMutation.isPending ? (
-                <>
-                  <SprinterLoading size="xs" className="mr-2" />
-                  {t.common.loading}
-                </>
-              ) : (
-                t.common.save
-              )}
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span tabIndex={0}>
+                  <Button
+                    type="submit"
+                    disabled={updateInfoMutation.isPending}
+                  >
+                    {updateInfoMutation.isPending ? (
+                      <>
+                        <SprinterLoading size="xs" className="mr-2" />
+                        {t.common.loading}
+                      </>
+                    ) : (
+                      t.common.save
+                    )}
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              {updateInfoMutation.isPending && <TooltipContent>{t.tooltips.formSubmitting}</TooltipContent>}
+            </Tooltip>
           </DialogFooter>
           </form>
         </DialogContent>

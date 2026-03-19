@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -36,15 +36,20 @@ import {
   User as UserIcon,
   ChevronDown,
   ChevronUp,
-  LayoutGrid,
+  Send,
+  Eye,
+  EyeOff,
+  RefreshCw,
+  Printer,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import dynamic from 'next/dynamic';
 
 import { tourApi, tourStopApi, apiClient, agencyApi } from '@/lib/api';
-import type { ApiTourDto, ApiTourStopDto, CreateTourStopPayload, UpdateTourPayload, ServiceRequestDto, OrganizationPublicDto, TourClientDto, AgencyClientDto, AgencyStopChoicesDto, AgencyStopServiceSummaryDto, ResourceDto, CategoryDto, LocationDto } from '@/lib/api';
-import { formatDate } from '@/lib/dateUtils';
+import type { ApiTourDto, ApiTourStopDto, CreateTourStopPayload, UpdateTourPayload, ServiceRequestDto, OrganizationPublicDto, TourClientDto, AgencyClientDto, AgencyStopChoicesDto, AgencyStopServiceSummaryDto, CategoryDto, LocationDto, CreateAgencyClientDto } from '@/lib/api';
+import { formatDate, formatShortDateTime } from '@/lib/dateUtils';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 const TourStopsMap = dynamic(
@@ -76,6 +81,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import {
   Select,
   SelectContent,
@@ -83,7 +89,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { LoadingState, EmptyState, ErrorState, TourStatusBadge, ConfirmDialog } from '@/components/shared';
+import {
+  LoadingState, EmptyState, ErrorState, TourStatusBadge, ConfirmDialog,
+  CompactReceipt, DetailedListReceipt, KitchenSummaryReceipt,
+  handleReceiptPrint, exportReceiptExcel,
+} from '@/components/shared';
+import type { ReceiptTemplate } from '@/components/shared';
+import { DialogDescription } from '@/components/ui/dialog';
 
 function resolveImageUrl(url?: string | null): string | null {
   return url || null;
@@ -115,6 +127,36 @@ export default function TourDetailPage() {
   const [orgFilterCategoryId, setOrgFilterCategoryId] = useState<number | null>(null);
   const [choicesStopId, setChoicesStopId] = useState<number | null>(null);
   const [expandedClientId, setExpandedClientId] = useState<number | null>(null);
+  const [isCreateClientOpen, setIsCreateClientOpen] = useState(false);
+  const [createClientForm, setCreateClientForm] = useState({ firstName: '', lastName: '', username: '', password: '' });
+  const [createClientErrors, setCreateClientErrors] = useState<Partial<Record<string, string>>>({});
+  const [showCreateClientPassword, setShowCreateClientPassword] = useState(false);
+  const [refreshingTab, setRefreshingTab] = useState<string | null>(null);
+
+  // Receipt dialog
+  const [receiptOpen, setReceiptOpen] = useState(false);
+  const [receiptTemplate, setReceiptTemplate] = useState<ReceiptTemplate>('compact');
+  const printRef = useRef<HTMLDivElement>(null);
+
+  const refreshTab = (tab: string) => {
+    setRefreshingTab(tab);
+    const keys: (string | number)[][] = [];
+    if (tab === 'info') {
+      keys.push(['agency-tour', tourId, apiLang], ['tour-service-requests', tourId, apiLang]);
+    } else if (tab === 'stops') {
+      keys.push(['tour-stops', tourId, apiLang], ['organizations-public-all', apiLang]);
+    } else if (tab === 'clients') {
+      keys.push(['tour-clients', tourId], ['agency-clients-all']);
+    } else if (tab === 'choices') {
+      keys.push(['tour-stops', tourId, apiLang]);
+      if (choicesStopId) {
+        keys.push(['agency-stop-choices', choicesStopId, apiLang], ['agency-stop-service-summary', choicesStopId, apiLang]);
+      }
+    }
+    Promise.all(keys.map(k => queryClient.invalidateQueries({ queryKey: k }))).finally(() => {
+      setTimeout(() => setRefreshingTab(null), 600);
+    });
+  };
 
   // Edit form state
   const [editForm, setEditForm] = useState({
@@ -178,7 +220,7 @@ export default function TourDetailPage() {
   const { data: serviceRequests } = useQuery({
     queryKey: ['tour-service-requests', tourId, apiLang],
     queryFn: async () => {
-      const response = await apiClient.getServiceRequestsByTour(tourId, 1, 100, apiLang);
+      const response = await apiClient.getServiceRequestsByTour(tourId, 1, 100);
       return response.data;
     },
     enabled: !!tourId,
@@ -238,15 +280,29 @@ export default function TourDetailPage() {
     enabled: !!choicesStopId,
   });
 
-  // Query: Stop layout (organization layout for selected stop)
-  const { data: stopLayout, isLoading: layoutLoading } = useQuery({
-    queryKey: ['stop-layout', choicesStopId, apiLang],
-    queryFn: async () => {
-      const response = await apiClient.getStopLayout(choicesStopId!);
-      return Array.isArray(response) ? response : (response as any).data ?? [];
-    },
-    enabled: !!choicesStopId,
-  });
+  // Note: layout endpoint is client-only (/client/tours/stops/{stopId}/layout), not available for agencies
+
+  // Auto-select first stop in choices tab
+  useEffect(() => {
+    if (stops?.length && !choicesStopId) {
+      setChoicesStopId(stops[0].id);
+    }
+  }, [stops, choicesStopId]);
+
+  // Receipt helpers
+  const selectedStop = stops?.find(s => s.id === choicesStopId);
+  const choicesOrgName = selectedStop?.organization?.name || '';
+  const receiptTourInfo = tour ? { tourName: tour.tourName, startDate: tour.startDate } : { tourName: '', startDate: '' };
+  const choicesArr = stopChoices || [];
+
+  const handlePrint = useCallback(() => {
+    handleReceiptPrint(printRef, receiptTemplate);
+  }, [receiptTemplate]);
+
+  const handleExportExcel = useCallback(() => {
+    if (!choicesArr.length) return;
+    exportReceiptExcel(receiptTourInfo, choicesArr, serviceSummary ?? null, choicesOrgName, t);
+  }, [choicesArr, serviceSummary, choicesOrgName, t, receiptTourInfo]);
 
   // Debounced organization search for stop form
   useEffect(() => {
@@ -334,6 +390,25 @@ export default function TourDetailPage() {
     },
   });
 
+  const createClientMutation = useMutation({
+    mutationFn: (data: CreateAgencyClientDto) => agencyApi.createClient(data),
+    onSuccess: (result) => {
+      if (result.success) {
+        toast.success(t.invitations?.clientCreated || 'Müşteri oluşturuldu');
+        queryClient.invalidateQueries({ queryKey: ['agency-clients'] });
+        setIsCreateClientOpen(false);
+        setCreateClientForm({ firstName: '', lastName: '', username: '', password: '' });
+        setCreateClientErrors({});
+        setShowCreateClientPassword(false);
+      } else {
+        toast.error(result.error || t.invitations?.clientCreateFailed || 'Müşteri oluşturulamadı');
+      }
+    },
+    onError: () => {
+      toast.error(t.invitations?.clientCreateFailed || 'Müşteri oluşturulamadı');
+    },
+  });
+
   const updateTourMutation = useMutation({
     mutationFn: async () => {
       const payload: UpdateTourPayload = {
@@ -405,8 +480,8 @@ export default function TourDetailPage() {
         tourId,
         organizationId: stopForm.organizationId,
         description: stopForm.description || undefined,
-        scheduledStartTime: stopForm.scheduledStartTime,
-        scheduledEndTime: stopForm.scheduledEndTime,
+        scheduledStartTime: stopForm.scheduledStartTime ? new Date(stopForm.scheduledStartTime).toISOString() : '',
+        scheduledEndTime: stopForm.scheduledEndTime ? new Date(stopForm.scheduledEndTime).toISOString() : '',
         showPriceToCustomer: stopForm.showPriceToCustomer,
       };
       const result = await tourStopApi.create(payload, apiLang);
@@ -427,10 +502,9 @@ export default function TourDetailPage() {
     mutationFn: async () => {
       if (!editingStop) return;
       const result = await tourStopApi.update(editingStop.id, {
-        organizationId: stopForm.organizationId,
         description: stopForm.description || undefined,
-        scheduledStartTime: stopForm.scheduledStartTime,
-        scheduledEndTime: stopForm.scheduledEndTime,
+        scheduledStartTime: stopForm.scheduledStartTime ? new Date(stopForm.scheduledStartTime).toISOString() : undefined,
+        scheduledEndTime: stopForm.scheduledEndTime ? new Date(stopForm.scheduledEndTime).toISOString() : undefined,
         showPriceToCustomer: stopForm.showPriceToCustomer,
       }, apiLang);
       if (!result.success) throw new Error(result.error);
@@ -461,6 +535,22 @@ export default function TourDetailPage() {
     },
   });
 
+  const submitChoicesMutation = useMutation({
+    mutationFn: async (stopId: number) => {
+      const result = await tourStopApi.submitChoices(stopId, apiLang);
+      if (!result.success) throw new Error(result.error);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agency-stop-choices'] });
+      queryClient.invalidateQueries({ queryKey: ['agency-stop-service-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['tour-stops', tourId] });
+      toast.success(t.tours.submitChoicesSuccess);
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || t.tours.submitChoicesError);
+    },
+  });
+
   // Handlers
 
   const openEditForm = () => {
@@ -469,8 +559,8 @@ export default function TourDetailPage() {
       tourCode: tour.tourCode,
       tourName: tour.tourName,
       description: tour.description || '',
-      startDate: tour.startDate ? tour.startDate.split('T')[0] : '',
-      endDate: tour.endDate ? tour.endDate.split('T')[0] : '',
+      startDate: tour.startDate ? tour.startDate.slice(0, 16) : '',
+      endDate: tour.endDate ? tour.endDate.slice(0, 16) : '',
       maxParticipants: tour.maxParticipants || 0,
       minParticipants: tour.minParticipants || 0,
     });
@@ -527,7 +617,7 @@ export default function TourDetailPage() {
   };
 
   const openCreateStopFromMap = (org: OrganizationPublicDto) => {
-    if (tour?.status !== 'draft') return;
+    if (tour?.status !== 'draft' && tour?.status !== 'published') return;
     const defaults = getDefaultStopTimes();
     setEditingStop(null);
     setStopForm({
@@ -646,30 +736,50 @@ export default function TourDetailPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {tour.status === 'draft' && (
-              <>
-                <Button variant="outline" size="sm" onClick={openEditForm}>
-                  <Pencil className="h-4 w-4 mr-1" />
-                  {t.common.edit}
-                </Button>
-                <Button size="sm" onClick={() => setStatusAction('publish')}>
-                  <PlayCircle className="h-4 w-4 mr-1" />
-                  {t.tours.publish}
-                </Button>
-              </>
-            )}
-            {tour.status === 'published' && (
-              <>
-                <Button size="sm" variant="outline" onClick={() => setStatusAction('complete')}>
-                  <CheckCircle className="h-4 w-4 mr-1" />
-                  {t.tours.complete}
-                </Button>
-                <Button size="sm" variant="destructive" onClick={() => setStatusAction('cancel')}>
-                  <Ban className="h-4 w-4 mr-1" />
-                  {t.tours.cancel}
-                </Button>
-              </>
-            )}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span tabIndex={0}>
+                  <Button variant="outline" size="sm" onClick={openEditForm} disabled={tour.status !== 'draft' && tour.status !== 'published'}>
+                    <Pencil className="h-4 w-4 mr-1" />
+                    {t.common.edit}
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              {tour.status !== 'draft' && tour.status !== 'published' && <TooltipContent>{t.tooltips.tourNotDraftOrPublished}</TooltipContent>}
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span tabIndex={0}>
+                  <Button size="sm" onClick={() => setStatusAction('publish')} disabled={tour.status !== 'draft'}>
+                    <PlayCircle className="h-4 w-4 mr-1" />
+                    {t.tours.publish}
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              {tour.status !== 'draft' && <TooltipContent>{t.tooltips.tourNotDraft}</TooltipContent>}
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span tabIndex={0}>
+                  <Button size="sm" variant="outline" onClick={() => setStatusAction('complete')} disabled={tour.status !== 'published'}>
+                    <CheckCircle className="h-4 w-4 mr-1" />
+                    {t.tours.complete}
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              {tour.status !== 'published' && <TooltipContent>{t.tooltips.tourNotPublished}</TooltipContent>}
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span tabIndex={0}>
+                  <Button size="sm" variant="destructive" onClick={() => setStatusAction('cancel')} disabled={tour.status !== 'published'}>
+                    <Ban className="h-4 w-4 mr-1" />
+                    {t.tours.cancel}
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              {tour.status !== 'published' && <TooltipContent>{t.tooltips.tourNotPublished}</TooltipContent>}
+            </Tooltip>
           </div>
         </div>
 
@@ -684,6 +794,12 @@ export default function TourDetailPage() {
 
           {/* Info Tab */}
           <TabsContent value="info" className="space-y-4">
+            <div className="flex justify-end">
+              <Button variant="outline" size="sm" onClick={() => refreshTab('info')} disabled={refreshingTab === 'info'}>
+                <RefreshCw className={`h-4 w-4 mr-1 ${refreshingTab === 'info' ? 'animate-spin' : ''}`} />
+                Yenile
+              </Button>
+            </div>
             <div className="grid gap-6 lg:grid-cols-2">
               {/* Tour Details */}
               <Card>
@@ -775,15 +891,21 @@ export default function TourDetailPage() {
                                   className="w-full h-full object-cover"
                                 />
                               </div>
-                              {tour.status === 'draft' && (
-                                <button
-                                  type="button"
-                                  onClick={() => setDeletePhotoId(img.id)}
-                                  className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                                >
-                                  <X className="h-3 w-3" />
-                                </button>
-                              )}
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span tabIndex={0} className="absolute top-1 right-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => setDeletePhotoId(img.id)}
+                                      disabled={tour.status !== 'draft' && tour.status !== 'published'}
+                                      className="bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </button>
+                                  </span>
+                                </TooltipTrigger>
+                                {tour.status !== 'draft' && tour.status !== 'published' && <TooltipContent>{t.tooltips.tourNotDraftOrPublished}</TooltipContent>}
+                              </Tooltip>
                             </div>
                           );
                         })}
@@ -871,6 +993,12 @@ export default function TourDetailPage() {
 
           {/* Stops Tab */}
           <TabsContent value="stops" className="space-y-4">
+            <div className="flex justify-end">
+              <Button variant="outline" size="sm" onClick={() => refreshTab('stops')} disabled={refreshingTab === 'stops'}>
+                <RefreshCw className={`h-4 w-4 mr-1 ${refreshingTab === 'stops' ? 'animate-spin' : ''}`} />
+                Yenile
+              </Button>
+            </div>
             <div className="grid gap-6 lg:grid-cols-5">
               {/* Left: Map (3/5) */}
               <div className="lg:col-span-3">
@@ -881,7 +1009,7 @@ export default function TourDetailPage() {
                       {t.tours.stops} - {t.tours.mapView}
                     </CardTitle>
                     <CardDescription>
-                      {tour.status === 'draft'
+                      {(tour.status === 'draft' || tour.status === 'published')
                         ? (t.tours.clickOrgToAddStop || 'Click a gray marker on the map to add it as a stop')
                         : `${stops?.length || 0} ${t.tours.stops.toLowerCase()}`}
                     </CardDescription>
@@ -891,7 +1019,7 @@ export default function TourDetailPage() {
                       stops={stops || []}
                       organizations={allOrganizations || []}
                       highlightedStopId={highlightedStopId}
-                      onOrganizationClick={tour.status === 'draft' ? openCreateStopFromMap : undefined}
+                      onOrganizationClick={(tour.status === 'draft' || tour.status === 'published') ? openCreateStopFromMap : undefined}
                       onStopClick={(stop) => setHighlightedStopId(stop.id)}
                       height="450px"
                     />
@@ -924,12 +1052,17 @@ export default function TourDetailPage() {
                         {stops?.length || 0} {t.tours.stops.toLowerCase()}
                       </CardDescription>
                     </div>
-                    {tour.status === 'draft' && (
-                      <Button size="sm" onClick={openCreateStopForm}>
-                        <Plus className="h-4 w-4 mr-1" />
-                        {t.tours.addStop}
-                      </Button>
-                    )}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span tabIndex={0}>
+                          <Button size="sm" onClick={openCreateStopForm} className="h-auto py-1.5 text-center leading-tight" disabled={tour.status !== 'draft' && tour.status !== 'published'}>
+                            <Plus className="h-4 w-4 mr-1 flex-shrink-0" />
+                            <span className="text-xs">{t.tours.addStop}</span>
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      {tour.status !== 'draft' && tour.status !== 'published' && <TooltipContent>{t.tooltips.tourNotDraftOrPublished}</TooltipContent>}
+                    </Tooltip>
                   </CardHeader>
                   <CardContent>
                     {stopsLoading ? (
@@ -939,8 +1072,8 @@ export default function TourDetailPage() {
                         icon={Store}
                         title={t.tours.noStops}
                         description={t.tours.noStops}
-                        actionLabel={tour.status === 'draft' ? t.tours.addStop : undefined}
-                        onAction={tour.status === 'draft' ? openCreateStopForm : undefined}
+                        actionLabel={(tour.status === 'draft' || tour.status === 'published') ? t.tours.addStop : undefined}
+                        onAction={(tour.status === 'draft' || tour.status === 'published') ? openCreateStopForm : undefined}
                       />
                     ) : (
                       <div className="space-y-2 max-h-[450px] overflow-y-auto">
@@ -985,9 +1118,9 @@ export default function TourDetailPage() {
                               <div className="flex items-center gap-2 text-xs text-slate-500">
                                 <Clock className="h-3 w-3 flex-shrink-0" />
                                 <span>
-                                  {stop.scheduledStartTime ? new Date(stop.scheduledStartTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
+                                  {stop.scheduledStartTime ? formatShortDateTime(stop.scheduledStartTime) : '-'}
                                   {' - '}
-                                  {stop.scheduledEndTime ? new Date(stop.scheduledEndTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
+                                  {stop.scheduledEndTime ? formatShortDateTime(stop.scheduledEndTime) : '-'}
                                 </span>
                               </div>
                               {(() => {
@@ -1007,26 +1140,40 @@ export default function TourDetailPage() {
                                 );
                               })()}
                             </div>
-                            {tour.status === 'draft' && (
-                              <div className="flex items-center gap-0.5 flex-shrink-0">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7"
-                                  onClick={(e) => { e.stopPropagation(); openEditStopForm(stop); }}
-                                >
-                                  <Pencil className="h-3.5 w-3.5" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7"
-                                  onClick={(e) => { e.stopPropagation(); setDeleteStopTarget(stop); }}
-                                >
-                                  <Trash2 className="h-3.5 w-3.5 text-red-500" />
-                                </Button>
-                              </div>
-                            )}
+                            <div className="flex items-center gap-0.5 flex-shrink-0">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span tabIndex={0}>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7"
+                                      disabled={tour.status !== 'draft' && tour.status !== 'published'}
+                                      onClick={(e) => { e.stopPropagation(); openEditStopForm(stop); }}
+                                    >
+                                      <Pencil className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </span>
+                                </TooltipTrigger>
+                                {tour.status !== 'draft' && tour.status !== 'published' && <TooltipContent>{t.tooltips.tourNotDraftOrPublished}</TooltipContent>}
+                              </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span tabIndex={0}>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7"
+                                      disabled={tour.status !== 'draft' && tour.status !== 'published'}
+                                      onClick={(e) => { e.stopPropagation(); setDeleteStopTarget(stop); }}
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                                    </Button>
+                                  </span>
+                                </TooltipTrigger>
+                                {tour.status !== 'draft' && tour.status !== 'published' && <TooltipContent>{t.tooltips.tourNotDraftOrPublished}</TooltipContent>}
+                              </Tooltip>
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -1042,10 +1189,16 @@ export default function TourDetailPage() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-lg">{t.tours.clients}</CardTitle>
-                <Button size="sm" onClick={() => setIsAddParticipantOpen(true)}>
-                  <UserPlus className="h-4 w-4 mr-1" />
-                  {t.tours.addParticipant}
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => refreshTab('clients')} disabled={refreshingTab === 'clients'}>
+                    <RefreshCw className={`h-4 w-4 mr-1 ${refreshingTab === 'clients' ? 'animate-spin' : ''}`} />
+                    Yenile
+                  </Button>
+                  <Button size="sm" onClick={() => setIsAddParticipantOpen(true)}>
+                    <UserPlus className="h-4 w-4 mr-1" />
+                    {t.tours.addParticipant}
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 {!tourClients?.length ? (
@@ -1158,6 +1311,12 @@ export default function TourDetailPage() {
 
           {/* Choices Tab */}
           <TabsContent value="choices" className="space-y-4">
+            <div className="flex justify-end">
+              <Button variant="outline" size="sm" onClick={() => refreshTab('choices')} disabled={refreshingTab === 'choices'}>
+                <RefreshCw className={`h-4 w-4 mr-1 ${refreshingTab === 'choices' ? 'animate-spin' : ''}`} />
+                Yenile
+              </Button>
+            </div>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               {/* Stop selector */}
               <Card>
@@ -1208,9 +1367,9 @@ export default function TourDetailPage() {
                               })()}
                             </div>
                             <p className="text-xs text-slate-500">
-                              {stop.scheduledStartTime ? new Date(stop.scheduledStartTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                              {stop.scheduledStartTime ? formatShortDateTime(stop.scheduledStartTime) : ''}
                               {stop.scheduledStartTime && stop.scheduledEndTime ? ' - ' : ''}
-                              {stop.scheduledEndTime ? new Date(stop.scheduledEndTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                              {stop.scheduledEndTime ? formatShortDateTime(stop.scheduledEndTime) : ''}
                             </p>
                             {(() => {
                               const statusConfig: Record<string, { color: string; label: string }> = {
@@ -1226,6 +1385,23 @@ export default function TourDetailPage() {
                                 <p className={`text-xs ${cfg.color}`}>
                                   Ön Rezervasyon: {cfg.label}
                                 </p>
+                              );
+                            })()}
+                            {(() => {
+                              const choicesConfig: Record<string, { variant: 'default' | 'secondary' | 'outline' | 'destructive'; label: string }> = {
+                                in_progress: { variant: 'outline', label: t.tours.choicesStatusInProgress },
+                                submitted: { variant: 'secondary', label: t.tours.choicesStatusSubmitted },
+                                approved: { variant: 'default', label: t.tours.choicesStatusApproved },
+                                rejected: { variant: 'destructive', label: t.tours.choicesStatusRejected },
+                                revision_requested: { variant: 'outline', label: t.tours.choicesStatusRevisionRequested },
+                              };
+                              const cs = stop.choicesStatus;
+                              if (!cs) return null;
+                              const cfg = choicesConfig[cs] || { variant: 'outline' as const, label: cs };
+                              return (
+                                <Badge variant={cfg.variant} className="text-[10px] px-1.5 py-0">
+                                  {cfg.label}
+                                </Badge>
                               );
                             })()}
                           </div>
@@ -1275,20 +1451,57 @@ export default function TourDetailPage() {
                                 </tr>
                               </thead>
                               <tbody>
-                                {serviceSummary.services.map((item) => (
-                                  <tr key={item.serviceId} className="border-b last:border-b-0">
-                                    <td className="py-2">{item.serviceName}</td>
-                                    <td className="py-2 text-center">{item.totalQuantity}</td>
-                                    <td className="py-2 text-right">{Number(item.unitPrice).toFixed(2)} ₺</td>
-                                    <td className="py-2 text-right font-medium">{Number(item.totalPrice).toFixed(2)} ₺</td>
-                                  </tr>
-                                ))}
+                                {serviceSummary.services.map((item, idx) => {
+                                  const svcId = Number(item.serviceId || item.service?.id || 0);
+                                  const notes: { name: string; note: string }[] = [];
+                                  for (const ch of choicesArr) {
+                                    const cName = [ch.client?.firstName, ch.client?.lastName].filter(Boolean).join(' ') || ch.clientName || `#${ch.clientId}`;
+                                    for (const sc of ch.serviceChoices || []) {
+                                      if (Number(sc.serviceId) === svcId && sc.note) {
+                                        notes.push({ name: cName, note: sc.note });
+                                      }
+                                    }
+                                  }
+                                  return (
+                                    <React.Fragment key={svcId || idx}>
+                                      <tr className={notes.length ? '' : 'border-b last:border-b-0'}>
+                                        <td className="py-2">{item.serviceName || item.service?.title}</td>
+                                        <td className="py-2 text-center">{item.totalQuantity}</td>
+                                        <td className="py-2 text-right">{Number(item.unitPrice).toFixed(2)} ₺</td>
+                                        <td className="py-2 text-right font-medium">{Number(item.totalPrice).toFixed(2)} ₺</td>
+                                      </tr>
+                                      {notes.length > 0 && (
+                                        <tr className="border-b last:border-b-0">
+                                          <td colSpan={4} className="pb-2 pl-4">
+                                            {notes.map((n, ni) => (
+                                              <span key={ni} className="inline-block text-xs italic bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded mr-1 mb-0.5">
+                                                {n.name}: {n.note}
+                                              </span>
+                                            ))}
+                                          </td>
+                                        </tr>
+                                      )}
+                                    </React.Fragment>
+                                  );
+                                })}
                               </tbody>
                               <tfoot>
                                 <tr className="border-t-2">
                                   <td colSpan={3} className="py-2 font-semibold text-right">{t.tours.grandTotal}</td>
                                   <td className="py-2 text-right font-bold text-lg">{Number(serviceSummary.grandTotal).toFixed(2)} ₺</td>
                                 </tr>
+                                {serviceSummary.commissionRate != null && (
+                                  <tr>
+                                    <td colSpan={3} className="py-1 text-right text-sm text-slate-500">{t.tours.commissionRate}</td>
+                                    <td className="py-1 text-right text-sm text-slate-500">%{serviceSummary.commissionRate}</td>
+                                  </tr>
+                                )}
+                                {serviceSummary.commissionAmount != null && (
+                                  <tr>
+                                    <td colSpan={3} className="py-1 text-right text-sm font-medium text-orange-600">{t.tours.commissionAmount}</td>
+                                    <td className="py-1 text-right font-semibold text-orange-600">{Number(serviceSummary.commissionAmount).toFixed(2)} ₺</td>
+                                  </tr>
+                                )}
                               </tfoot>
                             </table>
                           </div>
@@ -1296,130 +1509,6 @@ export default function TourDetailPage() {
                       </CardContent>
                     </Card>
 
-                    {/* Stop Layout */}
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-lg flex items-center gap-2">
-                          <LayoutGrid className="h-5 w-5" />
-                          {t.tours.stopLayout}
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        {layoutLoading ? (
-                          <LoadingState message={t.common.loading} />
-                        ) : !stopLayout?.length ? (
-                          <p className="text-sm text-slate-500 text-center py-4">{t.tours.noLayout}</p>
-                        ) : (
-                          <div className="space-y-3">
-                            {stopLayout.map((floor: ResourceDto) => (
-                              <div key={floor.id} className="border rounded-lg overflow-hidden">
-                                <div className="bg-slate-100 px-3 py-2 font-medium text-sm flex items-center gap-2">
-                                  <span>{floor.name}</span>
-                                  {floor.capacity > 0 && (
-                                    <Badge variant="outline" className="text-xs">{floor.capacity} {t.tours.capacity || 'kişi'}</Badge>
-                                  )}
-                                </div>
-                                {floor.children && floor.children.length > 0 && (
-                                  <div className="p-2">
-                                    {floor.children.map((room: ResourceDto) => (
-                                      <div key={room.id} className="mb-2 last:mb-0">
-                                        {/* Show room name if it has children (tables) */}
-                                        {room.children && room.children.length > 0 ? (
-                                          <>
-                                            <p className="text-xs font-medium text-slate-500 px-1 mb-1">{room.name}</p>
-                                            <div className="flex flex-wrap gap-1.5">
-                                              {room.children.map((table: ResourceDto) => {
-                                                const occupant = stopChoices?.find(
-                                                  (c: AgencyStopChoicesDto) => {
-                                                    const rc = c.resourceChoice;
-                                                    if (!rc) return false;
-                                                    if (Array.isArray(rc)) {
-                                                      const rcTable = rc.find((item) => item.resourceTypeCode === 'table');
-                                                      return rcTable?.resourceName === table.name;
-                                                    }
-                                                    return rc.resourceId === table.id;
-                                                  }
-                                                );
-                                                const occupantName = occupant?.client
-                                                  ? `${occupant.client.firstName || ''} ${occupant.client.lastName || ''}`.trim()
-                                                  : occupant?.clientName;
-                                                return (
-                                                  <div
-                                                    key={table.id}
-                                                    className={`px-2.5 py-1.5 rounded-md text-xs border ${
-                                                      occupant
-                                                        ? 'bg-blue-50 border-blue-300 text-blue-700'
-                                                        : 'bg-white border-slate-200 text-slate-600'
-                                                    }`}
-                                                    title={occupantName ? `${table.name} - ${occupantName}` : table.name}
-                                                  >
-                                                    <span className="font-medium">{table.name}</span>
-                                                    {table.capacity > 0 && <span className="text-slate-400 ml-1">({table.capacity})</span>}
-                                                    {occupantName && (
-                                                      <span className="ml-1 text-blue-600">{occupantName}</span>
-                                                    )}
-                                                  </div>
-                                                );
-                                              })}
-                                            </div>
-                                          </>
-                                        ) : (
-                                          /* Room itself is a leaf (table-like) */
-                                          <div className="flex flex-wrap gap-1.5">
-                                            {(() => {
-                                              const occupant = stopChoices?.find(
-                                                (c: AgencyStopChoicesDto) => {
-                                                  const rc = c.resourceChoice;
-                                                  if (!rc) return false;
-                                                  if (Array.isArray(rc)) {
-                                                    const rcRoom = rc.find((item) => item.resourceTypeCode === 'room');
-                                                    return rcRoom?.resourceName === room.name;
-                                                  }
-                                                  return rc.resourceId === room.id;
-                                                }
-                                              );
-                                              const occupantName = occupant?.client
-                                                ? `${occupant.client.firstName || ''} ${occupant.client.lastName || ''}`.trim()
-                                                : occupant?.clientName;
-                                              return (
-                                                <div
-                                                  className={`px-2.5 py-1.5 rounded-md text-xs border ${
-                                                    occupant
-                                                      ? 'bg-blue-50 border-blue-300 text-blue-700'
-                                                      : 'bg-white border-slate-200 text-slate-600'
-                                                  }`}
-                                                >
-                                                  <span className="font-medium">{room.name}</span>
-                                                  {room.capacity > 0 && <span className="text-slate-400 ml-1">({room.capacity})</span>}
-                                                  {occupantName && (
-                                                    <span className="ml-1 text-blue-600">{occupantName}</span>
-                                                  )}
-                                                </div>
-                                              );
-                                            })()}
-                                          </div>
-                                        )}
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                            {/* Legend */}
-                            <div className="flex items-center gap-4 text-xs text-slate-500 pt-1">
-                              <div className="flex items-center gap-1.5">
-                                <div className="w-3 h-3 rounded border border-slate-200 bg-white" />
-                                <span>{t.tours.available}</span>
-                              </div>
-                              <div className="flex items-center gap-1.5">
-                                <div className="w-3 h-3 rounded border border-blue-300 bg-blue-50" />
-                                <span>{t.tours.occupied}</span>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
 
                     {/* Customer Choices Detail */}
                     <Card>
@@ -1436,14 +1525,14 @@ export default function TourDetailPage() {
                           <p className="text-sm text-slate-500 text-center py-4">{t.tours.noChoices}</p>
                         ) : (
                           <div className="space-y-2">
-                            {stopChoices.map((choice: AgencyStopChoicesDto) => {
+                            {stopChoices.map((choice: AgencyStopChoicesDto, choiceIdx: number) => {
                               const clientName = choice.client
                                 ? `${choice.client.firstName || ''} ${choice.client.lastName || ''}`.trim()
                                 : choice.clientName || `#${choice.clientId}`;
                               const isExpanded = expandedClientId === choice.clientId;
 
                               return (
-                                <div key={choice.clientId} className="border rounded-lg overflow-hidden">
+                                <div key={`${choice.clientId}-${choiceIdx}`} className="border rounded-lg overflow-hidden">
                                   <button
                                     type="button"
                                     className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 transition-colors"
@@ -1522,6 +1611,68 @@ export default function TourDetailPage() {
                         )}
                       </CardContent>
                     </Card>
+
+                    {/* Submit Choices to Business */}
+                    {(() => {
+                      const currentStop = stops?.find(s => s.id === choicesStopId);
+                      const cs = currentStop?.choicesStatus;
+                      const preResApproved = currentStop?.preReservationStatus === 'approved';
+                      const canSubmit = preResApproved && (!cs || cs === 'in_progress' || cs === 'revision_requested');
+
+                      const choicesConfig: Record<string, { variant: 'default' | 'secondary' | 'outline' | 'destructive'; label: string }> = {
+                        submitted: { variant: 'secondary', label: t.tours.choicesStatusSubmitted },
+                        approved: { variant: 'default', label: t.tours.choicesStatusApproved },
+                        rejected: { variant: 'destructive', label: t.tours.choicesStatusRejected },
+                        revision_requested: { variant: 'outline', label: t.tours.choicesStatusRevisionRequested },
+                        in_progress: { variant: 'outline', label: t.tours.choicesStatusInProgress },
+                      };
+
+                      return (
+                        <div className="flex items-center justify-between">
+                          {cs && choicesConfig[cs] && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-slate-500">{t.tours.choicesStatus}:</span>
+                              <Badge variant={choicesConfig[cs].variant}>
+                                {choicesConfig[cs].label}
+                              </Badge>
+                            </div>
+                          )}
+                          {!cs && <div />}
+                          <div className="flex items-center gap-2">
+                            {choicesArr.length > 0 && (
+                              <Button variant="outline" onClick={() => setReceiptOpen(true)} className="gap-2">
+                                <Printer className="h-4 w-4" />
+                                {t.guests.printReceipt}
+                              </Button>
+                            )}
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span tabIndex={0}>
+                                  <Button
+                                    onClick={() => {
+                                      if (choicesStopId && confirm(t.tours.submitChoicesConfirm)) {
+                                        submitChoicesMutation.mutate(choicesStopId);
+                                      }
+                                    }}
+                                    disabled={!canSubmit || submitChoicesMutation.isPending}
+                                    className="gap-2"
+                                  >
+                                    {submitChoicesMutation.isPending ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <Send className="h-4 w-4" />
+                                    )}
+                                    {t.tours.submitChoicesToBusiness}
+                                  </Button>
+                                </span>
+                              </TooltipTrigger>
+                              {!canSubmit && <TooltipContent>{t.tooltips.tourNotPublished}</TooltipContent>}
+                              {canSubmit && submitChoicesMutation.isPending && <TooltipContent>{t.tooltips.formSubmitting}</TooltipContent>}
+                            </Tooltip>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </>
                 )}
               </div>
@@ -1529,6 +1680,70 @@ export default function TourDetailPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Receipt Dialog */}
+      <Dialog open={receiptOpen} onOpenChange={setReceiptOpen}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{t.guests.printReceipt}</DialogTitle>
+            <DialogDescription>{t.guests.receiptTemplate}</DialogDescription>
+          </DialogHeader>
+
+          {/* Template selector */}
+          <div className="flex gap-2 mb-4">
+            {([
+              { key: 'compact' as ReceiptTemplate, label: t.guests.compactReceipt, desc: t.guests.compactReceiptDesc },
+              { key: 'detailed' as ReceiptTemplate, label: t.guests.detailedList, desc: t.guests.detailedListDesc },
+              { key: 'kitchen' as ReceiptTemplate, label: t.guests.kitchenSummary, desc: t.guests.kitchenSummaryDesc },
+            ]).map((tmpl) => (
+              <button
+                key={tmpl.key}
+                type="button"
+                onClick={() => setReceiptTemplate(tmpl.key)}
+                className={`flex-1 p-3 rounded-lg border text-left transition-colors ${
+                  receiptTemplate === tmpl.key
+                    ? 'bg-slate-100 border-slate-400 ring-1 ring-slate-400'
+                    : 'bg-white border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <p className="text-sm font-medium">{tmpl.label}</p>
+                <p className="text-xs text-slate-500 mt-0.5">{tmpl.desc}</p>
+              </button>
+            ))}
+          </div>
+
+          {/* Receipt preview */}
+          <div className="border rounded-lg p-4 bg-white overflow-auto max-h-[50vh]" ref={printRef}>
+            {choicesArr.length > 0 && (
+              <>
+                {receiptTemplate === 'compact' && (
+                  <CompactReceipt tourInfo={receiptTourInfo} choices={choicesArr} orgName={choicesOrgName} t={t} />
+                )}
+                {receiptTemplate === 'detailed' && (
+                  <DetailedListReceipt tourInfo={receiptTourInfo} choices={choicesArr} orgName={choicesOrgName} t={t} />
+                )}
+                {receiptTemplate === 'kitchen' && (
+                  <KitchenSummaryReceipt tourInfo={receiptTourInfo} choices={choicesArr} orgName={choicesOrgName} t={t} />
+                )}
+              </>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReceiptOpen(false)}>
+              {t.common.cancel}
+            </Button>
+            <Button variant="outline" onClick={handleExportExcel}>
+              <FileSpreadsheet className="h-4 w-4 mr-2" />
+              {t.guests.exportExcel}
+            </Button>
+            <Button onClick={handlePrint}>
+              <Printer className="h-4 w-4 mr-2" />
+              {t.guests.print}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Tour Dialog */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
@@ -1559,7 +1774,7 @@ export default function TourDetailPage() {
                 <div className="space-y-2">
                   <Label>{t.tours.startDate}</Label>
                   <Input
-                    type="date"
+                    type="datetime-local"
                     value={editForm.startDate}
                     onChange={(e) => setEditForm((prev) => ({ ...prev, startDate: e.target.value }))}
                   />
@@ -1567,7 +1782,7 @@ export default function TourDetailPage() {
                 <div className="space-y-2">
                   <Label>{t.tours.endDate}</Label>
                   <Input
-                    type="date"
+                    type="datetime-local"
                     value={editForm.endDate}
                     onChange={(e) => setEditForm((prev) => ({ ...prev, endDate: e.target.value }))}
                   />
@@ -1674,10 +1889,17 @@ export default function TourDetailPage() {
               <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>
                 {t.common.cancel}
               </Button>
-              <Button type="submit" disabled={updateTourMutation.isPending}>
-                <Save className="h-4 w-4 mr-1" />
-                {updateTourMutation.isPending ? t.common.loading : t.common.save}
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span tabIndex={0}>
+                    <Button type="submit" disabled={updateTourMutation.isPending}>
+                      <Save className="h-4 w-4 mr-1" />
+                      {updateTourMutation.isPending ? t.common.loading : t.common.save}
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {updateTourMutation.isPending && <TooltipContent>{t.tooltips.formSubmitting}</TooltipContent>}
+              </Tooltip>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -1905,6 +2127,7 @@ export default function TourDetailPage() {
                 <Textarea
                   value={stopForm.description}
                   onChange={(e) => setStopForm((prev) => ({ ...prev, description: e.target.value }))}
+                  placeholder="Müşterilerinizin göreceği durak açıklaması"
                   rows={2}
                 />
               </div>
@@ -1921,11 +2144,18 @@ export default function TourDetailPage() {
               <Button type="button" variant="outline" onClick={closeStopForm}>
                 {t.common.cancel}
               </Button>
-              <Button type="submit" disabled={createStopMutation.isPending || updateStopMutation.isPending}>
-                {(createStopMutation.isPending || updateStopMutation.isPending)
-                  ? t.common.loading
-                  : editingStop ? t.common.update : t.common.create}
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span tabIndex={0}>
+                    <Button type="submit" disabled={createStopMutation.isPending || updateStopMutation.isPending}>
+                      {(createStopMutation.isPending || updateStopMutation.isPending)
+                        ? t.common.loading
+                        : editingStop ? t.common.update : t.common.create}
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {(createStopMutation.isPending || updateStopMutation.isPending) && <TooltipContent>{t.tooltips.formSubmitting}</TooltipContent>}
+              </Tooltip>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -1986,15 +2216,26 @@ export default function TourDetailPage() {
           </DialogHeader>
 
           <div className="space-y-3 flex-1 overflow-hidden flex flex-col">
-            {/* Search */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <Input
-                placeholder={t.tours.searchClient}
-                value={addParticipantSearch}
-                onChange={(e) => setAddParticipantSearch(e.target.value)}
-                className="pl-9"
-              />
+            {/* Search + New Client Button */}
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Input
+                  placeholder={t.tours.searchClient}
+                  value={addParticipantSearch}
+                  onChange={(e) => setAddParticipantSearch(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setIsCreateClientOpen(true)}
+                className="shrink-0"
+              >
+                <UserPlus className="h-4 w-4 mr-1" />
+                Yeni Müşteri
+              </Button>
             </div>
 
             {/* Notes */}
@@ -2063,6 +2304,125 @@ export default function TourDetailPage() {
               )}
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Client Dialog */}
+      <Dialog open={isCreateClientOpen} onOpenChange={(open) => {
+        setIsCreateClientOpen(open);
+        if (!open) {
+          setCreateClientForm({ firstName: '', lastName: '', username: '', password: '' });
+          setCreateClientErrors({});
+          setShowCreateClientPassword(false);
+        }
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserIcon className="h-5 w-5 text-blue-600" />
+              Yeni Müşteri Ekle
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            const newErrors: Partial<Record<string, string>> = {};
+            if (!createClientForm.firstName.trim()) newErrors.firstName = t.invitations?.firstNameRequired || 'Ad gerekli';
+            if (!createClientForm.lastName.trim()) newErrors.lastName = t.invitations?.lastNameRequired || 'Soyad gerekli';
+            if (!createClientForm.username.trim()) {
+              newErrors.username = t.invitations?.usernameRequired || 'Kullanıcı adı gerekli';
+            } else if (createClientForm.username.length < 3) {
+              newErrors.username = t.invitations?.usernameMinLength || 'En az 3 karakter';
+            }
+            if (!createClientForm.password.trim()) {
+              newErrors.password = t.invitations?.passwordRequired || 'Şifre gerekli';
+            } else if (createClientForm.password.length < 6) {
+              newErrors.password = t.invitations?.passwordMinLength || 'En az 6 karakter';
+            }
+            setCreateClientErrors(newErrors);
+            if (Object.keys(newErrors).length === 0) {
+              createClientMutation.mutate({
+                firstName: createClientForm.firstName.trim(),
+                lastName: createClientForm.lastName.trim(),
+                username: createClientForm.username.trim(),
+                password: createClientForm.password,
+              });
+            }
+          }} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="cc-firstName">Ad *</Label>
+                <Input
+                  id="cc-firstName"
+                  value={createClientForm.firstName}
+                  onChange={(e) => setCreateClientForm(prev => ({ ...prev, firstName: e.target.value }))}
+                  placeholder="Ahmet"
+                  className={createClientErrors.firstName ? 'border-red-500' : ''}
+                />
+                {createClientErrors.firstName && <p className="text-xs text-red-500">{createClientErrors.firstName}</p>}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cc-lastName">Soyad *</Label>
+                <Input
+                  id="cc-lastName"
+                  value={createClientForm.lastName}
+                  onChange={(e) => setCreateClientForm(prev => ({ ...prev, lastName: e.target.value }))}
+                  placeholder="Yılmaz"
+                  className={createClientErrors.lastName ? 'border-red-500' : ''}
+                />
+                {createClientErrors.lastName && <p className="text-xs text-red-500">{createClientErrors.lastName}</p>}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cc-username">Kullanıcı Adı *</Label>
+              <Input
+                id="cc-username"
+                value={createClientForm.username}
+                onChange={(e) => setCreateClientForm(prev => ({ ...prev, username: e.target.value }))}
+                placeholder="ahmet_yilmaz"
+                className={createClientErrors.username ? 'border-red-500' : ''}
+              />
+              {createClientErrors.username && <p className="text-xs text-red-500">{createClientErrors.username}</p>}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cc-password">Şifre *</Label>
+              <div className="relative">
+                <Input
+                  id="cc-password"
+                  type={showCreateClientPassword ? 'text' : 'password'}
+                  value={createClientForm.password}
+                  onChange={(e) => setCreateClientForm(prev => ({ ...prev, password: e.target.value }))}
+                  placeholder="En az 6 karakter"
+                  className={`pr-10 ${createClientErrors.password ? 'border-red-500' : ''}`}
+                />
+                <button
+                  type="button"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  onClick={() => setShowCreateClientPassword(!showCreateClientPassword)}
+                >
+                  {showCreateClientPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              {createClientErrors.password && <p className="text-xs text-red-500">{createClientErrors.password}</p>}
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsCreateClientOpen(false)}>
+                İptal
+              </Button>
+              <Button type="submit" disabled={createClientMutation.isPending}>
+                {createClientMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Oluşturuluyor...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Oluştur
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

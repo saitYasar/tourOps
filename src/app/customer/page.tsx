@@ -1,7 +1,7 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
-import { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState, useEffect, useRef } from 'react';
 import {
   Calendar,
   MapPin,
@@ -20,33 +20,81 @@ import {
   XCircle,
   AlertCircle,
   FileText,
+  Bell,
+  X,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 import {
   apiClient,
+  getAuthStorageKeys,
   type ClientProfileDto,
   type ClientReservationDto,
   type ClientParticipantTourDto,
   type ClientStopChoicesDto,
   type ClientServiceChoiceDto,
   type ClientTourStopDto,
+  type PanelNotificationDto,
 } from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { LanguageSwitcher } from '@/components/shared';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { LoadingState, ErrorState } from '@/components/shared';
+import { toast } from 'sonner';
 
-const AUTH_TOKEN_KEY = 'tourops_access_token';
-const AUTH_USER_DATA_KEY = 'tourops_user_data';
+const customerKeys = getAuthStorageKeys('customer');
 
 export default function CustomerDashboard() {
   const { t, locale } = useLanguage();
   const apiLang = (locale === 'de' ? 'en' : locale) as 'tr' | 'en';
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'dashboard' | 'reservations' | 'serviceRequests' | 'profile'>('dashboard');
+  const queryClient = useQueryClient();
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [selectedNotif, setSelectedNotif] = useState<PanelNotificationDto | null>(null);
+  const [toursPage, setToursPage] = useState(1);
+  const [reservationsPage, setReservationsPage] = useState(1);
+  const PAGE_SIZE = 10;
+  const notifRef = useRef<HTMLDivElement>(null);
+
+  // Notification - unread count
+  const { data: unreadData } = useQuery({
+    queryKey: ['client-unread-count'],
+    queryFn: () => apiClient.getClientUnreadCount(),
+    refetchInterval: 30000,
+  });
+
+  // Notification - list (only when dropdown open)
+  const { data: notifListData } = useQuery({
+    queryKey: ['client-notifications'],
+    queryFn: () => apiClient.getClientNotifications(1, 10),
+    enabled: notifOpen,
+  });
+
+  const markReadMutation = useMutation({
+    mutationFn: (id: number) => apiClient.markClientNotificationRead(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['client-unread-count'] });
+      queryClient.invalidateQueries({ queryKey: ['client-notifications'] });
+    },
+  });
+
+  const clientUnreadCount = (unreadData as { unreadCount?: number })?.unreadCount || 0;
+  const clientNotifications: PanelNotificationDto[] =
+    (notifListData as { data?: PanelNotificationDto[] })?.data || [];
+
+  // Close notification dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setNotifOpen(false);
+      }
+    };
+    if (notifOpen) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [notifOpen]);
 
   // Client Profile
   const { data: profile, isLoading: profileLoading, error: profileError, refetch: refetchProfile } = useQuery({
@@ -56,21 +104,23 @@ export default function CustomerDashboard() {
 
   // Reservations
   const { data: reservationsData, isLoading: reservationsLoading } = useQuery({
-    queryKey: ['client-reservations', profile?.id, apiLang],
-    queryFn: () => apiClient.getClientReservations(String(profile!.id), 1, 50, apiLang),
+    queryKey: ['client-reservations', profile?.id, apiLang, reservationsPage],
+    queryFn: () => apiClient.getClientReservations(String(profile!.id), reservationsPage, PAGE_SIZE),
     enabled: !!profile?.id,
   });
 
   // Tours - new client API
   const { data: toursData, isLoading: toursLoading } = useQuery({
-    queryKey: ['client-my-tours', apiLang],
-    queryFn: () => apiClient.getMyTours(1, 50, apiLang),
+    queryKey: ['client-my-tours', apiLang, toursPage],
+    queryFn: () => apiClient.getMyTours(toursPage, PAGE_SIZE, apiLang),
     enabled: !!profile,
   });
 
   // Derive tours early so hooks can depend on it
-  const tours: ClientParticipantTourDto[] = (toursData as unknown as { data?: ClientParticipantTourDto[] })?.data ??
-                (Array.isArray(toursData) ? toursData : []);
+  const toursResponse = toursData as unknown as { data?: ClientParticipantTourDto[]; total?: number; meta?: { total?: number } };
+  const tours: ClientParticipantTourDto[] = toursResponse?.data ?? (Array.isArray(toursData) ? toursData as ClientParticipantTourDto[] : []);
+  const toursTotalCount = toursResponse?.total ?? toursResponse?.meta?.total ?? tours.length;
+  const toursTotalPages = Math.ceil(toursTotalCount / PAGE_SIZE);
 
   // Service Choices (loaded from tour stops via /client/tours/stops/{stopId}/choices)
   const [stopChoices, setStopChoices] = useState<{ stop: ClientTourStopDto; tourName: string; choices: ClientStopChoicesDto }[]>([]);
@@ -82,31 +132,42 @@ export default function CustomerDashboard() {
     setChoicesLoading(true);
     (async () => {
       const results: { stop: ClientTourStopDto; tourName: string; choices: ClientStopChoicesDto }[] = [];
-      for (const tourItem of tours) {
-        try {
-          const detailData = await apiClient.getMyTourDetail(tourItem.tour.id, apiLang);
-          const detail = (detailData && typeof detailData === 'object' && 'data' in detailData)
-            ? (detailData as unknown as { data: { tour: { stops: ClientTourStopDto[] }; } }).data
-            : detailData;
-          const stops = detail?.tour?.stops || [];
-          const approvedStops = stops.filter((s: ClientTourStopDto) => s.preReservationStatus === 'approved');
-          for (const stop of approvedStops) {
-            try {
-              const choicesData = await apiClient.getStopChoices(stop.id, apiLang);
-              const choices: ClientStopChoicesDto = (choicesData && typeof choicesData === 'object' && 'data' in choicesData)
-                ? (choicesData as unknown as { data: ClientStopChoicesDto }).data
-                : choicesData;
-              if (choices?.serviceChoices?.length || choices?.resourceChoice) {
-                results.push({ stop, tourName: tourItem.tour?.tourName || '', choices });
-              }
-            } catch {
-              // Stop may not have choices yet
-            }
-          }
-        } catch {
-          // Tour detail may fail
+
+      // Fetch all tour details in parallel instead of sequentially (N+1 fix)
+      const detailResults = await Promise.allSettled(
+        tours.map(tourItem => apiClient.getMyTourDetail(tourItem.tour.id, apiLang))
+      );
+
+      // Collect all approved stops with their tour names
+      const allStopRequests: { stop: ClientTourStopDto; tourName: string }[] = [];
+      detailResults.forEach((result, index) => {
+        if (result.status !== 'fulfilled') return;
+        const detailData = result.value;
+        const detail = (detailData && typeof detailData === 'object' && 'data' in detailData)
+          ? (detailData as unknown as { data: { tour: { stops: ClientTourStopDto[] }; } }).data
+          : detailData;
+        const stops = detail?.tour?.stops || [];
+        const approvedStops = stops.filter((s: ClientTourStopDto) => s.preReservationStatus === 'approved');
+        const tourName = tours[index].tour?.tourName || '';
+        approvedStops.forEach(stop => allStopRequests.push({ stop, tourName }));
+      });
+
+      // Fetch all stop choices in parallel
+      const choiceResults = await Promise.allSettled(
+        allStopRequests.map(({ stop }) => apiClient.getStopChoices(stop.id, apiLang))
+      );
+
+      choiceResults.forEach((result, index) => {
+        if (result.status !== 'fulfilled') return;
+        const choicesData = result.value;
+        const choices: ClientStopChoicesDto = (choicesData && typeof choicesData === 'object' && 'data' in choicesData)
+          ? (choicesData as unknown as { data: ClientStopChoicesDto }).data
+          : choicesData;
+        if (choices?.serviceChoices?.length || choices?.resourceChoice) {
+          results.push({ ...allStopRequests[index], choices });
         }
-      }
+      });
+
       if (!cancelled) {
         setStopChoices(results);
         setChoicesLoading(false);
@@ -116,10 +177,10 @@ export default function CustomerDashboard() {
   }, [tours.length, apiLang]);
 
   const handleLogout = () => {
-    localStorage.removeItem(AUTH_TOKEN_KEY);
-    localStorage.removeItem(AUTH_USER_DATA_KEY);
+    localStorage.removeItem(customerKeys.token);
+    localStorage.removeItem(customerKeys.userData);
     apiClient.logout();
-    router.replace('/agency/login');
+    router.replace('/login/customer');
   };
 
   if (profileLoading) {
@@ -138,18 +199,20 @@ export default function CustomerDashboard() {
     );
   }
 
-  const reservations = (reservationsData as unknown as { data?: ClientReservationDto[] })?.data ??
-                       (Array.isArray(reservationsData) ? reservationsData : []);
+  const reservationsResponse = reservationsData as unknown as { data?: ClientReservationDto[]; total?: number; meta?: { total?: number } };
+  const reservations = reservationsResponse?.data ?? (Array.isArray(reservationsData) ? reservationsData as ClientReservationDto[] : []);
+  const reservationsTotalCount = reservationsResponse?.total ?? reservationsResponse?.meta?.total ?? reservations.length;
+  const reservationsTotalPages = Math.ceil(reservationsTotalCount / PAGE_SIZE);
 
   const pendingReservations = reservations.filter((r: ClientReservationDto) => r.status === 'pending');
   const approvedReservations = reservations.filter((r: ClientReservationDto) => r.status === 'approved');
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sky-50 via-orange-50 to-amber-50">
+    <div className="min-h-screen bg-gradient-to-br from-sky-50 via-orange-50 to-amber-50 overflow-x-hidden">
       {/* Top Navigation */}
       <nav className="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6">
-          <div className="flex items-center justify-between h-16">
+        <div className="max-w-5xl mx-auto px-3 sm:px-6">
+          <div className="flex items-center justify-between h-14 sm:h-16">
             {/* Logo */}
             <div className="flex items-center gap-2">
               <div className="p-2 rounded-xl bg-gradient-to-r from-sky-500 to-orange-500">
@@ -187,14 +250,73 @@ export default function CustomerDashboard() {
               />
             </div>
 
-            {/* Right side */}
-            <div className="flex items-center gap-2">
+            {/* Right actions */}
+            <div className="flex items-center gap-1 sm:gap-2">
               <LanguageSwitcher />
+              <div className="relative" ref={notifRef}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="relative text-slate-500 h-8 w-8 sm:h-9 sm:w-9"
+                  onClick={() => setNotifOpen(!notifOpen)}
+                >
+                  <Bell className="h-4 w-4" />
+                  {clientUnreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center">
+                      {clientUnreadCount > 9 ? '9+' : clientUnreadCount}
+                    </span>
+                  )}
+                </Button>
+                {notifOpen && (
+                  <div className="absolute right-0 top-full mt-2 w-72 sm:w-80 bg-white border rounded-lg shadow-lg z-50 max-h-80 sm:max-h-96 overflow-y-auto">
+                    <div className="p-3 border-b font-medium text-sm text-slate-700">
+                      {clientUnreadCount > 0
+                        ? `${clientUnreadCount} ${t.notifications.unreadCount}`
+                        : t.notifications.noNotificationsShort}
+                    </div>
+                    {clientNotifications.length === 0 ? (
+                      <div className="p-4 text-center text-sm text-slate-400">
+                        {t.notifications.noNotifications}
+                      </div>
+                    ) : (
+                      clientNotifications.map((n) => (
+                        <button
+                          key={n.id}
+                          className={`w-full text-left p-3 border-b last:border-b-0 hover:bg-slate-50 transition-colors ${!n.isRead ? 'bg-blue-50/50' : ''}`}
+                          onClick={() => {
+                            if (!n.isRead) markReadMutation.mutate(n.id);
+                            setSelectedNotif(n);
+                            setNotifOpen(false);
+                          }}
+                        >
+                          <div className="flex gap-3">
+                            {n.imageUrl && (
+                              <img
+                                src={n.imageUrl}
+                                alt=""
+                                className="w-10 h-10 rounded-lg object-cover shrink-0"
+                              />
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <p className={`text-sm ${!n.isRead ? 'font-semibold' : 'font-medium'} text-slate-900 truncate`}>{n.title}</p>
+                              <p className="text-xs text-slate-500 line-clamp-2 mt-0.5">{n.body}</p>
+                              <p className="text-xs text-slate-400 mt-1">{new Date(n.createdAt).toLocaleDateString(locale)}</p>
+                            </div>
+                            {!n.isRead && (
+                              <span className="w-2 h-2 bg-blue-500 rounded-full shrink-0 mt-1.5" />
+                            )}
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
               <Button
                 variant="ghost"
-                size="sm"
+                size="icon"
                 onClick={handleLogout}
-                className="text-slate-500 hover:text-red-600"
+                className="text-slate-500 hover:text-red-600 h-8 w-8 sm:h-9 sm:w-9"
               >
                 <LogOut className="h-4 w-4" />
               </Button>
@@ -203,7 +325,7 @@ export default function CustomerDashboard() {
         </div>
 
         {/* Mobile Nav */}
-        <div className="sm:hidden flex border-t border-slate-100 overflow-x-auto">
+        <div className="sm:hidden flex border-t border-slate-100">
           <MobileNavTab
             active={activeTab === 'dashboard'}
             onClick={() => setActiveTab('dashboard')}
@@ -232,7 +354,7 @@ export default function CustomerDashboard() {
       </nav>
 
       {/* Content */}
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
+      <div className="max-w-5xl mx-auto px-3 sm:px-6 py-4 sm:py-6">
         {activeTab === 'dashboard' && (
           <DashboardView
             profile={profile}
@@ -240,6 +362,10 @@ export default function CustomerDashboard() {
             reservations={reservations.filter((r: ClientReservationDto) => r.status !== 'rejected')}
             toursLoading={toursLoading}
             t={t}
+            locale={locale}
+            toursPage={toursPage}
+            toursTotalPages={toursTotalPages}
+            onToursPageChange={setToursPage}
           />
         )}
         {activeTab === 'reservations' && (
@@ -247,6 +373,10 @@ export default function CustomerDashboard() {
             reservations={reservations.filter((r: ClientReservationDto) => r.status !== 'rejected')}
             loading={reservationsLoading}
             t={t}
+            locale={locale}
+            page={reservationsPage}
+            totalPages={reservationsTotalPages}
+            onPageChange={setReservationsPage}
           />
         )}
         {activeTab === 'serviceRequests' && (
@@ -257,10 +387,47 @@ export default function CustomerDashboard() {
           />
         )}
         {activeTab === 'profile' && (
-          <ProfileView profile={profile} t={t} />
+          <ProfileView profile={profile} t={t} locale={locale} />
         )}
       </div>
 
+      {/* Notification Detail Popup */}
+      {selectedNotif && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setSelectedNotif(null)} />
+          <div className="relative bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="font-semibold text-slate-900">
+                {t.notifications.detail}
+              </h3>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setSelectedNotif(null)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            {selectedNotif.imageUrl && (
+              <div className="w-full">
+                <img
+                  src={selectedNotif.imageUrl}
+                  alt=""
+                  className="w-full max-h-64 object-cover"
+                />
+              </div>
+            )}
+            <div className="p-4 space-y-3">
+              <h4 className="text-lg font-bold text-slate-900">{selectedNotif.title}</h4>
+              <p className="text-sm text-slate-600 whitespace-pre-wrap leading-relaxed">{selectedNotif.body}</p>
+              <p className="text-xs text-slate-400">
+                {new Date(selectedNotif.createdAt).toLocaleString(locale)}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -274,6 +441,10 @@ function DashboardView({
   reservations,
   toursLoading,
   t,
+  locale,
+  toursPage,
+  toursTotalPages,
+  onToursPageChange,
 }: {
   profile: ClientProfileDto;
   tours: ClientParticipantTourDto[];
@@ -281,6 +452,10 @@ function DashboardView({
   toursLoading: boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   t: any;
+  locale: string;
+  toursPage: number;
+  toursTotalPages: number;
+  onToursPageChange: (page: number) => void;
 }) {
   const pendingCount = reservations.filter(r => r.status === 'pending').length;
   const approvedCount = reservations.filter(r => r.status === 'approved').length;
@@ -309,39 +484,39 @@ function DashboardView({
           <Sun className="absolute top-6 left-1/3 h-5 w-5 text-yellow-300/30 animate-pulse" />
         </div>
 
-        <CardContent className="p-6 relative text-white">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="p-3 bg-white/20 backdrop-blur-sm rounded-2xl">
+        <CardContent className="p-4 sm:p-6 relative text-white">
+          <div className="flex items-center gap-3 sm:gap-4 mb-3 sm:mb-4">
+            <div className="p-2 sm:p-3 bg-white/20 backdrop-blur-sm rounded-xl sm:rounded-2xl shrink-0">
               {profile.profilePhoto ? (
-                <img src={profile.profilePhoto} alt="" className="h-8 w-8 rounded-lg object-cover" />
+                <img src={profile.profilePhoto} alt="" className="h-6 w-6 sm:h-8 sm:w-8 rounded-lg object-cover" />
               ) : (
-                <Compass className="h-8 w-8" />
+                <Compass className="h-6 w-6 sm:h-8 sm:w-8" />
               )}
             </div>
-            <div>
-              <h2 className="text-2xl font-bold">{t.customer.welcome}, {profile.firstName}!</h2>
-              <p className="text-white/80 text-sm">{t.customer.readyForAdventure}</p>
+            <div className="min-w-0">
+              <h2 className="text-lg sm:text-2xl font-bold truncate">{t.customer.welcome}, {profile.firstName}!</h2>
+              <p className="text-white/80 text-xs sm:text-sm">{t.customer.readyForAdventure}</p>
             </div>
           </div>
-          <div className="flex flex-wrap gap-3 mt-4">
-            <div className="flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2">
-              <Plane className="h-4 w-4" />
-              <span className="text-sm font-medium">{tours.length} {t.customer.tourCount}</span>
+          <div className="flex flex-wrap gap-2 sm:gap-3 mt-3 sm:mt-4">
+            <div className="flex items-center gap-1.5 sm:gap-2 bg-white/20 backdrop-blur-sm rounded-full px-2.5 sm:px-4 py-1.5 sm:py-2">
+              <Plane className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span className="text-xs sm:text-sm font-medium">{tours.length} {t.customer.tourCount}</span>
             </div>
-            <div className="flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2">
-              <Ticket className="h-4 w-4" />
-              <span className="text-sm font-medium">{reservations.length} {t.requests.title}</span>
+            <div className="flex items-center gap-1.5 sm:gap-2 bg-white/20 backdrop-blur-sm rounded-full px-2.5 sm:px-4 py-1.5 sm:py-2">
+              <Ticket className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span className="text-xs sm:text-sm font-medium">{reservations.length} {t.requests.title}</span>
             </div>
-            <div className="flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2">
-              <Camera className="h-4 w-4" />
-              <span className="text-sm font-medium">{t.customer.enjoyTrip}</span>
+            <div className="flex items-center gap-1.5 sm:gap-2 bg-white/20 backdrop-blur-sm rounded-full px-2.5 sm:px-4 py-1.5 sm:py-2">
+              <Camera className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span className="text-xs sm:text-sm font-medium">{t.customer.enjoyTrip}</span>
             </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
         <StatCard
           icon={Compass}
           label={t.customer.activeTours}
@@ -398,52 +573,75 @@ function DashboardView({
             {tours.map((item, index) => {
               const tour = item.tour;
               const statusCfg = participantStatusConfig[item.status] || participantStatusConfig.pending;
-              return (
-                <Link key={item.participantId} href={`/customer/tours/${tour.id}`}>
-                  <Card className="overflow-hidden border-0 shadow-md hover:shadow-lg transition-all bg-white cursor-pointer">
-                    {tour.coverImageUrl ? (
-                      <div className="h-32 bg-slate-100 overflow-hidden">
-                        <img src={tour.coverImageUrl} alt={tour.tourName} className="w-full h-full object-cover" />
-                      </div>
-                    ) : (
-                      <div className={`h-2 bg-gradient-to-r ${
-                        ['from-sky-400 to-blue-500', 'from-orange-400 to-amber-500', 'from-emerald-400 to-teal-500', 'from-rose-400 to-pink-500'][index % 4]
-                      }`} />
+              const isConfirmed = item.status === 'confirmed';
+
+              const cardContent = (
+                <Card className={`overflow-hidden border-0 shadow-md transition-all bg-white ${isConfirmed ? 'hover:shadow-lg cursor-pointer' : 'opacity-75 cursor-not-allowed'}`}>
+                  {tour.coverImageUrl ? (
+                    <div className="h-28 sm:h-32 bg-slate-100 overflow-hidden">
+                      <img src={tour.coverImageUrl} alt={tour.tourName} className="w-full h-full object-cover" />
+                    </div>
+                  ) : (
+                    <div className={`h-2 bg-gradient-to-r ${
+                      ['from-sky-400 to-blue-500', 'from-orange-400 to-amber-500', 'from-emerald-400 to-teal-500', 'from-rose-400 to-pink-500'][index % 4]
+                    }`} />
+                  )}
+                  <CardContent className="p-3 sm:p-4">
+                    <div className="flex items-start justify-between gap-2 mb-1.5 sm:mb-2">
+                      <h4 className="font-bold text-slate-800 text-sm sm:text-base min-w-0 truncate">{tour.tourName}</h4>
+                      <span
+                        className={`text-[10px] sm:text-xs font-medium px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full whitespace-nowrap shrink-0 ${statusCfg.color} ${!isConfirmed ? 'cursor-help' : ''}`}
+                        title={!isConfirmed ? t.customer.participantNotConfirmedTooltip : ''}
+                      >
+                        {statusCfg.label}
+                      </span>
+                    </div>
+                    {tour.description && (
+                      <p className="text-xs sm:text-sm text-slate-500 line-clamp-2 mb-2 sm:mb-3">{tour.description}</p>
                     )}
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <h4 className="font-bold text-slate-800">{tour.tourName}</h4>
-                        <span className={`text-xs font-medium px-2 py-1 rounded-full whitespace-nowrap ${statusCfg.color}`}>
-                          {statusCfg.label}
+                    <div className="flex flex-wrap gap-1.5 sm:gap-2 text-[10px] sm:text-xs">
+                      {tour.tourCode && (
+                        <span className="flex items-center gap-1 bg-violet-50 text-violet-700 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full">
+                          <Ticket className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                          {tour.tourCode}
                         </span>
-                      </div>
-                      {tour.description && (
-                        <p className="text-sm text-slate-500 line-clamp-2 mb-3">{tour.description}</p>
                       )}
-                      <div className="flex flex-wrap gap-2 text-xs">
-                        {tour.tourCode && (
-                          <span className="flex items-center gap-1 bg-violet-50 text-violet-700 px-2 py-1 rounded-full">
-                            <Ticket className="h-3 w-3" />
-                            {tour.tourCode}
-                          </span>
-                        )}
-                        {tour.startDate && (
-                          <span className="flex items-center gap-1 bg-sky-50 text-sky-700 px-2 py-1 rounded-full">
-                            <Calendar className="h-3 w-3" />
-                            {new Date(tour.startDate).toLocaleDateString('tr-TR')}
-                          </span>
-                        )}
-                        <span className="flex items-center gap-1 bg-slate-50 text-slate-600 px-2 py-1 rounded-full">
-                          <User className="h-3 w-3" />
-                          {tour.currentParticipants}/{tour.maxParticipants}
+                      {tour.startDate && (
+                        <span className="flex items-center gap-1 bg-sky-50 text-sky-700 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full">
+                          <Calendar className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                          {new Date(tour.startDate).toLocaleDateString(locale)}
                         </span>
-                      </div>
-                    </CardContent>
-                  </Card>
+                      )}
+                      <span className="flex items-center gap-1 bg-slate-50 text-slate-600 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full">
+                        <User className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                        {tour.currentParticipants}/{tour.maxParticipants}
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+
+              return isConfirmed ? (
+                <Link key={item.participantId} href={`/customer/tours/${tour.id}`}>
+                  {cardContent}
                 </Link>
+              ) : (
+                <div key={item.participantId}>
+                  {cardContent}
+                </div>
               );
             })}
           </div>
+        )}
+
+        {/* Tours Pagination */}
+        {toursTotalPages > 1 && (
+          <Pagination
+            page={toursPage}
+            totalPages={toursTotalPages}
+            onPageChange={onToursPageChange}
+            t={t}
+          />
         )}
       </div>
     </div>
@@ -457,11 +655,19 @@ function ReservationsView({
   reservations,
   loading,
   t,
+  locale,
+  page,
+  totalPages,
+  onPageChange,
 }: {
   reservations: ClientReservationDto[];
   loading: boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   t: any;
+  locale: string;
+  page: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
 }) {
   if (loading) return <LoadingState message={t.common.loading} />;
 
@@ -494,37 +700,51 @@ function ReservationsView({
             const StatusIcon = config.icon;
             return (
               <Card key={reservation.id} className="bg-white border-0 shadow-sm hover:shadow-md transition-all">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg ${config.color}`}>
-                        <StatusIcon className="h-5 w-5" />
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex items-start sm:items-center justify-between gap-2">
+                    <div className="flex items-start sm:items-center gap-2 sm:gap-3 min-w-0">
+                      <div className={`p-1.5 sm:p-2 rounded-lg shrink-0 ${config.color}`}>
+                        <StatusIcon className="h-4 w-4 sm:h-5 sm:w-5" />
                       </div>
-                      <div>
-                        <p className="font-medium text-slate-800">
+                      <div className="min-w-0">
+                        <p className="font-medium text-slate-800 text-sm sm:text-base truncate">
                           {t.requests.preReservation} #{String(reservation.id).slice(0, 8)}
                         </p>
-                        <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
-                          <Calendar className="h-3 w-3" />
-                          {new Date(reservation.reservationDate).toLocaleDateString('tr-TR')}
-                          <span className="text-slate-300">|</span>
-                          <User className="h-3 w-3" />
-                          {reservation.numberOfParticipants} {t.tours.people}
+                        <div className="flex items-center gap-1.5 sm:gap-2 text-xs text-slate-500 mt-0.5 sm:mt-1 flex-wrap">
+                          <span className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            {new Date(reservation.reservationDate).toLocaleDateString(locale)}
+                          </span>
+                          <span className="text-slate-300 hidden sm:inline">|</span>
+                          <span className="flex items-center gap-1">
+                            <User className="h-3 w-3" />
+                            {reservation.numberOfParticipants} {t.tours.people}
+                          </span>
                         </div>
                       </div>
                     </div>
-                    <span className={`text-xs font-medium px-3 py-1 rounded-full ${config.color}`}>
+                    <span className={`text-[10px] sm:text-xs font-medium px-2 sm:px-3 py-0.5 sm:py-1 rounded-full shrink-0 ${config.color}`}>
                       {config.label}
                     </span>
                   </div>
                   {reservation.specialRequests && (
-                    <p className="text-xs text-slate-500 mt-2 pl-12">{reservation.specialRequests}</p>
+                    <p className="text-xs text-slate-500 mt-2 pl-6 sm:pl-12">{reservation.specialRequests}</p>
                   )}
                 </CardContent>
               </Card>
             );
           })}
         </div>
+      )}
+
+      {/* Reservations Pagination */}
+      {totalPages > 1 && (
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          onPageChange={onPageChange}
+          t={t}
+        />
       )}
     </div>
   );
@@ -564,22 +784,22 @@ function ServiceChoicesView({
         <div className="space-y-3">
           {stopChoices.map(({ stop, tourName, choices }) => (
             <Card key={stop.id} className="bg-white border-0 shadow-sm hover:shadow-md transition-all">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="p-2 rounded-lg text-emerald-600 bg-emerald-50">
-                    <CheckCircle2 className="h-5 w-5" />
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
+                  <div className="p-1.5 sm:p-2 rounded-lg text-emerald-600 bg-emerald-50 shrink-0">
+                    <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5" />
                   </div>
-                  <div>
-                    <p className="font-medium text-slate-800">{stop.organization?.name}</p>
-                    <p className="text-xs text-slate-500">{tourName}</p>
+                  <div className="min-w-0">
+                    <p className="font-medium text-slate-800 text-sm sm:text-base truncate">{stop.organization?.name}</p>
+                    <p className="text-xs text-slate-500 truncate">{tourName}</p>
                   </div>
                 </div>
                 {choices.serviceChoices && choices.serviceChoices.length > 0 && (
-                  <div className="space-y-1.5 pl-12">
+                  <div className="space-y-1.5 pl-8 sm:pl-12 mt-2">
                     {choices.serviceChoices.map((sc: ClientServiceChoiceDto) => (
-                      <div key={sc.id} className="flex items-center justify-between text-sm">
-                        <span className="text-slate-700">{sc.service?.title || `#${sc.serviceId}`}</span>
-                        <span className="font-medium text-slate-800">x{sc.quantity}</span>
+                      <div key={sc.id} className="flex items-center justify-between text-xs sm:text-sm gap-2">
+                        <span className="text-slate-700 min-w-0 truncate">{sc.service?.title || `#${sc.serviceId}`}</span>
+                        <span className="font-medium text-slate-800 shrink-0">x{sc.quantity}</span>
                       </div>
                     ))}
                   </div>
@@ -599,10 +819,12 @@ function ServiceChoicesView({
 function ProfileView({
   profile,
   t,
+  locale,
 }: {
   profile: ClientProfileDto;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   t: any;
+  locale: string;
 }) {
   return (
     <div className="space-y-6">
@@ -614,8 +836,8 @@ function ProfileView({
       <Card className="bg-white border-0 shadow-md">
         <CardContent className="p-6">
           {/* Avatar */}
-          <div className="flex items-center gap-4 mb-6 pb-6 border-b border-slate-100">
-            <div className="w-16 h-16 rounded-full bg-gradient-to-r from-sky-400 to-orange-400 flex items-center justify-center text-white text-2xl font-bold">
+          <div className="flex items-center gap-3 sm:gap-4 mb-4 sm:mb-6 pb-4 sm:pb-6 border-b border-slate-100">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-gradient-to-r from-sky-400 to-orange-400 flex items-center justify-center text-white text-xl sm:text-2xl font-bold">
               {profile.profilePhoto ? (
                 <img src={profile.profilePhoto} alt="" className="w-full h-full rounded-full object-cover" />
               ) : (
@@ -623,7 +845,7 @@ function ProfileView({
               )}
             </div>
             <div>
-              <h4 className="text-xl font-bold text-slate-800">{profile.firstName} {profile.lastName}</h4>
+              <h4 className="text-lg sm:text-xl font-bold text-slate-800">{profile.firstName} {profile.lastName}</h4>
               <p className="text-sm text-slate-500">@{profile.username}</p>
             </div>
           </div>
@@ -638,7 +860,7 @@ function ProfileView({
               profile.phone ? `+${profile.phoneCountryCode || ''} ${profile.phone}` : '-'
             } />
             <ProfileRow label={t.admin.lastLogin} value={
-              profile.lastLoginAt ? new Date(profile.lastLoginAt).toLocaleString('tr-TR') : '-'
+              profile.lastLoginAt ? new Date(profile.lastLoginAt).toLocaleString(locale) : '-'
             } />
             <ProfileRow label={t.customer.statusLabel} value={profile.active ? t.customer.statusActiveLabel : t.customer.statusInactiveLabel} />
           </div>
@@ -700,12 +922,12 @@ function MobileNavTab({ active, onClick, icon: Icon, label }: {
   return (
     <button
       onClick={onClick}
-      className={`flex-1 flex flex-col items-center gap-1 py-2 text-xs transition-all ${
+      className={`flex-1 flex flex-col items-center gap-0.5 py-2 px-1 min-w-0 text-[10px] leading-tight transition-all ${
         active ? 'text-orange-600 border-b-2 border-orange-500' : 'text-slate-500'
       }`}
     >
-      <Icon className="h-4 w-4" />
-      {label}
+      <Icon className="h-4 w-4 shrink-0" />
+      <span className="truncate w-full text-center">{label}</span>
     </button>
   );
 }
@@ -726,12 +948,12 @@ function StatCard({ icon: Icon, label, value, color }: {
 
   return (
     <Card className="bg-white border-0 shadow-sm">
-      <CardContent className="p-4">
-        <div className={`p-2 rounded-lg ${colors.split(' ').slice(2).join(' ')} w-fit mb-2`}>
-          <Icon className="h-4 w-4" />
+      <CardContent className="p-3 sm:p-4">
+        <div className={`p-1.5 sm:p-2 rounded-lg ${colors.split(' ').slice(2).join(' ')} w-fit mb-1.5 sm:mb-2`}>
+          <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
         </div>
-        <p className="text-2xl font-bold text-slate-800">{value}</p>
-        <p className="text-xs text-slate-500">{label}</p>
+        <p className="text-xl sm:text-2xl font-bold text-slate-800">{value}</p>
+        <p className="text-[10px] sm:text-xs text-slate-500 truncate">{label}</p>
       </CardContent>
     </Card>
   );
@@ -739,9 +961,43 @@ function StatCard({ icon: Icon, label, value, color }: {
 
 function ProfileRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between py-2">
-      <span className="text-sm text-slate-500">{label}</span>
-      <span className="text-sm font-medium text-slate-800">{value}</span>
+    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-1.5 sm:py-2 gap-0.5 sm:gap-4">
+      <span className="text-xs sm:text-sm text-slate-500">{label}</span>
+      <span className="text-sm font-medium text-slate-800 break-all">{value}</span>
+    </div>
+  );
+}
+
+function Pagination({ page, totalPages, onPageChange, t }: {
+  page: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  t: any;
+}) {
+  return (
+    <div className="flex items-center justify-center gap-2 mt-4">
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => onPageChange(page - 1)}
+        disabled={page <= 1}
+        className="text-xs"
+      >
+        {t.common.back}
+      </Button>
+      <span className="text-sm text-slate-600">
+        {page} / {totalPages}
+      </span>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => onPageChange(page + 1)}
+        disabled={page >= totalPages}
+        className="text-xs"
+      >
+        {t.common.next}
+      </Button>
     </div>
   );
 }
