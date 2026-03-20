@@ -61,7 +61,7 @@ import {
 import {
   LoadingState, EmptyState, ErrorState, TourStatusBadge, AdminPagination,
   CompactReceipt, DetailedListReceipt, KitchenSummaryReceipt, ReceiptServiceSummary,
-  handleReceiptPrint, exportReceiptExcel,
+  handleReceiptPrint, exportReceiptExcel, ChoiceDeadlineCountdown,
 } from '@/components/shared';
 import type { ReceiptTemplate } from '@/components/shared';
 
@@ -685,6 +685,9 @@ export default function AdminToursPage() {
                                       </Badge>
                                     );
                                   })()}
+                                  {stop.preReservationStatus === 'approved' && stop.choicesStatus !== 'approved' && (
+                                    <ChoiceDeadlineCountdown tourStopId={stop.id} compact />
+                                  )}
                                 </div>
                               </button>
                             ))}

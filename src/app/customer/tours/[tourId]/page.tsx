@@ -41,7 +41,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { LoadingState, ErrorState, LanguageSwitcher } from '@/components/shared';
+import { LoadingState, ErrorState, LanguageSwitcher, ChoiceDeadlineCountdown } from '@/components/shared';
 import { formatShortDateTime } from '@/lib/dateUtils';
 import { toast } from 'sonner';
 import { CustomerVenueSelector } from '@/components/customer/CustomerVenueSelector';
@@ -622,6 +622,11 @@ export default function CustomerTourDetailPage() {
                               {stop.scheduledEndTime && formatShortDateTime(stop.scheduledEndTime)}
                             </div>
                           )}
+
+                          {/* Choice Deadline Countdown */}
+                          <div className="mt-1">
+                            <ChoiceDeadlineCountdown tourStopId={stop.id} compact />
+                          </div>
 
                           {/* Rating */}
                           {org.totalReviews > 0 && (

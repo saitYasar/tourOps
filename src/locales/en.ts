@@ -351,6 +351,8 @@ export const en = {
     choicesStatusRejected: 'Choices Rejected',
     choicesStatusRevisionRequested: 'Revision Requested',
     choicesStatus: 'Choices Status',
+    deadlineExpired: 'Deadline expired',
+    deadlineRemaining: 'Time remaining',
   },
   requests: {
     title: 'Reservation Requests',

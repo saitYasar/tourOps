@@ -1266,6 +1266,17 @@ export interface ApiTourStopDto {
   updatedAt?: string;
 }
 
+export interface ChoiceDeadlineRemainingDto {
+  tourStopId: number;
+  scheduledEndTime: string;
+  choiceDeadline: number;
+  deadlineTime: string;
+  remainingDays: number;
+  remainingHours: number;
+  remainingMinutes: number;
+  isExpired: boolean;
+}
+
 export interface CreateTourStopPayload {
   tourId: number;
   organizationId: number;
@@ -1689,10 +1700,10 @@ class ApiClient {
   // Client - Reservations
   // ============================================
 
-  async getClientReservations(clientId: string, page = 1, limit = 10) {
+  async getClientReservations(clientId: string, page = 1, limit = 10, lang: 'tr' | 'en' = 'tr') {
     return this.request<PaginatedResponse<ClientReservationDto>>(`/reservations/client/${clientId}?page=${page}&limit=${limit}`, {
       method: 'GET',
-    }, 'tr', true);
+    }, lang);
   }
 
   async createReservation(data: CreateReservationDto, lang: 'tr' | 'en' = 'tr') {
@@ -3614,6 +3625,14 @@ class ApiClient {
     return this.request<AgencyStopServiceSummaryDto>(`/admin/tour-stops/${stopId}/service-summary`, {
       method: 'GET',
     }, lang);
+  }
+
+  // ============================================
+  // Tour Stop - Public
+  // ============================================
+
+  async getChoiceDeadlineRemaining(tourStopId: number) {
+    return this.request<ChoiceDeadlineRemainingDto>(`/tour-stops/${tourStopId}/choice-deadline-remaining`, { method: 'GET' }, 'tr', true);
   }
 
   // ============================================

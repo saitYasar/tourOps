@@ -92,7 +92,7 @@ import {
 import {
   LoadingState, EmptyState, ErrorState, TourStatusBadge, ConfirmDialog,
   CompactReceipt, DetailedListReceipt, KitchenSummaryReceipt, ReceiptServiceSummary,
-  handleReceiptPrint, exportReceiptExcel,
+  handleReceiptPrint, exportReceiptExcel, ChoiceDeadlineCountdown,
 } from '@/components/shared';
 import type { ReceiptTemplate } from '@/components/shared';
 import { DialogDescription } from '@/components/ui/dialog';
@@ -1404,6 +1404,9 @@ export default function TourDetailPage() {
                                 </Badge>
                               );
                             })()}
+                            {stop.preReservationStatus === 'approved' && stop.choicesStatus !== 'approved' && (
+                              <ChoiceDeadlineCountdown tourStopId={stop.id} compact />
+                            )}
                           </div>
                         </button>
                       ))}
@@ -1633,15 +1636,19 @@ export default function TourDetailPage() {
 
                       return (
                         <div className="flex items-center justify-between">
-                          {cs && choicesConfig[cs] && (
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm text-slate-500">{t.tours.choicesStatus}:</span>
-                              <Badge variant={choicesConfig[cs].variant}>
-                                {choicesConfig[cs].label}
-                              </Badge>
-                            </div>
-                          )}
-                          {!cs && <div />}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {cs && choicesConfig[cs] && (
+                              <>
+                                <span className="text-sm text-slate-500">{t.tours.choicesStatus}:</span>
+                                <Badge variant={choicesConfig[cs].variant}>
+                                  {choicesConfig[cs].label}
+                                </Badge>
+                              </>
+                            )}
+                            {preResApproved && cs !== 'approved' && (
+                              <ChoiceDeadlineCountdown tourStopId={choicesStopId} />
+                            )}
+                          </div>
                           <div className="flex items-center gap-2">
                             {choicesArr.length > 0 && (
                               <Button variant="outline" onClick={() => setReceiptOpen(true)} className="gap-2">
