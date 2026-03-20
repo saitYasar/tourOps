@@ -114,8 +114,76 @@ export function CustomerVenueSelector({
     setSelectedTableId(null);
   };
 
-  // ─── Level 3: Chair selection ───────────────────────────────
+  // ─── Level 3: Chair selection (bus-seat style layout) ────────
   if (selectedTableId) {
+    // Split chairs into two sides for table layout
+    const topRow = chairResources.slice(0, Math.ceil(chairResources.length / 2));
+    const bottomRow = chairResources.slice(Math.ceil(chairResources.length / 2));
+
+    const renderSeatTile = (chair: ResourceDto) => {
+      const occupant = chair.client;
+      const isOwnSeat = !!(currentClientId && occupant && occupant.id === currentClientId);
+      const isOccupiedByOther = !!(occupant && !isOwnSeat);
+      const isSelected = existingResourceId === chair.id;
+      const occupantName = occupant ? `${occupant.firstName} ${occupant.lastName}` : '';
+      // Extract short label: just the number or last part of the name
+      const shortLabel = chair.name.replace(/^.*[-–]\s*/, '').replace(/^(Yer|Seat|Sandalye|Koltuk)\s*/i, '') || chair.name;
+
+      return (
+        <Tooltip key={chair.id}>
+          <TooltipTrigger asChild>
+            <span tabIndex={0}>
+              <button
+                disabled={savingTable || isOccupiedByOther}
+                className={`relative flex flex-col items-center justify-center w-[52px] h-[58px] sm:w-[60px] sm:h-[66px] rounded-lg border-2 transition-all ${
+                  savingTable ? 'opacity-50 cursor-wait' :
+                  isOccupiedByOther
+                    ? 'border-red-300 bg-red-100 cursor-not-allowed'
+                    : isOwnSeat || isSelected
+                      ? 'border-emerald-500 bg-emerald-100 shadow-md shadow-emerald-200/50'
+                      : 'border-slate-200 bg-white hover:border-orange-400 hover:bg-orange-50 hover:shadow-sm'
+                }`}
+                onClick={() => {
+                  if (!isOccupiedByOther) onSelectChair(chair);
+                }}
+              >
+                {/* Checkmark for own/selected seat */}
+                {(isOwnSeat || isSelected) && (
+                  <div className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-emerald-500 flex items-center justify-center shadow-sm">
+                    <Check className="h-2.5 w-2.5 text-white" strokeWidth={3} />
+                  </div>
+                )}
+
+                {/* Seat icon */}
+                {savingTable ? (
+                  <Loader2 className="h-5 w-5 sm:h-6 sm:w-6 text-orange-500 animate-spin" />
+                ) : (
+                  <Armchair className={`h-5 w-5 sm:h-6 sm:w-6 ${
+                    isOccupiedByOther ? 'text-red-400' :
+                    isOwnSeat || isSelected ? 'text-emerald-600' : 'text-slate-400'
+                  }`} />
+                )}
+
+                {/* Seat number */}
+                <span className={`text-[10px] sm:text-xs font-bold leading-tight mt-0.5 ${
+                  isOccupiedByOther ? 'text-red-600' :
+                  isOwnSeat || isSelected ? 'text-emerald-700' : 'text-slate-700'
+                }`}>
+                  {shortLabel}
+                </span>
+              </button>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="text-xs">
+            <p className="font-medium">{chair.name}</p>
+            {isOwnSeat && <p className="text-emerald-600">{t.customer.yourSeat}</p>}
+            {isOccupiedByOther && <p className="text-red-500">{occupantName}</p>}
+            {!occupant && <p className="text-slate-400">{t.customer.seatEmpty}</p>}
+          </TooltipContent>
+        </Tooltip>
+      );
+    };
+
     return (
       <div className="space-y-4">
         {/* Breadcrumb + Back */}
@@ -136,29 +204,22 @@ export function CustomerVenueSelector({
         </div>
 
         {/* Legend */}
-        <div className="flex flex-wrap gap-2 sm:gap-3 text-xs">
+        <div className="flex flex-wrap gap-3 sm:gap-4 text-xs">
           <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-sm bg-slate-100 border border-slate-300" />
+            <div className="w-4 h-4 rounded border-2 border-slate-200 bg-white" />
             <span className="text-slate-500">{t.customer.seatEmpty}</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-sm bg-emerald-100 border border-emerald-400" />
+            <div className="w-4 h-4 rounded border-2 border-emerald-500 bg-emerald-100" />
             <span className="text-emerald-600">{t.customer.seatYours}</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-sm bg-red-100 border border-red-400" />
+            <div className="w-4 h-4 rounded border-2 border-red-300 bg-red-100" />
             <span className="text-red-500">{t.customer.seatOccupied}</span>
           </div>
         </div>
 
-        {/* Resource type title for chairs */}
-        {chairResources.length > 0 && chairResources[0].resourceType?.name && (
-          <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide">
-            {chairResources[0].resourceType.name}
-          </h3>
-        )}
-
-        {/* Chairs grid */}
+        {/* Seat map */}
         {loadingChildren && chairResources.length === 0 ? (
           <div className="flex items-center justify-center py-12 gap-2 text-slate-400">
             <Loader2 className="h-5 w-5 animate-spin" />
@@ -170,68 +231,27 @@ export function CustomerVenueSelector({
             <p className="text-slate-500">{t.customer.noChairs}</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
-            {chairResources.map(chair => {
-              const occupant = chair.client;
-              const isOwnSeat = !!(currentClientId && occupant && occupant.id === currentClientId);
-              const isOccupiedByOther = !!(occupant && !isOwnSeat);
-              const isSelected = existingResourceId === chair.id;
-              const occupantName = occupant ? `${occupant.firstName} ${occupant.lastName}` : '';
+          <div className="flex flex-col items-center gap-2 py-4">
+            {/* Top row of seats */}
+            <div className="flex flex-wrap justify-center gap-2">
+              {topRow.map(renderSeatTile)}
+            </div>
 
-              return (
-                <div key={chair.id} className="relative group">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span tabIndex={0}>
-                        <button
-                          disabled={savingTable || isOccupiedByOther}
-                          className={`relative w-full p-3 sm:p-4 rounded-xl border-2 transition-all text-center ${
-                            savingTable ? 'opacity-50 cursor-wait' :
-                            isOccupiedByOther
-                              ? 'border-red-300 bg-red-50 cursor-not-allowed opacity-80'
-                              : isOwnSeat || isSelected
-                                ? 'border-emerald-400 bg-emerald-50 ring-2 ring-emerald-200'
-                                : 'border-slate-200 hover:border-orange-300 hover:bg-orange-50/50'
-                          }`}
-                          onClick={() => {
-                            if (!isOccupiedByOther) onSelectChair(chair);
-                          }}
-                        >
-                          {(isOwnSeat || isSelected) && (
-                            <div className="absolute top-1.5 right-1.5">
-                              <Check className="h-3.5 w-3.5 text-emerald-600" />
-                            </div>
-                          )}
-                          {savingTable ? (
-                            <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 mx-auto mb-1 text-orange-500 animate-spin" />
-                          ) : (
-                            <Armchair className={`h-6 w-6 sm:h-8 sm:w-8 mx-auto mb-1 ${
-                              isOccupiedByOther ? 'text-red-400' :
-                              isOwnSeat || isSelected ? 'text-emerald-600' : 'text-slate-400'
-                            }`} />
-                          )}
-                          <p className={`font-bold text-xs sm:text-sm truncate ${
-                            isOccupiedByOther ? 'text-red-600' :
-                            isOwnSeat ? 'text-emerald-700' : 'text-slate-800'
-                          }`}>{chair.name}</p>
-                          {isOwnSeat && (
-                            <p className="text-[10px] text-emerald-600 font-medium mt-0.5">{t.customer.yourSeat}</p>
-                          )}
-                          {isOccupiedByOther && (
-                            <p className="text-[10px] text-red-500 font-medium mt-0.5 truncate">{occupantName}</p>
-                          )}
-                        </button>
-                      </span>
-                    </TooltipTrigger>
-                    {(savingTable || isOccupiedByOther) && (
-                      <TooltipContent>
-                        {savingTable ? t.tooltips.savingInProgress : t.tooltips.seatOccupied}
-                      </TooltipContent>
-                    )}
-                  </Tooltip>
-                </div>
-              );
-            })}
+            {/* Table visual */}
+            <div className="relative mx-4 my-1">
+              <div className={`flex items-center justify-center px-8 sm:px-12 py-3 sm:py-4 border-2 border-amber-300 bg-amber-50 text-amber-800 font-bold text-sm sm:text-base ${
+                chairResources.length <= 2 ? 'rounded-full min-w-[80px]' : 'rounded-2xl min-w-[140px] sm:min-w-[200px]'
+              }`}>
+                <span className="truncate">{activeTable?.name}</span>
+              </div>
+            </div>
+
+            {/* Bottom row of seats */}
+            {bottomRow.length > 0 && (
+              <div className="flex flex-wrap justify-center gap-2">
+                {bottomRow.map(renderSeatTile)}
+              </div>
+            )}
           </div>
         )}
       </div>
