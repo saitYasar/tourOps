@@ -40,6 +40,7 @@ interface CustomerVenueSelectorProps {
   onSelectChair: (chair: ResourceDto, skipConfirm?: boolean) => void;
   savingTable: boolean;
   existingResourceId?: number;
+  pendingChairId?: number;
   currentClientId?: number;
 }
 
@@ -51,6 +52,7 @@ export function CustomerVenueSelector({
   onSelectChair,
   savingTable,
   existingResourceId,
+  pendingChairId,
   currentClientId,
 }: CustomerVenueSelectorProps) {
   const { t } = useLanguage();
@@ -125,6 +127,7 @@ export function CustomerVenueSelector({
       const isOwnSeat = !!(currentClientId && occupant && occupant.id === currentClientId);
       const isOccupiedByOther = !!(occupant && !isOwnSeat);
       const isSelected = existingResourceId === chair.id;
+      const isPending = pendingChairId === chair.id;
       const occupantName = occupant ? `${occupant.firstName} ${occupant.lastName}` : '';
       // Extract short label: just the number or last part of the name
       const shortLabel = chair.name.replace(/^.*[-–]\s*/, '').replace(/^(Yer|Seat|Sandalye|Koltuk)\s*/i, '') || chair.name;
@@ -139,20 +142,26 @@ export function CustomerVenueSelector({
                   savingTable ? 'opacity-50 cursor-wait' :
                   isOccupiedByOther
                     ? 'border-red-300 bg-red-100 cursor-not-allowed'
-                    : isOwnSeat || isSelected
-                      ? 'border-emerald-500 bg-emerald-100 shadow-md shadow-emerald-200/50'
-                      : 'border-slate-200 bg-white hover:border-orange-400 hover:bg-orange-50 hover:shadow-sm'
+                    : isPending
+                      ? 'border-orange-500 bg-orange-100 shadow-md shadow-orange-200/50 ring-2 ring-orange-300'
+                      : isOwnSeat || isSelected
+                        ? 'border-emerald-500 bg-emerald-100 shadow-md shadow-emerald-200/50'
+                        : 'border-slate-200 bg-white hover:border-orange-400 hover:bg-orange-50 hover:shadow-sm'
                 }`}
                 onClick={() => {
                   if (!isOccupiedByOther) onSelectChair(chair);
                 }}
               >
-                {/* Checkmark for own/selected seat */}
-                {(isOwnSeat || isSelected) && (
+                {/* Badge for selected/pending seat */}
+                {isPending ? (
+                  <div className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-orange-500 flex items-center justify-center shadow-sm">
+                    <Check className="h-2.5 w-2.5 text-white" strokeWidth={3} />
+                  </div>
+                ) : (isOwnSeat || isSelected) ? (
                   <div className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-emerald-500 flex items-center justify-center shadow-sm">
                     <Check className="h-2.5 w-2.5 text-white" strokeWidth={3} />
                   </div>
-                )}
+                ) : null}
 
                 {/* Seat icon */}
                 {savingTable ? (
@@ -160,6 +169,7 @@ export function CustomerVenueSelector({
                 ) : (
                   <Armchair className={`h-5 w-5 sm:h-6 sm:w-6 ${
                     isOccupiedByOther ? 'text-red-400' :
+                    isPending ? 'text-orange-600' :
                     isOwnSeat || isSelected ? 'text-emerald-600' : 'text-slate-400'
                   }`} />
                 )}
@@ -167,6 +177,7 @@ export function CustomerVenueSelector({
                 {/* Seat number */}
                 <span className={`text-[10px] sm:text-xs font-bold leading-tight mt-0.5 ${
                   isOccupiedByOther ? 'text-red-600' :
+                  isPending ? 'text-orange-700' :
                   isOwnSeat || isSelected ? 'text-emerald-700' : 'text-slate-700'
                 }`}>
                   {shortLabel}
@@ -212,6 +223,10 @@ export function CustomerVenueSelector({
           <div className="flex items-center gap-1.5">
             <div className="w-4 h-4 rounded border-2 border-emerald-500 bg-emerald-100" />
             <span className="text-emerald-600">{t.customer.seatYours}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-4 h-4 rounded border-2 border-orange-500 bg-orange-100" />
+            <span className="text-orange-600">{t.customer.seatPending || 'Yeni Seçim'}</span>
           </div>
           <div className="flex items-center gap-1.5">
             <div className="w-4 h-4 rounded border-2 border-red-300 bg-red-100" />

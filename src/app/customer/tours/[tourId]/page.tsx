@@ -727,7 +727,7 @@ export default function CustomerTourDetailPage() {
       {/* Table Selection Dialog */}
       {/* ============================================ */}
       <Dialog open={!!tableStopId} onOpenChange={() => closeTableDialog()}>
-        <DialogContent className="sm:max-w-2xl max-h-[95vh] sm:max-h-[90vh] w-[95vw] sm:w-auto flex flex-col">
+        <DialogContent className="sm:max-w-4xl max-h-[95vh] sm:max-h-[90vh] w-[95vw] sm:w-auto flex flex-col">
           <DialogHeader className="flex-shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <Armchair className="h-5 w-5 text-orange-500" />
@@ -755,6 +755,7 @@ export default function CustomerTourDetailPage() {
                 onSelectChair={handleSelectChair}
                 savingTable={savingTable}
                 existingResourceId={tableStopId ? selectedTables[tableStopId]?.resourceId : undefined}
+                pendingChairId={pendingChair?.id}
                 currentClientId={clientProfile?.id}
               />
             )}

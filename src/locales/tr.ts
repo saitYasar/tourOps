@@ -688,6 +688,7 @@ export const tr = {
     seatOccupied: 'Dolu',
     seatEmpty: 'Boş',
     seatYours: 'Sizin Yeriniz',
+    seatPending: 'Yeni Seçim',
     yourSeat: 'Sizin yeriniz',
     confirmSeatChange: 'Yerinizi değiştirmek istediğinize emin misiniz?',
     seatChangeTitle: 'Koltuk Değişikliği',

@@ -688,6 +688,7 @@ export const en = {
     seatOccupied: 'Occupied',
     seatEmpty: 'Available',
     seatYours: 'Your Seat',
+    seatPending: 'New Selection',
     yourSeat: 'Your seat',
     confirmSeatChange: 'Are you sure you want to change your seat?',
     seatChangeTitle: 'Change Seat',

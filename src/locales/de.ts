@@ -688,6 +688,7 @@ export const de = {
     seatOccupied: 'Belegt',
     seatEmpty: 'Verfügbar',
     seatYours: 'Ihr Platz',
+    seatPending: 'Neue Auswahl',
     yourSeat: 'Ihr Platz',
     confirmSeatChange: 'Möchten Sie Ihren Platz wirklich wechseln?',
     seatChangeTitle: 'Platz wechseln',
