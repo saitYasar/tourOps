@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Percent,
@@ -8,18 +8,29 @@ import {
   Pencil,
   Trash2,
   MoreHorizontal,
+  Search,
+  Building2,
+  Tag,
+  Globe,
+  ArrowUpDown,
+  CheckCircle,
+  XCircle,
+  Calendar,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useDebounce } from '@/hooks/useDebounce';
 import {
   adminApi,
   type SystemCommissionDto,
   type CreateSystemCommissionDto,
   type UpdateSystemCommissionDto,
   type CommissionScope,
+  type CategoryDto,
+  type CompanyDto,
 } from '@/lib/api';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -53,7 +64,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { LoadingState, ConfirmDialog } from '@/components/shared';
+import { LoadingState, ConfirmDialog, AdminPagination } from '@/components/shared';
 
 const SCOPES: CommissionScope[] = ['global', 'category', 'organization'];
 
@@ -61,9 +72,31 @@ export default function AdminCommissionsPage() {
   const { t, locale } = useLanguage();
   const queryClient = useQueryClient();
 
+  // Filter & sort state
   const [page, setPage] = useState(1);
-  const [limit] = useState(10);
+  const [limit, setLimit] = useState(10);
   const [filterScope, setFilterScope] = useState<string>('');
+  const [filterActive, setFilterActive] = useState<string>('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearch = useDebounce(searchTerm, 500);
+  const [sortBy, setSortBy] = useState('');
+  const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC' | ''>('');
+
+  // Reset page on filter change
+  const prevFilters = useRef({ debouncedSearch, filterScope, filterActive, sortBy, sortOrder });
+  useEffect(() => {
+    const prev = prevFilters.current;
+    if (
+      prev.debouncedSearch !== debouncedSearch ||
+      prev.filterScope !== filterScope ||
+      prev.filterActive !== filterActive ||
+      prev.sortBy !== sortBy ||
+      prev.sortOrder !== sortOrder
+    ) {
+      setPage(1);
+      prevFilters.current = { debouncedSearch, filterScope, filterActive, sortBy, sortOrder };
+    }
+  }, [debouncedSearch, filterScope, filterActive, sortBy, sortOrder]);
 
   // Dialog states
   const [createOpen, setCreateOpen] = useState(false);
@@ -78,11 +111,85 @@ export default function AdminCommissionsPage() {
   const [formDescription, setFormDescription] = useState('');
   const [formActive, setFormActive] = useState(true);
 
+  // Organization search state (for form)
+  const [orgSearch, setOrgSearch] = useState('');
+  const [orgSearchDebounced, setOrgSearchDebounced] = useState('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => setOrgSearchDebounced(orgSearch), 300);
+    return () => clearTimeout(timer);
+  }, [orgSearch]);
+
   // Fetch commissions
   const { data: result, isLoading } = useQuery({
-    queryKey: ['admin-commissions', page, limit, filterScope],
-    queryFn: () => adminApi.listSystemCommissions(page, limit, filterScope || undefined, undefined),
+    queryKey: ['admin-commissions', page, limit, filterScope, filterActive, debouncedSearch, sortBy, sortOrder],
+    queryFn: () => adminApi.listSystemCommissions({
+      page,
+      limit,
+      scope: filterScope && filterScope !== 'all' ? filterScope : undefined,
+      active: filterActive === 'true' ? true : filterActive === 'false' ? false : undefined,
+      search: debouncedSearch || undefined,
+      sortBy: sortBy || undefined,
+      sortOrder: sortOrder || undefined,
+    }),
   });
+
+  // Fetch scope counts via separate small queries (limit: 1 just to get meta.total)
+  const { data: totalCommCount } = useQuery({
+    queryKey: ['admin-commissions-count-all'],
+    queryFn: () => adminApi.listSystemCommissions({ limit: 1 }),
+  });
+  const { data: globalCommCount } = useQuery({
+    queryKey: ['admin-commissions-count-global'],
+    queryFn: () => adminApi.listSystemCommissions({ limit: 1, scope: 'global' }),
+  });
+  const { data: categoryCommCount } = useQuery({
+    queryKey: ['admin-commissions-count-category'],
+    queryFn: () => adminApi.listSystemCommissions({ limit: 1, scope: 'category' }),
+  });
+  const { data: orgCommCount } = useQuery({
+    queryKey: ['admin-commissions-count-organization'],
+    queryFn: () => adminApi.listSystemCommissions({ limit: 1, scope: 'organization' }),
+  });
+
+  // Fetch categories for scope selector & table display
+  const { data: categoriesResult } = useQuery({
+    queryKey: ['admin-org-categories'],
+    queryFn: () => adminApi.getOrganizationCategories(1, 100),
+  });
+  const categories: CategoryDto[] = categoriesResult?.success ? categoriesResult.data?.data || [] : [];
+
+  // Fetch organizations for form (with search)
+  const { data: orgsResult } = useQuery({
+    queryKey: ['admin-orgs-commission', orgSearchDebounced],
+    queryFn: () => adminApi.getOrganizationsList({ name: orgSearchDebounced || undefined, page: 1, limit: 20 }),
+    enabled: formScope === 'organization',
+  });
+  const organizations: CompanyDto[] = orgsResult?.success ? orgsResult.data?.data || [] : [];
+
+  // Build lookup maps for table display (fallback when API doesn't return nested objects)
+  const categoryMap = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const cat of categories) map.set(cat.id, cat.name);
+    return map;
+  }, [categories]);
+
+  const orgScopeIds = useMemo(() => {
+    const commissions: SystemCommissionDto[] = result?.success ? result.data?.data || [] : [];
+    return commissions.filter(c => c.scope === 'organization' && c.scopeId && !c.organization).map(c => c.scopeId!);
+  }, [result]);
+
+  const { data: orgDisplayResult } = useQuery({
+    queryKey: ['admin-orgs-display', orgScopeIds],
+    queryFn: () => adminApi.getOrganizationsList({ page: 1, limit: 100 }),
+    enabled: orgScopeIds.length > 0,
+  });
+  const orgDisplayMap = useMemo(() => {
+    const map = new Map<number, string>();
+    const orgs: CompanyDto[] = orgDisplayResult?.success ? orgDisplayResult.data?.data || [] : [];
+    for (const org of orgs) map.set(org.id, org.name);
+    return map;
+  }, [orgDisplayResult]);
 
   // Create mutation
   const createMutation = useMutation({
@@ -146,6 +253,7 @@ export default function AdminCommissionsPage() {
     setFormValue('');
     setFormDescription('');
     setFormActive(true);
+    setOrgSearch('');
   };
 
   const openEdit = (commission: SystemCommissionDto) => {
@@ -155,11 +263,18 @@ export default function AdminCommissionsPage() {
     setFormValue(String(commission.value));
     setFormDescription(commission.description || '');
     setFormActive(commission.active);
+    // Pre-fill org search with the name if available
+    if (commission.scope === 'organization' && commission.organization?.name) {
+      setOrgSearch(commission.organization.name);
+    } else {
+      setOrgSearch('');
+    }
     setEditOpen(true);
   };
 
   const handleCreate = () => {
     if (!formValue) return;
+    if (formScope !== 'global' && !formScopeId) return;
     const data: CreateSystemCommissionDto = {
       scope: formScope,
       value: Number(formValue),
@@ -176,6 +291,7 @@ export default function AdminCommissionsPage() {
 
   const handleUpdate = () => {
     if (!editingCommission || !formValue) return;
+    if (formScope !== 'global' && !formScopeId) return;
     const data: UpdateSystemCommissionDto = {
       scope: formScope,
       value: Number(formValue),
@@ -190,11 +306,26 @@ export default function AdminCommissionsPage() {
     updateMutation.mutate({ id: editingCommission.id, data });
   };
 
-  if (isLoading) return <LoadingState />;
-
   const commissions = result?.success ? result.data?.data || [] : [];
   const meta = result?.success ? result.data?.meta : null;
-  const totalPages = meta ? Math.ceil((meta.total || meta.totalCount || 0) / limit) : 1;
+
+  // Summary counts from meta.total
+  const getCommTotal = (r: typeof totalCommCount) => (r?.success ? r.data?.meta?.total || r.data?.meta?.totalCount || 0 : 0);
+  const counts = {
+    total: getCommTotal(totalCommCount),
+    global: getCommTotal(globalCommCount),
+    category: getCommTotal(categoryCommCount),
+    organization: getCommTotal(orgCommCount),
+  };
+
+  const scopeIcon = (scope: string) => {
+    switch (scope) {
+      case 'global': return <Globe className="h-3.5 w-3.5" />;
+      case 'category': return <Tag className="h-3.5 w-3.5" />;
+      case 'organization': return <Building2 className="h-3.5 w-3.5" />;
+      default: return null;
+    }
+  };
 
   const scopeBadgeColor = (scope: string) => {
     switch (scope) {
@@ -205,11 +336,108 @@ export default function AdminCommissionsPage() {
     }
   };
 
+  const getScopeName = (c: SystemCommissionDto) => {
+    if (c.scope === 'global') return '-';
+    // Use nested objects from API if available
+    if (c.scope === 'category' && c.scopeId) {
+      return c.category?.name || categoryMap.get(c.scopeId) || `#${c.scopeId}`;
+    }
+    if (c.scope === 'organization' && c.scopeId) {
+      return c.organization?.name || orgDisplayMap.get(c.scopeId) || `#${c.scopeId}`;
+    }
+    return c.scopeId ? `#${c.scopeId}` : '-';
+  };
+
+  const renderScopeIdField = () => {
+    if (formScope === 'global') return null;
+
+    if (formScope === 'category') {
+      return (
+        <div>
+          <Label>{t.commissions.scopeTypes.category}</Label>
+          <Select value={formScopeId} onValueChange={setFormScopeId}>
+            <SelectTrigger>
+              <SelectValue placeholder={t.commissions.selectCategory} />
+            </SelectTrigger>
+            <SelectContent>
+              {categories.map((cat) => (
+                <SelectItem key={cat.id} value={String(cat.id)}>
+                  {cat.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      );
+    }
+
+    if (formScope === 'organization') {
+      const selectedOrg = organizations.find(o => String(o.id) === formScopeId);
+      return (
+        <div>
+          <Label>{t.commissions.scopeTypes.organization}</Label>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input
+              value={orgSearch}
+              onChange={(e) => { setOrgSearch(e.target.value); setFormScopeId(''); }}
+              placeholder={t.commissions.selectOrganization}
+              className="pl-9"
+            />
+          </div>
+          {formScopeId && selectedOrg && (
+            <div className="mt-2 flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded-lg text-sm">
+              <Building2 className="h-4 w-4 text-green-600 shrink-0" />
+              <span className="font-medium text-green-800">{selectedOrg.name}</span>
+              <button type="button" className="ml-auto text-green-600 hover:text-red-500" onClick={() => setFormScopeId('')}>✕</button>
+            </div>
+          )}
+          {!formScopeId && (orgSearch || orgSearchDebounced) && (
+            <div className="mt-2 border rounded-lg max-h-[200px] overflow-y-auto">
+              {organizations.length === 0 ? (
+                <p className="text-sm text-slate-400 text-center py-4">
+                  {t.commissions.noOrgFound}
+                </p>
+              ) : (
+                organizations.map((org) => (
+                  <button
+                    key={org.id}
+                    type="button"
+                    className="w-full flex items-center gap-3 px-3 py-2 hover:bg-slate-50 text-left border-b last:border-b-0"
+                    onClick={() => { setFormScopeId(String(org.id)); setOrgSearch(org.name); }}
+                  >
+                    <Building2 className="h-4 w-4 text-slate-400 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{org.name}</p>
+                      <p className="text-xs text-slate-500">{org.email}</p>
+                    </div>
+                    <Badge variant="outline" className="ml-auto shrink-0 text-xs">
+                      {org.status === 'active' ? t.admin.statusActive : org.status}
+                    </Badge>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    return null;
+  };
+
   const renderForm = (isEdit: boolean) => (
     <div className="space-y-4">
       <div>
         <Label>{t.commissions.scope}</Label>
-        <Select value={formScope} onValueChange={(v) => setFormScope(v as CommissionScope)}>
+        <Select
+          value={formScope}
+          onValueChange={(v) => {
+            setFormScope(v as CommissionScope);
+            setFormScopeId('');
+            setOrgSearch('');
+          }}
+        >
           <SelectTrigger>
             <SelectValue />
           </SelectTrigger>
@@ -222,35 +450,29 @@ export default function AdminCommissionsPage() {
           </SelectContent>
         </Select>
       </div>
-      {formScope !== 'global' && (
-        <div>
-          <Label>{t.commissions.scopeId}</Label>
-          <Input
-            type="number"
-            value={formScopeId}
-            onChange={(e) => setFormScopeId(e.target.value)}
-            placeholder="ID"
-          />
-        </div>
-      )}
+      {renderScopeIdField()}
       <div>
         <Label>{t.commissions.value}</Label>
-        <Input
-          type="number"
-          min="0"
-          max="100"
-          step="0.01"
-          value={formValue}
-          onChange={(e) => setFormValue(e.target.value)}
-          placeholder="0"
-        />
+        <div className="relative">
+          <Input
+            type="number"
+            min="0"
+            max="100"
+            step="0.01"
+            value={formValue}
+            onChange={(e) => setFormValue(e.target.value)}
+            placeholder="0"
+            className="pr-8"
+          />
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">%</span>
+        </div>
       </div>
       <div>
         <Label>{t.commissions.description}</Label>
         <Input
           value={formDescription}
           onChange={(e) => setFormDescription(e.target.value)}
-          placeholder={locale === 'tr' ? 'Komisyon açıklaması' : 'Commission description'}
+          placeholder={t.commissions.commissionDesc}
         />
       </div>
       <div className="flex items-center gap-3">
@@ -269,7 +491,7 @@ export default function AdminCommissionsPage() {
         </Button>
         <Button
           onClick={isEdit ? handleUpdate : handleCreate}
-          disabled={createMutation.isPending || updateMutation.isPending}
+          disabled={createMutation.isPending || updateMutation.isPending || (formScope !== 'global' && !formScopeId)}
         >
           {createMutation.isPending || updateMutation.isPending
             ? t.common.loading
@@ -281,83 +503,233 @@ export default function AdminCommissionsPage() {
     </div>
   );
 
+  const handleSortChange = (val: string) => {
+    switch (val) {
+      case 'value_asc': setSortBy('value'); setSortOrder('ASC'); break;
+      case 'value_desc': setSortBy('value'); setSortOrder('DESC'); break;
+      case 'newest': setSortBy('createdAt'); setSortOrder('DESC'); break;
+      case 'oldest': setSortBy('createdAt'); setSortOrder('ASC'); break;
+      default: setSortBy(''); setSortOrder(''); break;
+    }
+  };
+
+  const currentSortValue = sortBy === 'value' && sortOrder === 'ASC' ? 'value_asc'
+    : sortBy === 'value' && sortOrder === 'DESC' ? 'value_desc'
+    : sortBy === 'createdAt' && sortOrder === 'DESC' ? 'newest'
+    : sortBy === 'createdAt' && sortOrder === 'ASC' ? 'oldest'
+    : 'none';
+
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Percent className="h-5 w-5" />
-                {t.commissions.title}
-              </CardTitle>
-              <CardDescription>{t.admin.commissionManagement}</CardDescription>
-            </div>
-            <div className="flex items-center gap-3">
-              <Select value={filterScope} onValueChange={setFilterScope}>
-                <SelectTrigger className="w-[160px]">
-                  <SelectValue placeholder={t.common.all} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t.common.all}</SelectItem>
-                  {SCOPES.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {t.commissions.scopeTypes[s]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button onClick={() => { resetForm(); setCreateOpen(true); }}>
-                <Plus className="h-4 w-4 mr-2" />
-                {t.commissions.create}
-              </Button>
-            </div>
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-violet-100 rounded-xl">
+            <Percent className="h-6 w-6 text-violet-600" />
           </div>
-        </CardHeader>
-        <CardContent>
-          {commissions.length === 0 ? (
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">{t.commissions.title}</h1>
+            <p className="text-slate-500 text-sm">{t.admin.commissionManagement}</p>
+          </div>
+        </div>
+        <Button onClick={() => { resetForm(); setCreateOpen(true); }} className="bg-violet-600 hover:bg-violet-700">
+          <Plus className="h-4 w-4 mr-2" />
+          {t.commissions.create}
+        </Button>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Card
+          className={`border cursor-pointer transition-all ${filterScope === '' || filterScope === 'all' ? 'ring-2 ring-violet-500 border-violet-200' : 'hover:border-slate-300'}`}
+          onClick={() => { setFilterScope(''); setPage(1); }}
+        >
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="p-2 bg-slate-100 rounded-lg">
+              <Percent className="h-5 w-5 text-slate-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-slate-900">{counts.total}</p>
+              <p className="text-xs text-slate-500">{t.commissions.totalCommissions}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card
+          className={`border cursor-pointer transition-all ${filterScope === 'global' ? 'ring-2 ring-purple-500 border-purple-200' : 'hover:border-slate-300'}`}
+          onClick={() => { setFilterScope('global'); setPage(1); }}
+        >
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="p-2 bg-purple-100 rounded-lg">
+              <Globe className="h-5 w-5 text-purple-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-purple-600">{counts.global}</p>
+              <p className="text-xs text-slate-500">{t.commissions.globalCommissions}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card
+          className={`border cursor-pointer transition-all ${filterScope === 'category' ? 'ring-2 ring-blue-500 border-blue-200' : 'hover:border-slate-300'}`}
+          onClick={() => { setFilterScope('category'); setPage(1); }}
+        >
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <Tag className="h-5 w-5 text-blue-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-blue-600">{counts.category}</p>
+              <p className="text-xs text-slate-500">{t.commissions.categoryCommissions}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card
+          className={`border cursor-pointer transition-all ${filterScope === 'organization' ? 'ring-2 ring-green-500 border-green-200' : 'hover:border-slate-300'}`}
+          onClick={() => { setFilterScope('organization'); setPage(1); }}
+        >
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="p-2 bg-green-100 rounded-lg">
+              <Building2 className="h-5 w-5 text-green-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-green-600">{counts.organization}</p>
+              <p className="text-xs text-slate-500">{t.commissions.orgCommissions}</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Filters */}
+      <Card className="border-0 shadow-sm">
+        <CardContent className="p-4">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Input
+                placeholder={t.commissions.searchPlaceholder}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <Select
+              value={filterActive || 'all'}
+              onValueChange={(val) => { setFilterActive(val === 'all' ? '' : val); setPage(1); }}
+            >
+              <SelectTrigger className="w-full sm:w-[180px]">
+                <SelectValue placeholder={t.commissions.allStatuses} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t.commissions.allStatuses}</SelectItem>
+                <SelectItem value="true">
+                  <span className="flex items-center gap-1.5">
+                    <CheckCircle className="h-3.5 w-3.5 text-green-500" />
+                    {t.commissions.activeOnly}
+                  </span>
+                </SelectItem>
+                <SelectItem value="false">
+                  <span className="flex items-center gap-1.5">
+                    <XCircle className="h-3.5 w-3.5 text-slate-400" />
+                    {t.commissions.inactiveOnly}
+                  </span>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={currentSortValue} onValueChange={handleSortChange}>
+              <SelectTrigger className="w-full sm:w-[220px]">
+                <SelectValue placeholder={t.commissions.sortDefault} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">{t.commissions.sortDefault}</SelectItem>
+                <SelectItem value="value_asc">{t.commissions.sortValueAsc}</SelectItem>
+                <SelectItem value="value_desc">{t.commissions.sortValueDesc}</SelectItem>
+                <SelectItem value="newest">{t.commissions.sortNewest}</SelectItem>
+                <SelectItem value="oldest">{t.commissions.sortOldest}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Table */}
+      <Card className="border-0 shadow-sm">
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="py-12">
+              <LoadingState />
+            </div>
+          ) : commissions.length === 0 ? (
             <div className="text-center py-12 text-slate-500">
               <Percent className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>{t.commissions.noCommissions}</p>
+              <p className="font-medium">{t.commissions.noCommissions}</p>
             </div>
           ) : (
             <>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>ID</TableHead>
                     <TableHead>{t.commissions.scope}</TableHead>
-                    <TableHead>{t.commissions.scopeId}</TableHead>
-                    <TableHead>{t.commissions.value}</TableHead>
+                    <TableHead>{t.commissions.target}</TableHead>
+                    <TableHead>
+                      <span className="flex items-center gap-1">
+                        {t.commissions.value}
+                        <ArrowUpDown className="h-3 w-3 text-slate-400" />
+                      </span>
+                    </TableHead>
                     <TableHead>{t.commissions.description}</TableHead>
                     <TableHead>{t.commissions.active}</TableHead>
-                    <TableHead>{t.common.createdAt}</TableHead>
-                    <TableHead>{t.common.actions}</TableHead>
+                    <TableHead>{t.commissions.createdDate}</TableHead>
+                    <TableHead className="text-right">{t.common.actions}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {commissions.map((c: SystemCommissionDto) => (
-                    <TableRow key={c.id}>
-                      <TableCell className="font-mono text-sm">{c.id}</TableCell>
+                    <TableRow key={c.id} className={!c.active ? 'opacity-50' : ''}>
                       <TableCell>
-                        <Badge variant="outline" className={scopeBadgeColor(c.scope)}>
+                        <Badge variant="outline" className={`${scopeBadgeColor(c.scope)} gap-1.5`}>
+                          {scopeIcon(c.scope)}
                           {t.commissions.scopeTypes[c.scope] || c.scope}
                         </Badge>
                       </TableCell>
-                      <TableCell>{c.scopeId || '-'}</TableCell>
-                      <TableCell className="font-semibold">%{c.value}</TableCell>
+                      <TableCell>
+                        {c.scope === 'global' ? (
+                          <span className="text-sm text-slate-400">-</span>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            {c.scope === 'category' ? (
+                              <Tag className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                            ) : (
+                              <Building2 className="h-3.5 w-3.5 text-green-500 shrink-0" />
+                            )}
+                            <span className="text-sm font-medium">{getScopeName(c)}</span>
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-lg font-bold text-violet-600">%{c.value}</span>
+                      </TableCell>
                       <TableCell className="text-sm text-slate-500 max-w-[200px] truncate">
                         {c.description || '-'}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={c.active ? 'default' : 'secondary'}>
-                          {c.active ? t.admin.statusActive : t.admin.statusInactive}
-                        </Badge>
+                        {c.active ? (
+                          <Badge className="bg-green-100 text-green-700 border-green-200 gap-1">
+                            <CheckCircle className="h-3 w-3" />
+                            {t.commissions.activeOnly}
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="gap-1">
+                            <XCircle className="h-3 w-3" />
+                            {t.commissions.inactiveOnly}
+                          </Badge>
+                        )}
                       </TableCell>
-                      <TableCell className="text-sm text-slate-500">
-                        {new Date(c.createdAt).toLocaleDateString(locale)}
+                      <TableCell className="text-xs text-slate-400">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          {new Date(c.createdAt).toLocaleDateString(locale === 'tr' ? 'tr-TR' : locale === 'de' ? 'de-DE' : 'en-US')}
+                        </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon">
@@ -385,34 +757,15 @@ export default function AdminCommissionsPage() {
               </Table>
 
               {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between mt-4">
-                  <p className="text-sm text-slate-500">
-                    {t.admin.paginationTotal}: {meta?.total || meta?.totalCount || 0} {t.admin.paginationRecords}
-                  </p>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={page <= 1}
-                      onClick={() => setPage((p) => p - 1)}
-                    >
-                      {t.admin.previous}
-                    </Button>
-                    <span className="flex items-center text-sm px-2">
-                      {t.admin.paginationPage} {page} / {totalPages}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={page >= totalPages}
-                      onClick={() => setPage((p) => p + 1)}
-                    >
-                      {t.admin.nextPage}
-                    </Button>
-                  </div>
-                </div>
-              )}
+              <div className="p-4 border-t">
+                <AdminPagination
+                  page={page}
+                  limit={limit}
+                  total={meta?.total || meta?.totalCount || commissions.length}
+                  onPageChange={setPage}
+                  onLimitChange={(newLimit) => { setLimit(newLimit); setPage(1); }}
+                />
+              </div>
             </>
           )}
         </CardContent>

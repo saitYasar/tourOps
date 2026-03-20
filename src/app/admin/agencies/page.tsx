@@ -36,7 +36,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { LoadingState, ConfirmDialog } from '@/components/shared';
+import { LoadingState, ConfirmDialog, AdminPagination } from '@/components/shared';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 function resolveImageUrl(company: CompanyDto): string | null {
@@ -416,7 +416,7 @@ export default function AdminAgenciesPage() {
   const debouncedSearch = useDebounce(searchTerm, 800);
   const [statusFilter, setStatusFilter] = useState<CompanyStatus | 'all'>('all');
   const [page, setPage] = useState(1);
-  const [limit] = useState(20);
+  const [limit, setLimit] = useState(20);
   const [statusUpdateTarget, setStatusUpdateTarget] = useState<{
     company: CompanyDto;
     newStatus: CompanyStatus;
@@ -431,13 +431,22 @@ export default function AdminAgenciesPage() {
     }
   }, [debouncedSearch]);
 
-  // Fetch all agencies (for status counts)
-  const { data: allAgenciesResult } = useQuery({
-    queryKey: ['admin-agencies-counts'],
-    queryFn: () =>
-      adminApi.getAgenciesList({
-        limit: 100,
-      }),
+  // Fetch status counts via separate small queries (limit: 1 just to get meta.total)
+  const { data: totalAgencyCount } = useQuery({
+    queryKey: ['admin-agencies-count-all'],
+    queryFn: () => adminApi.getAgenciesList({ limit: 1 }),
+  });
+  const { data: pendingAgencyCount } = useQuery({
+    queryKey: ['admin-agencies-count-pending'],
+    queryFn: () => adminApi.getAgenciesList({ status: 'pending', limit: 1 }),
+  });
+  const { data: activeAgencyCount } = useQuery({
+    queryKey: ['admin-agencies-count-active'],
+    queryFn: () => adminApi.getAgenciesList({ status: 'active', limit: 1 }),
+  });
+  const { data: suspendedAgencyCount } = useQuery({
+    queryKey: ['admin-agencies-count-suspended'],
+    queryFn: () => adminApi.getAgenciesList({ status: 'suspended', limit: 1 }),
   });
 
   // Fetch agencies with current filter (for the list)
@@ -446,6 +455,7 @@ export default function AdminAgenciesPage() {
     queryFn: () =>
       adminApi.getAgenciesList({
         name: debouncedSearch || undefined,
+        status: statusFilter !== 'all' ? statusFilter : undefined,
         page,
         limit,
       }),
@@ -460,7 +470,10 @@ export default function AdminAgenciesPage() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-agencies'] });
-      queryClient.invalidateQueries({ queryKey: ['admin-agencies-counts'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-agencies-count-all'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-agencies-count-pending'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-agencies-count-active'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-agencies-count-suspended'] });
       toast.success(t.admin.agencyStatusUpdated);
       setStatusUpdateTarget(null);
     },
@@ -474,14 +487,13 @@ export default function AdminAgenciesPage() {
   const companies = companiesResult?.success ? companiesResult.data?.data || [] : [];
   const meta = companiesResult?.success ? companiesResult.data?.meta : null;
 
-  // Status counts from the unfiltered query
-  const allAgencies = allAgenciesResult?.success ? allAgenciesResult.data?.data || [] : [];
-  const allAgenciesMeta = allAgenciesResult?.success ? allAgenciesResult.data?.meta : null;
+  // Status counts from meta.total of each filtered query
+  const getMetaTotal = (r: typeof totalAgencyCount) => (r?.success ? r.data?.meta?.total || r.data?.meta?.totalCount || 0 : 0);
   const statusCounts = {
-    all: allAgenciesMeta?.total || allAgencies.length,
-    pending: allAgencies.filter((c) => c.status === 'pending').length,
-    active: allAgencies.filter((c) => c.status === 'active').length,
-    suspended: allAgencies.filter((c) => c.status === 'suspended').length,
+    all: getMetaTotal(totalAgencyCount),
+    pending: getMetaTotal(pendingAgencyCount),
+    active: getMetaTotal(activeAgencyCount),
+    suspended: getMetaTotal(suspendedAgencyCount),
   };
 
   const handleStatusUpdate = (company: CompanyDto, newStatus: CompanyStatus) => {
@@ -630,45 +642,14 @@ export default function AdminAgenciesPage() {
         )}
 
         {/* Pagination */}
-        {meta && meta.totalPages > 1 && (
-          <div className="flex items-center justify-between pt-4">
-            <p className="text-sm text-slate-500">
-              {`${t.admin.agencyPage} ${meta.page} / ${meta.totalPages} (${t.admin.agencyTotalRecords} ${meta.total})`}
-            </p>
-            <div className="flex gap-2">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span tabIndex={0}>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setPage((p) => Math.max(1, p - 1))}
-                      disabled={page === 1}
-                    >
-                      Önceki
-                    </Button>
-                  </span>
-                </TooltipTrigger>
-                {page === 1 && <TooltipContent>{t.tooltips.firstPage}</TooltipContent>}
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span tabIndex={0}>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setPage((p) => Math.min(meta.totalPages, p + 1))}
-                      disabled={page === meta.totalPages}
-                    >
-                      Sonraki
-                    </Button>
-                  </span>
-                </TooltipTrigger>
-                {page === meta.totalPages && <TooltipContent>{t.tooltips.lastPage}</TooltipContent>}
-              </Tooltip>
-            </div>
-          </div>
-        )}
+        <AdminPagination
+          page={page}
+          limit={limit}
+          total={meta?.total || meta?.totalCount || companies.length}
+          totalPages={meta?.totalPages}
+          onPageChange={setPage}
+          onLimitChange={(newLimit) => { setLimit(newLimit); setPage(1); }}
+        />
       </div>
 
       {/* Status Update Confirmation */}

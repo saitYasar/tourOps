@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Bell,
@@ -9,6 +9,10 @@ import {
   Trash2,
   MoreHorizontal,
   Image as ImageIcon,
+  Search,
+  X,
+  Check,
+  Upload,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -48,9 +52,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { LoadingState, ConfirmDialog } from '@/components/shared';
-import { MultiCombobox, type MultiComboboxOption } from '@/components/ui/multi-combobox';
-import { Combobox } from '@/components/ui/combobox';
+import { LoadingState, ConfirmDialog, AdminPagination } from '@/components/shared';
 
 const TARGET_TYPES: NotificationTargetType[] = [
   'ALL_CLIENTS',
@@ -68,6 +70,11 @@ const SPECIFIC_TYPES: NotificationTargetType[] = [
   'SPECIFIC_CLIENT',
   'ORGANIZATION_CATEGORY',
 ];
+
+interface TargetOption {
+  value: string;
+  label: string;
+}
 
 export default function AdminNotificationsPage() {
   const { t, locale } = useLanguage();
@@ -90,9 +97,13 @@ export default function AdminNotificationsPage() {
   const [formTargetId, setFormTargetId] = useState('');
   const [formImage, setFormImage] = useState<File | null>(null);
 
-  // Target options for searchable selects
-  const [targetOptions, setTargetOptions] = useState<MultiComboboxOption[]>([]);
+  // Target options for inline search
+  const [targetOptions, setTargetOptions] = useState<TargetOption[]>([]);
   const [targetOptionsLoading, setTargetOptionsLoading] = useState(false);
+  const [targetSearch, setTargetSearch] = useState('');
+
+  // Image input ref
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch target options when target type changes
   const fetchTargetOptions = useCallback(async (targetType: NotificationTargetType) => {
@@ -103,19 +114,19 @@ export default function AdminNotificationsPage() {
     setTargetOptionsLoading(true);
     try {
       if (targetType === 'SPECIFIC_ORGANIZATION') {
-        const res = await adminApi.getOrganizationsList({ limit: 200, lang: locale as 'tr' | 'en' });
+        const res = await adminApi.getOrganizationsList({ limit: 100, lang: locale as 'tr' | 'en' });
         if (res.success && res.data?.data) {
           setTargetOptions(res.data.data.map((o: { id: number; name: string }) => ({
             value: String(o.id),
-            label: `${o.name} (ID: ${o.id})`,
+            label: o.name,
           })));
         }
       } else if (targetType === 'SPECIFIC_AGENCY') {
-        const res = await adminApi.getAgenciesList({ limit: 200, lang: locale as 'tr' | 'en' });
+        const res = await adminApi.getAgenciesList({ limit: 100, lang: locale as 'tr' | 'en' });
         if (res.success && res.data?.data) {
           setTargetOptions(res.data.data.map((a: { id: number; name: string }) => ({
             value: String(a.id),
-            label: `${a.name} (ID: ${a.id})`,
+            label: a.name,
           })));
         }
       } else if (targetType === 'SPECIFIC_CLIENT') {
@@ -123,7 +134,7 @@ export default function AdminNotificationsPage() {
         if (res.success && res.data?.data) {
           setTargetOptions(res.data.data.map((u: { id: number; firstName: string; lastName: string; email: string }) => ({
             value: String(u.id),
-            label: `${u.firstName} ${u.lastName} — ${u.email} (ID: ${u.id})`,
+            label: `${u.firstName} ${u.lastName} — ${u.email}`,
           })));
         }
       } else if (targetType === 'ORGANIZATION_CATEGORY') {
@@ -132,7 +143,7 @@ export default function AdminNotificationsPage() {
           const cats = Array.isArray(res.data) ? res.data : (res.data as { data?: { id: number; name: string }[] }).data || [];
           setTargetOptions(cats.map((c: { id: number; name: string }) => ({
             value: String(c.id),
-            label: `${c.name} (ID: ${c.id})`,
+            label: c.name,
           })));
         }
       }
@@ -150,6 +161,11 @@ export default function AdminNotificationsPage() {
       setTargetOptions([]);
     }
   }, [formTargetType, fetchTargetOptions]);
+
+  // Filtered options based on search
+  const filteredTargetOptions = targetSearch.trim()
+    ? targetOptions.filter(o => o.label.toLowerCase().includes(targetSearch.toLowerCase()))
+    : targetOptions;
 
   // Fetch notifications
   const { data: result, isLoading } = useQuery({
@@ -220,6 +236,7 @@ export default function AdminNotificationsPage() {
     setFormTargetIds([]);
     setFormTargetId('');
     setFormImage(null);
+    setTargetSearch('');
   };
 
   const openEdit = (notification: AdminNotificationDto) => {
@@ -230,6 +247,7 @@ export default function AdminNotificationsPage() {
     setFormTargetId(notification.targetId ? String(notification.targetId) : '');
     setFormTargetIds(notification.targetId ? [String(notification.targetId)] : []);
     setFormImage(null);
+    setTargetSearch('');
     setEditOpen(true);
   };
 
@@ -261,7 +279,6 @@ export default function AdminNotificationsPage() {
     if (needsTarget && formTargetIds.length === 0 && !formTargetId) return;
 
     if (hasMultiple) {
-      // Create one notification per selected target
       setIsMultiCreating(true);
       let successCount = 0;
       let errorCount = 0;
@@ -277,7 +294,7 @@ export default function AdminNotificationsPage() {
       setIsMultiCreating(false);
       if (successCount > 0) {
         queryClient.invalidateQueries({ queryKey: ['admin-notifications'] });
-        toast.success(`${successCount} bildirim oluşturuldu${errorCount > 0 ? `, ${errorCount} hata` : ''}`);
+        toast.success(`${successCount} ${t.notifications.created}${errorCount > 0 ? `, ${errorCount} hata` : ''}`);
         resetForm();
         setCreateOpen(false);
       } else {
@@ -301,16 +318,144 @@ export default function AdminNotificationsPage() {
 
   const notifications = result?.success ? result.data?.data || [] : [];
   const meta = result?.success ? result.data?.meta : null;
-  const totalPages = meta ? Math.ceil((meta.total || meta.totalCount || 0) / limit) : 1;
+
+  const getTargetLabel = (targetType: NotificationTargetType) => {
+    switch (targetType) {
+      case 'SPECIFIC_ORGANIZATION': return t.notifications.selectOrganization;
+      case 'SPECIFIC_AGENCY': return t.notifications.selectAgency;
+      case 'SPECIFIC_CLIENT': return t.notifications.selectClient;
+      case 'ORGANIZATION_CATEGORY': return t.notifications.selectCategory;
+      default: return '';
+    }
+  };
+
+  const toggleTargetId = (id: string, isEdit: boolean) => {
+    if (isEdit) {
+      // Single select for edit
+      setFormTargetIds([id]);
+      setFormTargetId(id);
+    } else {
+      // Multi select for create
+      if (formTargetIds.includes(id)) {
+        setFormTargetIds(formTargetIds.filter(v => v !== id));
+      } else {
+        setFormTargetIds([...formTargetIds, id]);
+      }
+    }
+  };
+
+  const renderTargetSelector = (isEdit: boolean) => {
+    if (!SPECIFIC_TYPES.includes(formTargetType)) return null;
+
+    const selectedOptions = targetOptions.filter(o =>
+      isEdit ? (o.value === formTargetIds[0] || o.value === formTargetId) : formTargetIds.includes(o.value)
+    );
+
+    return (
+      <div>
+        <Label>{getTargetLabel(formTargetType)}</Label>
+
+        {/* Selected items */}
+        {selectedOptions.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-2 mt-1">
+            {selectedOptions.map(opt => (
+              <Badge key={opt.value} variant="secondary" className="text-xs gap-1 pr-1">
+                {opt.label}
+                <button
+                  type="button"
+                  className="ml-0.5 hover:text-red-600 rounded-full"
+                  onClick={() => {
+                    if (isEdit) {
+                      setFormTargetIds([]);
+                      setFormTargetId('');
+                    } else {
+                      setFormTargetIds(formTargetIds.filter(v => v !== opt.value));
+                    }
+                  }}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            ))}
+            {!isEdit && formTargetIds.length > 0 && (
+              <button
+                type="button"
+                className="text-xs text-red-500 hover:text-red-700 ml-1"
+                onClick={() => setFormTargetIds([])}
+              >
+                {t.notifications.clearAll}
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Search input */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Input
+            value={targetSearch}
+            onChange={(e) => setTargetSearch(e.target.value)}
+            placeholder={t.notifications.searchByName}
+            className="pl-9 pr-8"
+          />
+          {targetSearch && (
+            <button
+              type="button"
+              onClick={() => setTargetSearch('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+
+        {/* Options list (always inline, scrollable) */}
+        <div className="mt-2 border rounded-lg max-h-[200px] overflow-y-auto">
+          {targetOptionsLoading ? (
+            <div className="py-6 text-center text-sm text-slate-500">{t.common.loading}</div>
+          ) : filteredTargetOptions.length === 0 ? (
+            <div className="py-6 text-center text-sm text-slate-400">{t.notifications.noResults}</div>
+          ) : (
+            filteredTargetOptions.map((opt) => {
+              const isSelected = isEdit
+                ? (opt.value === formTargetIds[0] || opt.value === formTargetId)
+                : formTargetIds.includes(opt.value);
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  className={`w-full flex items-center gap-3 px-3 py-2 text-left border-b last:border-b-0 hover:bg-slate-50 transition-colors ${isSelected ? 'bg-blue-50' : ''}`}
+                  onClick={() => toggleTargetId(opt.value, isEdit)}
+                >
+                  <div className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 ${isSelected ? 'bg-blue-600 border-blue-600' : 'border-slate-300'}`}>
+                    {isSelected && <Check className="h-3 w-3 text-white" />}
+                  </div>
+                  <span className="text-sm truncate">{opt.label}</span>
+                  <span className="text-xs text-slate-400 ml-auto shrink-0">ID: {opt.value}</span>
+                </button>
+              );
+            })
+          )}
+        </div>
+
+        {/* Selected count info */}
+        {!isEdit && formTargetIds.length > 1 && (
+          <p className="text-xs text-slate-500 mt-1.5">
+            {formTargetIds.length} {t.notifications.selected} — {t.notifications.eachWillBeCreated}
+          </p>
+        )}
+      </div>
+    );
+  };
 
   const renderForm = (isEdit: boolean) => (
     <div className="space-y-4">
       <div>
-        <Label>{t.common.appName === 'TourOps' ? 'Başlık' : 'Title'}</Label>
+        <Label>{t.notifications.notifTitle}</Label>
         <Input
           value={formTitle}
           onChange={(e) => setFormTitle(e.target.value)}
-          placeholder={locale === 'tr' ? 'Bildirim başlığı' : 'Notification title'}
+          placeholder={t.notifications.notifTitlePlaceholder}
         />
       </div>
       <div>
@@ -318,13 +463,13 @@ export default function AdminNotificationsPage() {
         <Textarea
           value={formBody}
           onChange={(e) => setFormBody(e.target.value)}
-          placeholder={locale === 'tr' ? 'Bildirim içeriği' : 'Notification content'}
+          placeholder={t.notifications.notifBodyPlaceholder}
           rows={4}
         />
       </div>
       <div>
         <Label>{t.notifications.targetType}</Label>
-        <Select value={formTargetType} onValueChange={(v) => { setFormTargetType(v as NotificationTargetType); setFormTargetIds([]); setFormTargetId(''); }}>
+        <Select value={formTargetType} onValueChange={(v) => { setFormTargetType(v as NotificationTargetType); setFormTargetIds([]); setFormTargetId(''); setTargetSearch(''); }}>
           <SelectTrigger>
             <SelectValue />
           </SelectTrigger>
@@ -337,49 +482,64 @@ export default function AdminNotificationsPage() {
           </SelectContent>
         </Select>
       </div>
-      {SPECIFIC_TYPES.includes(formTargetType) && (
-        <div>
-          <Label>
-            {formTargetType === 'SPECIFIC_ORGANIZATION' ? 'İşletme Seçin' :
-             formTargetType === 'SPECIFIC_AGENCY' ? 'Acente Seçin' :
-             formTargetType === 'SPECIFIC_CLIENT' ? 'Müşteri Seçin' :
-             'Kategori Seçin'}
-          </Label>
-          {isEdit ? (
-            <Combobox
-              options={targetOptions.map(o => ({ value: o.value, label: o.label }))}
-              value={formTargetIds[0] || formTargetId}
-              onValueChange={(v) => { setFormTargetIds([v]); setFormTargetId(v); }}
-              placeholder={locale === 'tr' ? 'Ara ve seç...' : 'Search and select...'}
-              searchPlaceholder={locale === 'tr' ? 'İsme göre ara...' : 'Search by name...'}
-              emptyText={targetOptionsLoading ? 'Yükleniyor...' : (locale === 'tr' ? 'Sonuç bulunamadı' : 'No results')}
-            />
-          ) : (
-            <MultiCombobox
-              options={targetOptions}
-              values={formTargetIds}
-              onValuesChange={setFormTargetIds}
-              placeholder={locale === 'tr' ? 'Ara ve seç...' : 'Search and select...'}
-              searchPlaceholder={locale === 'tr' ? 'İsme göre ara...' : 'Search by name...'}
-              emptyText={locale === 'tr' ? 'Sonuç bulunamadı' : 'No results'}
-              loading={targetOptionsLoading}
-            />
-          )}
-          {!isEdit && formTargetIds.length > 1 && (
-            <p className="text-xs text-slate-500 mt-1">
-              {formTargetIds.length} seçildi — her biri için ayrı bildirim oluşturulacak
-            </p>
-          )}
-        </div>
-      )}
+
+      {renderTargetSelector(isEdit)}
+
+      {/* Image Upload */}
       <div>
         <Label>{t.notifications.image}</Label>
-        <Input
+        <input
+          ref={imageInputRef}
           type="file"
           accept="image/*"
+          className="hidden"
           onChange={(e) => setFormImage(e.target.files?.[0] || null)}
         />
+        {formImage ? (
+          <div className="mt-1 flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+            <div className="h-12 w-12 rounded-lg bg-white border border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
+              <img
+                src={URL.createObjectURL(formImage)}
+                alt=""
+                className="h-full w-full object-cover"
+              />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-slate-700 truncate">{formImage.name}</p>
+              <p className="text-xs text-slate-400">{(formImage.size / 1024).toFixed(0)} KB</p>
+            </div>
+            <div className="flex gap-1.5 shrink-0">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => imageInputRef.current?.click()}
+              >
+                {t.notifications.changeImage}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                onClick={() => setFormImage(null)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => imageInputRef.current?.click()}
+            className="mt-1 w-full flex flex-col items-center justify-center gap-2 p-6 border-2 border-dashed border-slate-300 rounded-lg hover:border-blue-400 hover:bg-blue-50/50 transition-colors cursor-pointer"
+          >
+            <Upload className="h-6 w-6 text-slate-400" />
+            <span className="text-sm text-slate-500">{t.notifications.imageUpload}</span>
+          </button>
+        )}
       </div>
+
       <DialogFooter>
         <Button
           variant="outline"
@@ -434,7 +594,7 @@ export default function AdminNotificationsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>ID</TableHead>
-                    <TableHead>{locale === 'tr' ? 'Başlık' : 'Title'}</TableHead>
+                    <TableHead>{t.notifications.notifTitle}</TableHead>
                     <TableHead>{t.notifications.targetType}</TableHead>
                     <TableHead>{t.notifications.targetId}</TableHead>
                     <TableHead>{t.notifications.image}</TableHead>
@@ -496,34 +656,12 @@ export default function AdminNotificationsPage() {
               </Table>
 
               {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between mt-4">
-                  <p className="text-sm text-slate-500">
-                    {t.admin.paginationTotal}: {meta?.total || meta?.totalCount || 0} {t.admin.paginationRecords}
-                  </p>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={page <= 1}
-                      onClick={() => setPage((p) => p - 1)}
-                    >
-                      {t.admin.previous}
-                    </Button>
-                    <span className="flex items-center text-sm px-2">
-                      {t.admin.paginationPage} {page} / {totalPages}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={page >= totalPages}
-                      onClick={() => setPage((p) => p + 1)}
-                    >
-                      {t.admin.nextPage}
-                    </Button>
-                  </div>
-                </div>
-              )}
+              <AdminPagination
+                page={page}
+                limit={limit}
+                total={meta?.total || meta?.totalCount || notifications.length}
+                onPageChange={setPage}
+              />
             </>
           )}
         </CardContent>
@@ -531,7 +669,7 @@ export default function AdminNotificationsPage() {
 
       {/* Create Dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{t.notifications.create}</DialogTitle>
           </DialogHeader>
@@ -541,7 +679,7 @@ export default function AdminNotificationsPage() {
 
       {/* Edit Dialog */}
       <Dialog open={editOpen} onOpenChange={(open) => { setEditOpen(open); if (!open) setEditingNotification(null); }}>
-        <DialogContent>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{t.notifications.edit}</DialogTitle>
           </DialogHeader>

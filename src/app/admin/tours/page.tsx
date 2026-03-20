@@ -9,8 +9,6 @@ import {
   Users,
   Eye,
   Building2,
-  ChevronLeft,
-  ChevronRight,
   MapPin,
   Clock,
   ChevronDown,
@@ -23,9 +21,11 @@ import {
   User as UserIcon,
   Printer,
   FileSpreadsheet,
+  ArrowUpDown,
 } from 'lucide-react';
 
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useDebounce } from '@/hooks/useDebounce';
 import { adminApi } from '@/lib/api';
 import type { ApiTourDto, AgencyStopChoicesDto, AgencyStopServiceSummaryDto } from '@/lib/api';
 import { formatDate, formatShortDateTime } from '@/lib/dateUtils';
@@ -51,8 +51,16 @@ import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import {
-  LoadingState, EmptyState, ErrorState, TourStatusBadge,
-  CompactReceipt, DetailedListReceipt, KitchenSummaryReceipt,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  LoadingState, EmptyState, ErrorState, TourStatusBadge, AdminPagination,
+  CompactReceipt, DetailedListReceipt, KitchenSummaryReceipt, ReceiptServiceSummary,
   handleReceiptPrint, exportReceiptExcel,
 } from '@/components/shared';
 import type { ReceiptTemplate } from '@/components/shared';
@@ -61,13 +69,22 @@ function resolveImageUrl(url?: string | null): string | null {
   return url || null;
 }
 
-const ITEMS_PER_PAGE = 12;
+const ITEMS_PER_PAGE = 20;
 
 export default function AdminToursPage() {
   const { t, locale } = useLanguage();
+
+  // Filters
   const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearch = useDebounce(searchTerm, 500);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [agencyFilter, setAgencyFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState('');
+  const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC' | ''>('');
   const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(ITEMS_PER_PAGE);
+
+  // Detail dialog
   const [selectedTourId, setSelectedTourId] = useState<number | null>(null);
   const [dialogTab, setDialogTab] = useState('info');
   const [expandedParticipantId, setExpandedParticipantId] = useState<number | null>(null);
@@ -79,11 +96,43 @@ export default function AdminToursPage() {
 
   const lang = (locale === 'de' ? 'en' : locale) as 'tr' | 'en';
 
+  // Reset page on filter change
+  const prevFilters = useRef({ debouncedSearch, statusFilter, agencyFilter, sortBy, sortOrder });
+  useEffect(() => {
+    const prev = prevFilters.current;
+    if (
+      prev.debouncedSearch !== debouncedSearch ||
+      prev.statusFilter !== statusFilter ||
+      prev.agencyFilter !== agencyFilter ||
+      prev.sortBy !== sortBy ||
+      prev.sortOrder !== sortOrder
+    ) {
+      setPage(1);
+      prevFilters.current = { debouncedSearch, statusFilter, agencyFilter, sortBy, sortOrder };
+    }
+  }, [debouncedSearch, statusFilter, agencyFilter, sortBy, sortOrder]);
+
+  // Fetch agencies for filter
+  const { data: agenciesResult } = useQuery({
+    queryKey: ['admin-agencies-list-for-filter'],
+    queryFn: () => adminApi.getAgenciesList({ limit: 100 }),
+  });
+  const agencies = agenciesResult?.success ? agenciesResult.data?.data || [] : [];
+
+  // Fetch tours
   const { data: toursResponse, isLoading, error } = useQuery({
-    queryKey: ['admin-tours', page, statusFilter, lang],
+    queryKey: ['admin-tours', page, limit, statusFilter, debouncedSearch, agencyFilter, sortBy, sortOrder, lang],
     queryFn: async () => {
-      const status = statusFilter !== 'all' ? statusFilter : undefined;
-      const result = await adminApi.getTours(page, ITEMS_PER_PAGE, lang, status);
+      const result = await adminApi.getTours({
+        page,
+        limit,
+        lang,
+        status: statusFilter !== 'all' ? statusFilter : undefined,
+        search: debouncedSearch || undefined,
+        agencyId: agencyFilter !== 'all' ? Number(agencyFilter) : undefined,
+        sortBy: sortBy || undefined,
+        sortOrder: sortOrder || undefined,
+      });
       if (!result.success) throw new Error(result.error);
       return { data: result.data || [], meta: result.meta };
     },
@@ -91,14 +140,6 @@ export default function AdminToursPage() {
 
   const tours = toursResponse?.data || [];
   const meta = toursResponse?.meta;
-  const totalPages = meta?.totalPages || 1;
-
-  // Client-side search filter (on top of server-side status filter)
-  const filteredTours = tours.filter(
-    (tour) =>
-      tour.tourName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      tour.tourCode.toLowerCase().includes(searchTerm.toLowerCase())
-  );
 
   // Tour detail query
   const { data: tourDetail, isLoading: isDetailLoading } = useQuery({
@@ -165,10 +206,21 @@ export default function AdminToursPage() {
     exportReceiptExcel(receiptTourInfo, choicesArr, serviceSummary ?? null, choicesOrgName, t);
   }, [choicesArr, serviceSummary, choicesOrgName, t, receiptTourInfo]);
 
-  const handleStatusFilterChange = (value: string) => {
-    setStatusFilter(value);
-    setPage(1);
+  const handleSortChange = (val: string) => {
+    switch (val) {
+      case 'date_desc': setSortBy('startDate'); setSortOrder('DESC'); break;
+      case 'date_asc': setSortBy('startDate'); setSortOrder('ASC'); break;
+      case 'name_asc': setSortBy('tourName'); setSortOrder('ASC'); break;
+      case 'name_desc': setSortBy('tourName'); setSortOrder('DESC'); break;
+      default: setSortBy(''); setSortOrder(''); break;
+    }
   };
+
+  const currentSortValue = sortBy === 'startDate' && sortOrder === 'DESC' ? 'date_desc'
+    : sortBy === 'startDate' && sortOrder === 'ASC' ? 'date_asc'
+    : sortBy === 'tourName' && sortOrder === 'ASC' ? 'name_asc'
+    : sortBy === 'tourName' && sortOrder === 'DESC' ? 'name_desc'
+    : 'none';
 
   if (error) return <ErrorState message={t.admin.tourLoadError} />;
 
@@ -177,15 +229,15 @@ export default function AdminToursPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-violet-100 rounded-xl">
+          <div className="p-2.5 bg-violet-100 rounded-xl">
             <Calendar className="h-6 w-6 text-violet-600" />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-slate-900">{t.admin.tourManagement}</h1>
-            <p className="text-slate-500">{t.tours.description}</p>
+            <p className="text-slate-500 text-sm">{t.tours.description}</p>
           </div>
         </div>
-        <Badge className="bg-violet-100 text-violet-700">
+        <Badge className="bg-violet-100 text-violet-700 text-sm px-3 py-1">
           {meta?.total || meta?.totalCount || tours.length} {t.admin.tours}
         </Badge>
       </div>
@@ -203,7 +255,7 @@ export default function AdminToursPage() {
                 className="pl-10"
               />
             </div>
-            <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
+            <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
               <SelectTrigger className="w-full sm:w-[180px]">
                 <SelectValue placeholder={t.tours.status} />
               </SelectTrigger>
@@ -215,119 +267,131 @@ export default function AdminToursPage() {
                 <SelectItem value="completed">{t.tours.completed}</SelectItem>
               </SelectContent>
             </Select>
+            <Select value={agencyFilter} onValueChange={(v) => { setAgencyFilter(v); setPage(1); }}>
+              <SelectTrigger className="w-full sm:w-[200px]">
+                <SelectValue placeholder={t.admin.tourAgency} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t.common.all}</SelectItem>
+                {agencies.map((a) => (
+                  <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={currentSortValue} onValueChange={handleSortChange}>
+              <SelectTrigger className="w-full sm:w-[200px]">
+                <SelectValue placeholder={t.commissions.sortDefault} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">{t.commissions.sortDefault}</SelectItem>
+                <SelectItem value="date_desc">{t.commissions.sortNewest}</SelectItem>
+                <SelectItem value="date_asc">{t.commissions.sortOldest}</SelectItem>
+                <SelectItem value="name_asc">A → Z</SelectItem>
+                <SelectItem value="name_desc">Z → A</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
 
-      {/* Loading */}
-      {isLoading && <LoadingState />}
+      {/* Tours Table */}
+      <Card className="border-0 shadow-sm">
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="py-12"><LoadingState /></div>
+          ) : tours.length === 0 ? (
+            <div className="py-12">
+              <EmptyState icon={Calendar} title={t.tours.list} description={t.tours.noTours} />
+            </div>
+          ) : (
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[60px]"></TableHead>
+                    <TableHead>{t.tours.name}</TableHead>
+                    <TableHead>{t.tours.tourCode}</TableHead>
+                    <TableHead>{t.admin.tourAgency}</TableHead>
+                    <TableHead>
+                      <span className="flex items-center gap-1">
+                        {t.tours.startDate}
+                        <ArrowUpDown className="h-3 w-3 text-slate-400" />
+                      </span>
+                    </TableHead>
+                    <TableHead>{t.tours.endDate}</TableHead>
+                    <TableHead className="text-center">{t.admin.tourParticipants}</TableHead>
+                    <TableHead>{t.tours.status}</TableHead>
+                    <TableHead className="text-right"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {tours.map((tour) => {
+                    const coverUrl = resolveImageUrl(tour.coverImageUrl);
+                    return (
+                      <TableRow
+                        key={tour.id}
+                        className="cursor-pointer hover:bg-slate-50"
+                        onClick={() => setSelectedTourId(tour.id)}
+                      >
+                        <TableCell className="pr-0">
+                          <div className="h-10 w-10 rounded-lg bg-slate-100 overflow-hidden shrink-0">
+                            {coverUrl ? (
+                              <img src={coverUrl} alt="" className="h-full w-full object-cover" />
+                            ) : (
+                              <div className="h-full w-full flex items-center justify-center">
+                                <ImageIcon className="h-4 w-4 text-slate-300" />
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-medium">{tour.tourName}</TableCell>
+                        <TableCell className="font-mono text-xs text-slate-500">{tour.tourCode}</TableCell>
+                        <TableCell>
+                          {tour.agency ? (
+                            <span className="flex items-center gap-1.5 text-sm">
+                              <Building2 className="h-3.5 w-3.5 text-slate-400" />
+                              {tour.agency.name}
+                            </span>
+                          ) : '-'}
+                        </TableCell>
+                        <TableCell className="text-sm">{formatDate(tour.startDate)}</TableCell>
+                        <TableCell className="text-sm">{formatDate(tour.endDate)}</TableCell>
+                        <TableCell className="text-center">
+                          {tour.maxParticipants ? (
+                            <span className="flex items-center justify-center gap-1 text-sm">
+                              <Users className="h-3.5 w-3.5 text-slate-400" />
+                              {tour.maxParticipants}
+                            </span>
+                          ) : '-'}
+                        </TableCell>
+                        <TableCell>
+                          <TourStatusBadge status={tour.status} />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="sm" className="text-slate-500">
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
 
-      {/* Tours Grid */}
-      {!isLoading && filteredTours.length === 0 ? (
-        <EmptyState
-          icon={Calendar}
-          title={t.tours.list}
-          description={t.tours.noTours}
-        />
-      ) : !isLoading && (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredTours.map((tour) => {
-            const coverUrl = resolveImageUrl(tour.coverImageUrl);
-            return (
-              <Card
-                key={tour.id}
-                className="border-0 shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => setSelectedTourId(tour.id)}
-              >
-                {/* Cover Image */}
-                <div className="h-40 bg-slate-100 relative">
-                  {coverUrl ? (
-                    <img src={coverUrl} alt={tour.tourName} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <ImageIcon className="h-10 w-10 text-slate-300" />
-                    </div>
-                  )}
-                  <div className="absolute top-2 right-2">
-                    <TourStatusBadge status={tour.status} />
-                  </div>
-                </div>
-                <CardContent className="p-4 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-semibold truncate">{tour.tourName}</h3>
-                    <span className="text-xs font-mono text-slate-400">{tour.tourCode}</span>
-                  </div>
-                  <div className="flex items-center gap-4 text-xs text-slate-500">
-                    <div className="flex items-center gap-1">
-                      <Calendar className="h-3 w-3" />
-                      <span>{formatDate(tour.startDate)} - {formatDate(tour.endDate)}</span>
-                    </div>
-                    {tour.maxParticipants && (
-                      <div className="flex items-center gap-1">
-                        <Users className="h-3 w-3" />
-                        <span>{tour.maxParticipants}</span>
-                      </div>
-                    )}
-                  </div>
-                  {tour.agency && (
-                    <div className="flex items-center gap-1 text-xs text-slate-400">
-                      <Building2 className="h-3 w-3" />
-                      <span>{tour.agency.name}</span>
-                    </div>
-                  )}
-                  {tour.galleryImages && tour.galleryImages.length > 0 && (
-                    <div className="flex items-center gap-1 text-xs text-slate-400">
-                      <ImageIcon className="h-3 w-3" />
-                      <span>{tour.galleryImages.length} fotoğraf</span>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Pagination */}
-      {!isLoading && totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span tabIndex={0}>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page <= 1}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                  {t.admin.previous}
-                </Button>
-              </span>
-            </TooltipTrigger>
-            {page <= 1 && <TooltipContent>{t.tooltips.firstPage}</TooltipContent>}
-          </Tooltip>
-          <span className="text-sm text-slate-500">
-            {t.admin.paginationPage} {page} / {totalPages}
-          </span>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span tabIndex={0}>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page >= totalPages}
-                >
-                  {t.admin.nextPage}
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </span>
-            </TooltipTrigger>
-            {page >= totalPages && <TooltipContent>{t.tooltips.lastPage}</TooltipContent>}
-          </Tooltip>
-        </div>
-      )}
+              <div className="p-4 border-t">
+                <AdminPagination
+                  page={page}
+                  limit={limit}
+                  total={meta?.total || meta?.totalCount || tours.length}
+                  totalPages={meta?.totalPages}
+                  onPageChange={setPage}
+                  onLimitChange={(newLimit) => { setLimit(newLimit); setPage(1); }}
+                />
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Tour Detail Dialog */}
       <Dialog open={!!selectedTourId} onOpenChange={(open) => { if (!open) { setSelectedTourId(null); setExpandedParticipantId(null); setDialogTab('info'); } }}>
@@ -349,7 +413,7 @@ export default function AdminToursPage() {
                 <TabsList className="shrink-0 w-full justify-start">
                   <TabsTrigger value="info" className="gap-1.5">
                     <Eye className="h-4 w-4" />
-                    Tur Bilgileri
+                    {t.admin.detail}
                   </TabsTrigger>
                   <TabsTrigger value="choices" className="gap-1.5">
                     <ClipboardList className="h-4 w-4" />
@@ -516,27 +580,24 @@ export default function AdminToursPage() {
                                     {p.client.username && (
                                       <div className="flex items-center gap-2 text-slate-600">
                                         <User className="h-3 w-3 text-slate-400" />
-                                        <span className="text-slate-500">Kullanıcı Adı:</span>
                                         <span className="font-medium text-slate-800">{p.client.username}</span>
                                       </div>
                                     )}
                                     {p.client.email && (
                                       <div className="flex items-center gap-2 text-slate-600">
                                         <Mail className="h-3 w-3 text-slate-400" />
-                                        <span className="text-slate-500">E-posta:</span>
                                         <span className="font-medium text-slate-800">{p.client.email}</span>
                                       </div>
                                     )}
                                     {p.client.phone && (
                                       <div className="flex items-center gap-2 text-slate-600">
                                         <Phone className="h-3 w-3 text-slate-400" />
-                                        <span className="text-slate-500">Telefon:</span>
                                         <span className="font-medium text-slate-800">{p.client.phone}</span>
                                       </div>
                                     )}
                                     {p.pricePaid != null && (
                                       <div className="flex items-center gap-2 text-slate-600">
-                                        <span className="text-slate-500">Ödenen:</span>
+                                        <DollarSign className="h-3 w-3 text-slate-400" />
                                         <span className="font-medium text-slate-800">{Number(p.pricePaid).toFixed(2)} ₺</span>
                                       </div>
                                     )}
@@ -709,27 +770,19 @@ export default function AdminToursPage() {
                                           <td colSpan={3} className="py-2 font-semibold text-right">{t.tours.grandTotal}</td>
                                           <td className="py-2 text-right font-bold text-lg">{Number(serviceSummary.grandTotal).toFixed(2)} ₺</td>
                                         </tr>
-                                        {serviceSummary.commissionRate != null && (
+                                        {serviceSummary.commissionRate != null && serviceSummary.commissionAmount != null && (
                                           <tr>
-                                            <td colSpan={3} className="py-1 text-right text-sm text-slate-500">{t.tours.commissionRate}</td>
-                                            <td className="py-1 text-right text-sm text-slate-500">%{serviceSummary.commissionRate}</td>
-                                          </tr>
-                                        )}
-                                        {serviceSummary.commissionAmount != null && (
-                                          <tr>
-                                            <td colSpan={3} className="py-1 text-right text-sm font-medium text-orange-600">{t.tours.commissionAmount}</td>
+                                            <td colSpan={3} className="py-1 text-right text-sm font-medium text-orange-600">
+                                              {t.tours.agencyCommission} %{serviceSummary.commissionRate}
+                                            </td>
                                             <td className="py-1 text-right font-semibold text-orange-600">{Number(serviceSummary.commissionAmount).toFixed(2)} ₺</td>
                                           </tr>
                                         )}
-                                        {(serviceSummary as Record<string, unknown>).systemCommissionRate != null && Number((serviceSummary as Record<string, unknown>).systemCommissionRate) > 0 && (
+                                        {(serviceSummary as Record<string, unknown>).systemCommissionRate != null && (serviceSummary as Record<string, unknown>).systemCommissionAmount != null && (
                                           <tr>
-                                            <td colSpan={3} className="py-1 text-right text-sm text-slate-500">Sistem Komisyon Oranı</td>
-                                            <td className="py-1 text-right text-sm text-slate-500">%{String((serviceSummary as Record<string, unknown>).systemCommissionRate)}</td>
-                                          </tr>
-                                        )}
-                                        {(serviceSummary as Record<string, unknown>).systemCommissionAmount != null && Number((serviceSummary as Record<string, unknown>).systemCommissionAmount) > 0 && (
-                                          <tr>
-                                            <td colSpan={3} className="py-1 text-right text-sm font-medium text-violet-600">Sistem Komisyon Tutarı</td>
+                                            <td colSpan={3} className="py-1 text-right text-sm font-medium text-violet-600">
+                                              {t.tours.systemCommission} %{String((serviceSummary as Record<string, unknown>).systemCommissionRate)}
+                                            </td>
                                             <td className="py-1 text-right font-semibold text-violet-600">{Number((serviceSummary as Record<string, unknown>).systemCommissionAmount).toFixed(2)} ₺</td>
                                           </tr>
                                         )}
@@ -796,7 +849,6 @@ export default function AdminToursPage() {
 
                                           {isExpanded && (
                                             <div className="border-t px-3 py-3 bg-slate-50 space-y-3">
-                                              {/* Resource choice */}
                                               {choice.resourceChoice && (
                                                 <div>
                                                   <p className="text-xs font-medium text-slate-500 mb-1">{t.tours.resource}</p>
@@ -808,8 +860,6 @@ export default function AdminToursPage() {
                                                   </div>
                                                 </div>
                                               )}
-
-                                              {/* Service choices */}
                                               {choice.serviceChoices && choice.serviceChoices.length > 0 && (
                                                 <div>
                                                   <p className="text-xs font-medium text-slate-500 mb-1">{t.tours.service}</p>
@@ -825,7 +875,7 @@ export default function AdminToursPage() {
                                                           )}
                                                         </div>
                                                         <div className="flex items-center gap-3 text-slate-600 shrink-0">
-                                                          <span>x{sc.quantity}</span>
+                                                          <span>{sc.quantity}x</span>
                                                           {sc.service?.basePrice != null && (
                                                             <span className="font-medium">{(Number(sc.service.basePrice) * sc.quantity).toFixed(2)} ₺</span>
                                                           )}
@@ -835,7 +885,6 @@ export default function AdminToursPage() {
                                                   </div>
                                                 </div>
                                               )}
-
                                               {!choice.resourceChoice && (!choice.serviceChoices || choice.serviceChoices.length === 0) && (
                                                 <p className="text-sm text-slate-400 text-center">{t.tours.noChoices}</p>
                                               )}
@@ -853,7 +902,6 @@ export default function AdminToursPage() {
                             {(() => {
                               const currentStop = stops?.find(s => s.id === choicesStopId);
                               const cs = currentStop?.choicesStatus;
-
                               const choicesStatusConfig: Record<string, { variant: 'default' | 'secondary' | 'outline' | 'destructive'; label: string }> = {
                                 submitted: { variant: 'secondary', label: t.tours.choicesStatusSubmitted },
                                 approved: { variant: 'default', label: t.tours.choicesStatusApproved },
@@ -861,7 +909,6 @@ export default function AdminToursPage() {
                                 revision_requested: { variant: 'outline', label: t.tours.choicesStatusRevisionRequested },
                                 in_progress: { variant: 'outline', label: t.tours.choicesStatusInProgress },
                               };
-
                               return (
                                 <div className="flex items-center justify-between">
                                   {cs && choicesStatusConfig[cs] ? (
@@ -901,7 +948,6 @@ export default function AdminToursPage() {
             <DialogDescription>{t.guests.receiptTemplate}</DialogDescription>
           </DialogHeader>
 
-          {/* Template selector */}
           <div className="flex gap-2 mb-4">
             {([
               { key: 'compact' as ReceiptTemplate, label: t.guests.compactReceipt, desc: t.guests.compactReceiptDesc },
@@ -924,7 +970,6 @@ export default function AdminToursPage() {
             ))}
           </div>
 
-          {/* Receipt preview */}
           <div ref={printRef} className="border rounded-lg p-4 bg-white overflow-x-auto">
             {receiptTemplate === 'compact' && (
               <CompactReceipt tourInfo={receiptTourInfo} choices={choicesArr} orgName={choicesOrgName} t={t} />
@@ -935,6 +980,7 @@ export default function AdminToursPage() {
             {receiptTemplate === 'kitchen' && (
               <KitchenSummaryReceipt tourInfo={receiptTourInfo} choices={choicesArr} orgName={choicesOrgName} t={t} />
             )}
+            <ReceiptServiceSummary serviceSummary={serviceSummary} t={t} />
           </div>
 
           <div className="flex justify-end gap-2 mt-4">

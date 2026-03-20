@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Users,
@@ -23,6 +23,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Table,
   TableBody,
   TableCell,
@@ -37,7 +44,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
-import { LoadingState, ConfirmDialog } from '@/components/shared';
+import { LoadingState, ConfirmDialog, AdminPagination } from '@/components/shared';
 
 // Map backend roles to display info
 const getRoleInfo = (role: string) => {
@@ -48,6 +55,7 @@ const getRoleInfo = (role: string) => {
     organization_user: { icon: Building2, color: 'bg-emerald-400', label: 'roleOrgUser', avatarBg: 'bg-emerald-50', avatarText: 'text-emerald-500' },
     org_user: { icon: Building2, color: 'bg-emerald-400', label: 'roleOrgUser', avatarBg: 'bg-emerald-50', avatarText: 'text-emerald-500' },
     agency_user: { icon: MapPin, color: 'bg-blue-400', label: 'roleAgencyUser', avatarBg: 'bg-blue-50', avatarText: 'text-blue-500' },
+    client: { icon: User, color: 'bg-amber-500', label: 'roleClient', avatarBg: 'bg-amber-50', avatarText: 'text-amber-600' },
   };
   return roleMap[role] || { icon: User, color: 'bg-slate-500', label: role, avatarBg: 'bg-slate-100', avatarText: 'text-slate-600' };
 };
@@ -57,6 +65,8 @@ const getStatusInfo = (status: string) => {
     active: { color: 'bg-green-500', label: 'statusActive' },
     inactive: { color: 'bg-slate-400', label: 'statusInactive' },
     pending: { color: 'bg-amber-500', label: 'statusPending' },
+    suspended: { color: 'bg-red-400', label: 'statusSuspended' },
+    deleted: { color: 'bg-red-700', label: 'statusDeleted' },
   };
   return statusMap[status] || { color: 'bg-slate-400', label: status };
 };
@@ -66,14 +76,32 @@ export default function AdminUsersPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [deleteUserId, setDeleteUserId] = useState<number | null>(null);
   const [page, setPage] = useState(1);
-  const [limit] = useState(50);
+  const [limit, setLimit] = useState(50);
+
+  // Debounce search — wait 500ms after user stops typing
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setPage(1);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  const filters = {
+    role: roleFilter || undefined,
+    status: statusFilter || undefined,
+    search: debouncedSearch.trim() || undefined,
+  };
 
   // Fetch users from real API
   const { data: usersResult, isLoading, error } = useQuery({
-    queryKey: ['admin-users', page, limit],
-    queryFn: () => adminApi.getUsers(page, limit),
+    queryKey: ['admin-users', page, limit, roleFilter, statusFilter, debouncedSearch],
+    queryFn: () => adminApi.getUsers(page, limit, filters),
   });
 
   const deleteMutation = useMutation({
@@ -96,12 +124,7 @@ export default function AdminUsersPage() {
   const hasError = error || (usersResult && !usersResult.success);
   const errorMessage = usersResult?.error;
 
-  // Client-side search filter
-  const filteredUsers = users.filter(
-    (user) =>
-      `${user.firstName} ${user.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredUsers = users;
 
   return (
     <div className="p-6 space-y-6">
@@ -132,17 +155,42 @@ export default function AdminUsersPage() {
         </div>
       )}
 
-      {/* Search */}
+      {/* Filters */}
       <Card className="border-0 shadow-sm">
         <CardContent className="p-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input
-              placeholder={t.common.search}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Input
+                placeholder={t.common.search}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <Select value={roleFilter} onValueChange={(v) => { setRoleFilter(v === 'all' ? '' : v); setPage(1); }}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder={(t.admin as Record<string, string>).userRole || 'Rol'} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t.common.all}</SelectItem>
+                <SelectItem value="system_admin">{(t.admin as Record<string, string>).roleSystemAdmin || 'Sistem Yöneticisi'}</SelectItem>
+                <SelectItem value="agency_user">{(t.admin as Record<string, string>).roleAgencyUser || 'Acente Kullanıcısı'}</SelectItem>
+                <SelectItem value="org_user">{(t.admin as Record<string, string>).roleOrgUser || 'İşletme Kullanıcısı'}</SelectItem>
+                <SelectItem value="client">{(t.admin as Record<string, string>).roleClient || 'Müşteri'}</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v === 'all' ? '' : v); setPage(1); }}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder={(t.admin as Record<string, string>).status || 'Durum'} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t.common.all}</SelectItem>
+                <SelectItem value="active">{(t.admin as Record<string, string>).statusActive || 'Aktif'}</SelectItem>
+                <SelectItem value="suspended">{(t.admin as Record<string, string>).statusSuspended || 'Askıya Alınmış'}</SelectItem>
+                <SelectItem value="deleted">{(t.admin as Record<string, string>).statusDeleted || 'Silinmiş'}</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
@@ -240,45 +288,14 @@ export default function AdminUsersPage() {
           </Table>
 
           {/* Pagination */}
-          {meta && meta.totalPages > 1 && (
-            <div className="flex items-center justify-between mt-4 pt-4 border-t">
-              <p className="text-sm text-slate-500">
-                {t.admin.paginationTotal} {meta.total} {t.admin.paginationUsers}, {t.admin.paginationPage} {meta.page} / {meta.totalPages}
-              </p>
-              <div className="flex gap-2">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span tabIndex={0}>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setPage(p => Math.max(1, p - 1))}
-                        disabled={page <= 1}
-                      >
-                        {t.admin.previous}
-                      </Button>
-                    </span>
-                  </TooltipTrigger>
-                  {page <= 1 && <TooltipContent>{t.tooltips.firstPage}</TooltipContent>}
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span tabIndex={0}>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setPage(p => p + 1)}
-                        disabled={page >= meta.totalPages}
-                      >
-                        {t.admin.nextPage}
-                      </Button>
-                    </span>
-                  </TooltipTrigger>
-                  {page >= meta.totalPages && <TooltipContent>{t.tooltips.lastPage}</TooltipContent>}
-                </Tooltip>
-              </div>
-            </div>
-          )}
+          <AdminPagination
+            page={page}
+            limit={limit}
+            total={meta?.total || meta?.totalCount || users.length}
+            totalPages={meta?.totalPages}
+            onPageChange={setPage}
+            onLimitChange={(newLimit) => { setLimit(newLimit); setPage(1); }}
+          />
         </CardContent>
       </Card>
 

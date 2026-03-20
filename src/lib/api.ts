@@ -188,6 +188,16 @@ export interface OrganizationDto {
   resources?: unknown[];
   agencies?: unknown[];
   photos?: PhotoDto[];
+  system_commission?: {
+    id: number;
+    scope: string;
+    scopeId?: number | null;
+    value: string;
+    description?: string;
+    active: boolean;
+    createdAt: string;
+    updatedAt: string;
+  } | null;
 }
 
 // Tour Client DTO (from /agency/tours/:tourId/clients API)
@@ -1335,6 +1345,8 @@ export interface SystemCommissionDto {
   active: boolean;
   createdAt: string;
   updatedAt: string;
+  organization?: { id: number; name: string } | null;
+  category?: { id: number; name: string } | null;
 }
 
 export interface CreateSystemCommissionDto {
@@ -2936,21 +2948,23 @@ class ApiClient {
     }, filters.lang || 'tr', true); // skipLang since we add it manually
   }
 
-  async getOrganizationsList(filters: { name?: string; status?: CompanyStatus; page?: number; limit?: number; lang?: 'tr' | 'en' }) {
+  async getOrganizationsList(filters: { name?: string; status?: CompanyStatus; page?: number; limit?: number; lang?: 'tr' | 'en'; sortByCommission?: 'ASC' | 'DESC' }) {
     const params = new URLSearchParams();
     if (filters.name) params.set('name', filters.name);
     if (filters.status) params.set('status', filters.status);
     if (filters.page) params.set('page', String(filters.page));
     if (filters.limit) params.set('limit', String(filters.limit));
+    if (filters.sortByCommission) params.set('sortByCommission', filters.sortByCommission);
 
     return this.request<PaginatedResponse<CompanyDto>>(`/organizations?${params.toString()}`, {
       method: 'GET',
     }, filters.lang || 'tr');
   }
 
-  async getAgenciesList(filters: { name?: string; page?: number; limit?: number; lang?: 'tr' | 'en' }) {
+  async getAgenciesList(filters: { name?: string; status?: CompanyStatus; page?: number; limit?: number; lang?: 'tr' | 'en' }) {
     const params = new URLSearchParams();
     if (filters.name) params.set('name', filters.name);
+    if (filters.status) params.set('status', filters.status);
     if (filters.page) params.set('page', String(filters.page));
     if (filters.limit) params.set('limit', String(filters.limit));
 
@@ -3523,11 +3537,16 @@ class ApiClient {
   // Admin - Users
   // ============================================
 
-  async getUsers(page = 1, limit = 100) {
-    const url = `/admin/users?page=${page}&limit=${limit}`;
-    return this.request<PaginatedResponse<AdminUserDto>>(url, {
+  async getUsers(page = 1, limit = 100, filters?: { role?: string; status?: string; search?: string }) {
+    const params = new URLSearchParams();
+    params.set('page', String(page));
+    params.set('limit', String(limit));
+    if (filters?.role) params.set('role', filters.role);
+    if (filters?.status) params.set('status', filters.status);
+    if (filters?.search) params.set('search', filters.search);
+    return this.request<PaginatedResponse<AdminUserDto>>(`/admin/users?${params.toString()}`, {
       method: 'GET',
-    }, 'tr', true); // skipLang - this endpoint doesn't accept lang param
+    }, 'tr', true);
   }
 
   async getUserById(id: number) {
@@ -3560,10 +3579,25 @@ class ApiClient {
   // Admin - Tours
   // ============================================
 
-  async getAdminTours(page = 1, limit = 10, lang: 'tr' | 'en' = 'tr', status?: string) {
-    let url = `/admin/tours?page=${page}&limit=${limit}`;
-    if (status) url += `&status=${status}`;
-    return this.request<PaginatedResponse<ApiTourDto>>(url, {}, lang);
+  async getAdminTours(filters: {
+    page?: number;
+    limit?: number;
+    lang?: 'tr' | 'en';
+    status?: string;
+    search?: string;
+    agencyId?: number;
+    sortBy?: string;
+    sortOrder?: 'ASC' | 'DESC';
+  } = {}) {
+    const params = new URLSearchParams();
+    params.set('page', String(filters.page || 1));
+    params.set('limit', String(filters.limit || 10));
+    if (filters.status) params.set('status', filters.status);
+    if (filters.search) params.set('search', filters.search);
+    if (filters.agencyId) params.set('agencyId', String(filters.agencyId));
+    if (filters.sortBy) params.set('sortBy', filters.sortBy);
+    if (filters.sortOrder) params.set('sortOrder', filters.sortOrder);
+    return this.request<PaginatedResponse<ApiTourDto>>(`/admin/tours?${params.toString()}`, {}, filters.lang || 'tr');
   }
 
   async getAdminTourById(id: number, lang: 'tr' | 'en' = 'tr') {
@@ -3974,11 +4008,26 @@ class ApiClient {
   // Admin - System Commissions (lang parametresi yok)
   // ============================================
 
-  async listSystemCommissions(page = 1, limit = 10, scope?: string, scopeId?: number) {
-    let endpoint = `/admin/system-commissions?page=${page}&limit=${limit}`;
-    if (scope) endpoint += `&scope=${scope}`;
-    if (scopeId) endpoint += `&scopeId=${scopeId}`;
-    return this.request<{ data: SystemCommissionDto[]; meta: { total: number; totalCount?: number; page: number; limit: number } }>(endpoint, { method: 'GET' }, 'tr', true);
+  async listSystemCommissions(filters: {
+    page?: number;
+    limit?: number;
+    scope?: string;
+    scopeId?: number;
+    active?: boolean;
+    search?: string;
+    sortBy?: string;
+    sortOrder?: 'ASC' | 'DESC';
+  } = {}) {
+    const params = new URLSearchParams();
+    params.set('page', String(filters.page || 1));
+    params.set('limit', String(filters.limit || 10));
+    if (filters.scope) params.set('scope', filters.scope);
+    if (filters.scopeId) params.set('scopeId', String(filters.scopeId));
+    if (filters.active !== undefined) params.set('active', String(filters.active));
+    if (filters.search) params.set('search', filters.search);
+    if (filters.sortBy) params.set('sortBy', filters.sortBy);
+    if (filters.sortOrder) params.set('sortOrder', filters.sortOrder);
+    return this.request<{ data: SystemCommissionDto[]; meta: { total: number; totalCount?: number; page: number; limit: number } }>(`/admin/system-commissions?${params.toString()}`, { method: 'GET' }, 'tr', true);
   }
 
   async getSystemCommission(id: number) {
@@ -4971,7 +5020,7 @@ export const adminApi = {
   },
 
   // List organizations via GET /organizations (supports name search)
-  async getOrganizationsList(filters: { name?: string; status?: CompanyStatus; page?: number; limit?: number; lang?: 'tr' | 'en' }) {
+  async getOrganizationsList(filters: { name?: string; status?: CompanyStatus; page?: number; limit?: number; lang?: 'tr' | 'en'; sortByCommission?: 'ASC' | 'DESC' }) {
     try {
       const response = await apiClient.getOrganizationsList(filters);
 
@@ -4986,8 +5035,8 @@ export const adminApi = {
     }
   },
 
-  // List agencies via GET /agencies (supports name search)
-  async getAgenciesList(filters: { name?: string; page?: number; limit?: number; lang?: 'tr' | 'en' }) {
+  // List agencies via GET /agencies (supports name search + status filter)
+  async getAgenciesList(filters: { name?: string; status?: CompanyStatus; page?: number; limit?: number; lang?: 'tr' | 'en' }) {
     try {
       const response = await apiClient.getAgenciesList(filters);
 
@@ -5431,9 +5480,9 @@ export const adminApi = {
   // Users
   // ============================================
 
-  async getUsers(page = 1, limit = 100) {
+  async getUsers(page = 1, limit = 100, filters?: { role?: string; status?: string; search?: string }) {
     try {
-      const response = await apiClient.getUsers(page, limit);
+      const response = await apiClient.getUsers(page, limit, filters);
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
@@ -5480,9 +5529,18 @@ export const adminApi = {
   // Tours
   // ============================================
 
-  async getTours(page = 1, limit = 50, lang: 'tr' | 'en' = 'tr', status?: string) {
+  async getTours(filters: {
+    page?: number;
+    limit?: number;
+    lang?: 'tr' | 'en';
+    status?: string;
+    search?: string;
+    agencyId?: number;
+    sortBy?: string;
+    sortOrder?: 'ASC' | 'DESC';
+  } = {}) {
     try {
-      const response = await apiClient.getAdminTours(page, limit, lang, status);
+      const response = await apiClient.getAdminTours(filters);
       // Normalize: backend may return tourPhotos instead of galleryImages
       const data = (response.data || []).map((tour: any) => {
         if (!tour.galleryImages && tour.tourPhotos) {
@@ -5581,9 +5639,18 @@ export const adminApi = {
   // System Commissions
   // ============================================
 
-  async listSystemCommissions(page = 1, limit = 10, scope?: string, scopeId?: number) {
+  async listSystemCommissions(filters: {
+    page?: number;
+    limit?: number;
+    scope?: string;
+    scopeId?: number;
+    active?: boolean;
+    search?: string;
+    sortBy?: string;
+    sortOrder?: 'ASC' | 'DESC';
+  } = {}) {
     try {
-      const response = await apiClient.listSystemCommissions(page, limit, scope, scopeId);
+      const response = await apiClient.listSystemCommissions(filters);
       if (response.meta && !response.meta.total && response.meta.totalCount) {
         response.meta.total = response.meta.totalCount;
       }

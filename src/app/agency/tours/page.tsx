@@ -44,7 +44,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
-import { LoadingState, EmptyState, ErrorState, ConfirmDialog, TourStatusBadge } from '@/components/shared';
+import { LoadingState, EmptyState, ErrorState, ConfirmDialog, TourStatusBadge, AdminPagination } from '@/components/shared';
 import { formatDate } from '@/lib/dateUtils';
 
 interface TourFormData {
@@ -491,45 +491,13 @@ export default function ToursPage() {
                 </Table>
 
                 {/* Pagination */}
-                {meta && meta.totalPages > 1 && (
-                  <div className="flex items-center justify-between mt-4">
-                    <p className="text-sm text-slate-500">
-                      {meta.total} tour, page {meta.page}/{meta.totalPages}
-                    </p>
-                    <div className="flex gap-2">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span tabIndex={0}>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              disabled={page <= 1}
-                              onClick={() => setPage((p) => p - 1)}
-                            >
-                              {t.common.back}
-                            </Button>
-                          </span>
-                        </TooltipTrigger>
-                        {page <= 1 && <TooltipContent>{t.tooltips.firstPage}</TooltipContent>}
-                      </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span tabIndex={0}>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              disabled={page >= meta.totalPages}
-                              onClick={() => setPage((p) => p + 1)}
-                            >
-                              {t.common.next}
-                            </Button>
-                          </span>
-                        </TooltipTrigger>
-                        {page >= meta.totalPages && <TooltipContent>{t.tooltips.lastPage}</TooltipContent>}
-                      </Tooltip>
-                    </div>
-                  </div>
-                )}
+                <AdminPagination
+                  page={page}
+                  limit={LIMIT}
+                  total={meta?.total || tours.length}
+                  totalPages={meta?.totalPages}
+                  onPageChange={setPage}
+                />
               </>
             )}
           </CardContent>

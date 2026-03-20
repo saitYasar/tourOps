@@ -49,7 +49,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { LoadingState, ConfirmDialog } from '@/components/shared';
+import { LoadingState, ConfirmDialog, AdminPagination } from '@/components/shared';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 // Map loading placeholder (uses useLanguage hook)
@@ -505,8 +505,9 @@ export default function AdminRestaurantsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearch = useDebounce(searchTerm, 800);
   const [statusFilter, setStatusFilter] = useState<CompanyStatus | 'all'>('all');
+  const [commissionSort, setCommissionSort] = useState<'ASC' | 'DESC' | ''>('');
   const [page, setPage] = useState(1);
-  const [limit] = useState(20);
+  const [limit, setLimit] = useState(20);
   const [selectedCompany, setSelectedCompany] = useState<CompanyDto | null>(null);
   const [statusUpdateTarget, setStatusUpdateTarget] = useState<{
     company: CompanyDto;
@@ -522,24 +523,34 @@ export default function AdminRestaurantsPage() {
     }
   }, [debouncedSearch]);
 
-  // Fetch all organizations (for status counts)
-  const { data: allOrgsResult } = useQuery({
-    queryKey: ['admin-organizations-counts'],
-    queryFn: () =>
-      adminApi.getOrganizationsList({
-        limit: 100,
-      }),
+  // Fetch status counts via separate small queries (limit: 1 just to get meta.total)
+  const { data: totalCountResult } = useQuery({
+    queryKey: ['admin-organizations-count-all'],
+    queryFn: () => adminApi.getOrganizationsList({ limit: 1 }),
+  });
+  const { data: pendingCountResult } = useQuery({
+    queryKey: ['admin-organizations-count-pending'],
+    queryFn: () => adminApi.getOrganizationsList({ status: 'pending', limit: 1 }),
+  });
+  const { data: activeCountResult } = useQuery({
+    queryKey: ['admin-organizations-count-active'],
+    queryFn: () => adminApi.getOrganizationsList({ status: 'active', limit: 1 }),
+  });
+  const { data: suspendedCountResult } = useQuery({
+    queryKey: ['admin-organizations-count-suspended'],
+    queryFn: () => adminApi.getOrganizationsList({ status: 'suspended', limit: 1 }),
   });
 
   // Fetch organizations with current filter (for the list)
   const { data: companiesResult, isLoading } = useQuery({
-    queryKey: ['admin-organizations', statusFilter, debouncedSearch, page, limit],
+    queryKey: ['admin-organizations', statusFilter, debouncedSearch, page, limit, commissionSort],
     queryFn: () =>
       adminApi.getOrganizationsList({
         status: statusFilter === 'all' ? undefined : statusFilter,
         name: debouncedSearch || undefined,
         page,
         limit,
+        sortByCommission: commissionSort || undefined,
       }),
   });
 
@@ -553,7 +564,10 @@ export default function AdminRestaurantsPage() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-organizations'] });
-      queryClient.invalidateQueries({ queryKey: ['admin-organizations-counts'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-organizations-count-all'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-organizations-count-pending'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-organizations-count-active'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-organizations-count-suspended'] });
       toast.success(t.admin.orgStatusUpdated);
       setStatusUpdateTarget(null);
     },
@@ -567,14 +581,13 @@ export default function AdminRestaurantsPage() {
   const companies = companiesResult?.success ? companiesResult.data?.data || [] : [];
   const meta = companiesResult?.success ? companiesResult.data?.meta : null;
 
-  // Status counts from the unfiltered query
-  const allOrgs = allOrgsResult?.success ? allOrgsResult.data?.data || [] : [];
-  const allOrgsMeta = allOrgsResult?.success ? allOrgsResult.data?.meta : null;
+  // Status counts from meta.total of each filtered query
+  const getMetaTotal = (r: typeof totalCountResult) => (r?.success ? r.data?.meta?.total || r.data?.meta?.totalCount || 0 : 0);
   const statusCounts = {
-    all: allOrgsMeta?.total || allOrgs.length,
-    pending: allOrgs.filter((c) => c.status === 'pending').length,
-    active: allOrgs.filter((c) => c.status === 'active').length,
-    suspended: allOrgs.filter((c) => c.status === 'suspended').length,
+    all: getMetaTotal(totalCountResult),
+    pending: getMetaTotal(pendingCountResult),
+    active: getMetaTotal(activeCountResult),
+    suspended: getMetaTotal(suspendedCountResult),
   };
 
   // Transform for map
@@ -697,17 +710,32 @@ export default function AdminRestaurantsPage() {
         </Card>
       </div>
 
-      {/* Search */}
+      {/* Search + Filters */}
       <Card className="border-0 shadow-sm">
         <CardContent className="p-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input
-              placeholder={t.admin.searchOrgPlaceholder}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Input
+                placeholder={t.admin.searchOrgPlaceholder}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <Select
+              value={commissionSort || 'none'}
+              onValueChange={(val) => { setCommissionSort(val === 'none' ? '' : val as 'ASC' | 'DESC'); setPage(1); }}
+            >
+              <SelectTrigger className="w-full sm:w-[220px]">
+                <SelectValue placeholder="Komisyon Sırala" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Varsayılan Sıralama</SelectItem>
+                <SelectItem value="ASC">Komisyon: Düşükten Yükseğe</SelectItem>
+                <SelectItem value="DESC">Komisyon: Yüksekten Düşüğe</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
@@ -755,45 +783,14 @@ export default function AdminRestaurantsPage() {
             )}
 
             {/* Pagination */}
-            {meta && meta.totalPages > 1 && (
-              <div className="flex items-center justify-between pt-4">
-                <p className="text-sm text-slate-500">
-                  {t.admin.paginationPage} {meta.page} / {meta.totalPages} ({t.admin.paginationTotal} {meta.total} {t.admin.paginationRecords})
-                </p>
-                <div className="flex gap-2">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span tabIndex={0}>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setPage((p) => Math.max(1, p - 1))}
-                          disabled={page === 1}
-                        >
-                          {t.admin.previous}
-                        </Button>
-                      </span>
-                    </TooltipTrigger>
-                    {page === 1 && <TooltipContent>{t.tooltips.firstPage}</TooltipContent>}
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span tabIndex={0}>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setPage((p) => Math.min(meta.totalPages, p + 1))}
-                          disabled={page === meta.totalPages}
-                        >
-                          {t.admin.nextPage}
-                        </Button>
-                      </span>
-                    </TooltipTrigger>
-                    {page === meta.totalPages && <TooltipContent>{t.tooltips.lastPage}</TooltipContent>}
-                  </Tooltip>
-                </div>
-              </div>
-            )}
+            <AdminPagination
+              page={page}
+              limit={limit}
+              total={meta?.total || meta?.totalCount || companies.length}
+              totalPages={meta?.totalPages}
+              onPageChange={setPage}
+              onLimitChange={(newLimit) => { setLimit(newLimit); setPage(1); }}
+            />
           </div>
         </TabsContent>
 
