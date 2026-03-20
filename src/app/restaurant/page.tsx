@@ -457,11 +457,21 @@ export default function RestaurantDashboard() {
 
               {/* Acente Komisyon Oranı */}
               <div className="space-y-1">
-                <p className="text-sm text-slate-500 font-medium">{t.restaurant.agencyCommissionRate}</p>
-                <p className="text-base font-medium text-slate-900">
+                <p className="text-sm text-slate-500 font-medium">{t.tours.agencyCommission}</p>
+                <p className="text-lg font-semibold text-orange-600">
                   {organization?.agencyCommissionRate != null ? `%${organization.agencyCommissionRate}` : '-'}
                 </p>
               </div>
+
+              {/* Sistem Komisyon Oranı */}
+              {organization?.system_commission && (
+                <div className="space-y-1">
+                  <p className="text-sm text-slate-500 font-medium">{t.tours.systemCommission}</p>
+                  <p className="text-lg font-semibold text-violet-600">
+                    %{organization.system_commission.value}
+                  </p>
+                </div>
+              )}
 
               {/* Adres - Tam Genişlik */}
               <div className="space-y-1 md:col-span-2">

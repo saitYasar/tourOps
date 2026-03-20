@@ -2652,12 +2652,23 @@ function ResourcesTab({ orgId }: { orgId: number }) {
           const chairType = resourceTypes.find((t) => t.code === 'chair' || t.code === 'seat');
           if (chairType) {
             const cap = form.capacity || 4;
-            const tableName = form.name.trim();
+            // Find max seat number across all tables
+            let maxSeatNum = 0;
+            const findMaxSeat = (nodes: ResourceDto[]) => {
+              for (const node of nodes) {
+                if (node.resourceType?.code === 'seat' || node.resourceType?.code === 'chair') {
+                  const num = parseInt(node.name, 10);
+                  if (!isNaN(num) && num > maxSeatNum) maxSeatNum = num;
+                }
+                if (node.children?.length) findMaxSeat(node.children);
+              }
+            };
+            findMaxSeat(allResources);
             let chairsCreated = 0;
             for (let i = 1; i <= cap; i++) {
               try {
                 await adminApi.createOrgResource(orgId, {
-                  name: `${tableName}-${i}`,
+                  name: `${maxSeatNum + i}`,
                   resourceTypeId: chairType.id,
                   parentId: tableResult.data.id,
                   capacity: 1,

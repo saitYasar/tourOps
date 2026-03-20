@@ -799,7 +799,7 @@ function ServiceChoicesView({
                     {choices.serviceChoices.map((sc: ClientServiceChoiceDto) => (
                       <div key={sc.id} className="flex items-center justify-between text-xs sm:text-sm gap-2">
                         <span className="text-slate-700 min-w-0 truncate">{sc.service?.title || `#${sc.serviceId}`}</span>
-                        <span className="font-medium text-slate-800 shrink-0">x{sc.quantity}</span>
+                        <span className="font-medium text-slate-800 shrink-0">{sc.quantity}x</span>
                       </div>
                     ))}
                   </div>

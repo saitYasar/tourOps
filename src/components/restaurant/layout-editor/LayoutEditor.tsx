@@ -262,6 +262,10 @@ export function LayoutEditor({
             const createdIds: number[] = [newRoom.id];
 
             // Create tables at relative positions (before resize so newRoom.x/y is stable)
+            let maxSeatNum = 0;
+            for (const t of stateRef.current.tables) {
+              for (const ch of t.chairs) { const n = parseInt(ch.name, 10); if (!isNaN(n) && n > maxSeatNum) maxSeatNum = n; }
+            }
             for (const tblData of clip.data.tables) {
               const tablesInRoom = stateRef.current.tables.filter(tt => tt.roomId === newRoom.id);
               const allTableNames = stateRef.current.tables.map(tt => tt.name);
@@ -270,9 +274,10 @@ export function LayoutEditor({
               while (nameSet.has(`Masa ${num}`)) num++;
               const newName = `Masa ${num}`;
 
-              const newTable = await createTable(newRoom.id, tblData.capacity, newRoom, tablesInRoom.length, allTableNames, newName);
+              const newTable = await createTable(newRoom.id, tblData.capacity, newRoom, tablesInRoom.length, allTableNames, newName, maxSeatNum);
               if (newTable) {
                 createdIds.push(newTable.id);
+                maxSeatNum += newTable.chairs.length;
                 dispatch({ type: 'MOVE_TABLE', id: newTable.id, x: newRoom.x + tblData.x, y: newRoom.y + tblData.y });
                 if (tblData.r !== 0) {
                   dispatch({ type: 'ROTATE_TABLE', id: newTable.id, r: tblData.r });
@@ -328,8 +333,10 @@ export function LayoutEditor({
           let num = state.tables.length + 1;
           while (nameSet.has(`Masa ${num}`)) num++;
           const newName = `Masa ${num}`;
+          let maxSeatNum = 0;
+          for (const t of state.tables) { for (const ch of t.chairs) { const n = parseInt(ch.name, 10); if (!isNaN(n) && n > maxSeatNum) maxSeatNum = n; } }
 
-          const newTable = await createTable(targetRoom.id, clip.data.capacity, targetRoom, tablesInRoom.length, allTableNames, newName);
+          const newTable = await createTable(targetRoom.id, clip.data.capacity, targetRoom, tablesInRoom.length, allTableNames, newName, maxSeatNum);
           if (newTable) {
             dispatch({ type: 'MOVE_TABLE', id: newTable.id, x: clip.data.x + 40, y: clip.data.y + 40 });
             pushUndo('Paste table', snapshot, [{ action: 'delete', resourceIds: [newTable.id] }]);
@@ -459,7 +466,9 @@ export function LayoutEditor({
 
       const tablesInRoom = state.tables.filter((tt) => tt.roomId === targetRoom!.id);
       const allTableNames = state.tables.map((tt) => tt.name);
-      const newTable = await createTable(targetRoom.id, addCapacity, targetRoom, tablesInRoom.length, allTableNames, addName.trim());
+      let maxSeatNum = 0;
+      for (const t of state.tables) { for (const ch of t.chairs) { const n = parseInt(ch.name, 10); if (!isNaN(n) && n > maxSeatNum) maxSeatNum = n; } }
+      const newTable = await createTable(targetRoom.id, addCapacity, targetRoom, tablesInRoom.length, allTableNames, addName.trim(), maxSeatNum);
       if (newTable) {
         pushUndo('Add table', snapshot, [{ action: 'delete', resourceIds: [newTable.id] }]);
       }

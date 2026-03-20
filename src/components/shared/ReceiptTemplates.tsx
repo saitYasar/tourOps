@@ -79,9 +79,9 @@ export function CompactReceipt({
             {resourceLabel && <p className="text-[10px]">{resourceLabel}</p>}
             {choice.serviceChoices?.map((sc) => (
               <div key={sc.id} className="flex justify-between">
-                <span>{sc.service?.title || `#${sc.serviceId}`} x{sc.quantity}</span>
+                <span>{sc.service?.title || `#${sc.serviceId}`}</span>
                 {sc.service?.basePrice != null && (
-                  <span>{(Number(sc.service.basePrice) * sc.quantity).toFixed(2)}₺</span>
+                  <span>{sc.quantity} x {Number(sc.service.basePrice).toFixed(2)} ₺</span>
                 )}
               </div>
             ))}
@@ -342,6 +342,70 @@ export function KitchenSummaryReceipt({
 }
 
 // ============================================
+// Service Summary (for print output)
+// ============================================
+export function ReceiptServiceSummary({
+  serviceSummary,
+  t,
+}: {
+  serviceSummary: AgencyStopServiceSummaryDto | null | undefined;
+  t: T;
+}) {
+  if (!serviceSummary?.services?.length) return null;
+
+  const systemCommissionRate = (serviceSummary as Record<string, unknown>).systemCommissionRate;
+  const systemCommissionAmount = (serviceSummary as Record<string, unknown>).systemCommissionAmount;
+
+  return (
+    <div style={{ marginTop: '1.5rem', borderTop: '2px solid #334155', paddingTop: '1rem' }}>
+      <h3 style={{ fontWeight: 'bold', fontSize: '0.95rem', marginBottom: '0.5rem' }}>{t.guests.serviceSummary}</h3>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+        <thead>
+          <tr>
+            <th style={{ border: '1px solid #999', padding: '6px 8px', textAlign: 'left', backgroundColor: '#e2e8f0', fontWeight: 'bold' }}>{t.guests.service}</th>
+            <th style={{ border: '1px solid #999', padding: '6px 8px', textAlign: 'center', backgroundColor: '#e2e8f0', fontWeight: 'bold' }}>{t.guests.quantity}</th>
+            <th style={{ border: '1px solid #999', padding: '6px 8px', textAlign: 'right', backgroundColor: '#e2e8f0', fontWeight: 'bold' }}>{t.tours.unitPrice}</th>
+            <th style={{ border: '1px solid #999', padding: '6px 8px', textAlign: 'right', backgroundColor: '#e2e8f0', fontWeight: 'bold' }}>{t.tours.totalPrice}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {serviceSummary.services.map((item, idx) => (
+            <tr key={idx}>
+              <td style={{ border: '1px solid #ccc', padding: '5px 8px' }}>{item.serviceName || item.service?.title || ''}</td>
+              <td style={{ border: '1px solid #ccc', padding: '5px 8px', textAlign: 'center' }}>{item.totalQuantity}</td>
+              <td style={{ border: '1px solid #ccc', padding: '5px 8px', textAlign: 'right' }}>{Number(item.unitPrice).toFixed(2)} ₺</td>
+              <td style={{ border: '1px solid #ccc', padding: '5px 8px', textAlign: 'right', fontWeight: 500 }}>{Number(item.totalPrice).toFixed(2)} ₺</td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr style={{ borderTop: '2px solid #333' }}>
+            <td colSpan={3} style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 'bold' }}>{t.tours.grandTotal}</td>
+            <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 'bold', fontSize: '1rem' }}>{Number(serviceSummary.grandTotal).toFixed(2)} ₺</td>
+          </tr>
+          {serviceSummary.commissionRate != null && serviceSummary.commissionAmount != null && (
+            <tr>
+              <td colSpan={3} style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 500, color: '#ea580c' }}>
+                {t.tours.agencyCommission} %{serviceSummary.commissionRate}
+              </td>
+              <td style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 600, color: '#ea580c' }}>{Number(serviceSummary.commissionAmount).toFixed(2)} ₺</td>
+            </tr>
+          )}
+          {systemCommissionRate != null && systemCommissionAmount != null && (
+            <tr>
+              <td colSpan={3} style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 500, color: '#7c3aed' }}>
+                {t.tours.systemCommission} %{String(systemCommissionRate)}
+              </td>
+              <td style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 600, color: '#7c3aed' }}>{Number(systemCommissionAmount as number).toFixed(2)} ₺</td>
+            </tr>
+          )}
+        </tfoot>
+      </table>
+    </div>
+  );
+}
+
+// ============================================
 // Print Handler
 // ============================================
 export function handleReceiptPrint(printRef: React.RefObject<HTMLDivElement | null>, receiptTemplate: ReceiptTemplate) {
@@ -389,6 +453,11 @@ export function handleReceiptPrint(printRef: React.RefObject<HTMLDivElement | nu
     .py-0\\.5 { padding-top: 0.125rem; padding-bottom: 0.125rem; }
     .pb-1 { padding-bottom: 0.25rem; }
     .pl-4 { padding-left: 1rem; }
+    .flex { display: flex; }
+    .justify-between { justify-content: space-between; }
+    .gap-2 { gap: 0.5rem; }
+    .gap-3 { gap: 0.75rem; }
+    .items-center { align-items: center; }
     @media print {
       * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
     }
@@ -590,21 +659,58 @@ export function exportReceiptExcel(
     }
     summaryAoa.push([t.tours.grandTotal, '', '', Number(serviceSummary.grandTotal)]);
 
+    // Commission rows
+    if (serviceSummary.commissionRate != null && serviceSummary.commissionAmount != null) {
+      summaryAoa.push([`${t.tours.agencyCommission} %${serviceSummary.commissionRate}`, '', '', Number(serviceSummary.commissionAmount)]);
+    }
+    const sysRate = (serviceSummary as Record<string, unknown>).systemCommissionRate;
+    const sysAmount = (serviceSummary as Record<string, unknown>).systemCommissionAmount;
+    if (sysRate != null && sysAmount != null) {
+      summaryAoa.push([`${t.tours.systemCommission} %${sysRate}`, '', '', Number(sysAmount as number)]);
+    }
+
     const ws3 = XLSX.utils.aoa_to_sheet(summaryAoa);
     for (let c = 0; c < summaryHeaders.length; c++) {
       const addr = XLSX.utils.encode_cell({ r: 0, c });
       if (ws3[addr]) ws3[addr].s = headerStyle;
     }
-    const totalRowIdx = summaryAoa.length - 1;
+    // Grand total row index (services count + 1 header)
+    const grandTotalRowIdx = serviceSummary.services.length + 1;
     for (let c = 0; c < summaryHeaders.length; c++) {
-      const addr = XLSX.utils.encode_cell({ r: totalRowIdx, c });
+      const addr = XLSX.utils.encode_cell({ r: grandTotalRowIdx, c });
       if (!ws3[addr]) ws3[addr] = { t: 's', v: '' };
       ws3[addr].s = {
         font: { bold: true, sz: 12 },
         border: { top: { style: 'medium' as const, color: { rgb: '333333' } }, bottom: { style: 'medium' as const, color: { rgb: '333333' } } },
       };
     }
-    for (let r = 1; r < totalRowIdx; r++) {
+    // Agency commission row style
+    if (serviceSummary.commissionRate != null && serviceSummary.commissionAmount != null) {
+      const acRowIdx = grandTotalRowIdx + 1;
+      for (let c = 0; c < summaryHeaders.length; c++) {
+        const addr = XLSX.utils.encode_cell({ r: acRowIdx, c });
+        if (!ws3[addr]) ws3[addr] = { t: 's', v: '' };
+        ws3[addr].s = {
+          font: { bold: true, color: { rgb: 'EA580C' } },
+          alignment: c === 3 ? { horizontal: 'right' as const } : undefined,
+          border: cellBorder,
+        };
+      }
+    }
+    // System commission row style
+    if (sysRate != null && sysAmount != null) {
+      const scRowIdx = grandTotalRowIdx + (serviceSummary.commissionRate != null ? 2 : 1);
+      for (let c = 0; c < summaryHeaders.length; c++) {
+        const addr = XLSX.utils.encode_cell({ r: scRowIdx, c });
+        if (!ws3[addr]) ws3[addr] = { t: 's', v: '' };
+        ws3[addr].s = {
+          font: { bold: true, color: { rgb: '7C3AED' } },
+          alignment: c === 3 ? { horizontal: 'right' as const } : undefined,
+          border: cellBorder,
+        };
+      }
+    }
+    for (let r = 1; r < grandTotalRowIdx; r++) {
       for (let c = 0; c < summaryHeaders.length; c++) {
         const addr = XLSX.utils.encode_cell({ r, c });
         if (ws3[addr]) ws3[addr].s = { border: cellBorder, alignment: c >= 2 ? { horizontal: 'right' as const } : undefined };

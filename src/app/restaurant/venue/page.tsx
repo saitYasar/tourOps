@@ -603,12 +603,23 @@ export default function VenuePage() {
           const chairType = resourceTypes.find(t => t.code === 'chair' || t.code === 'seat');
           if (chairType) {
             const capacity = form.capacity || 4;
-            const tableName = form.name.trim();
+            // Find max seat number across all tables
+            let maxSeatNum = 0;
+            const findMaxSeat = (nodes: ResourceDto[]) => {
+              for (const node of nodes) {
+                if (node.resourceType?.code === 'seat' || node.resourceType?.code === 'chair') {
+                  const num = parseInt(node.name, 10);
+                  if (!isNaN(num) && num > maxSeatNum) maxSeatNum = num;
+                }
+                if (node.children?.length) findMaxSeat(node.children);
+              }
+            };
+            findMaxSeat(resources);
             let chairsCreated = 0;
             for (let i = 1; i <= capacity; i++) {
               try {
                 await resourceApi.create({
-                  name: `${tableName}-${i}`,
+                  name: `${maxSeatNum + i}`,
                   resourceTypeId: chairType.id,
                   parentId: tableResult.data.id,
                   capacity: 1,
@@ -616,7 +627,7 @@ export default function VenuePage() {
                 });
                 chairsCreated++;
               } catch (chairErr) {
-                console.error(`Chair ${tableName}-${i} creation failed:`, chairErr);
+                console.error(`Chair ${maxSeatNum + i} creation failed:`, chairErr);
               }
             }
             toast.success(`${t.venue.table} + ${chairsCreated} ${t.venue.chair.toLowerCase()} ${t.venue.resourceCreated.toLowerCase()}`);

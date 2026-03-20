@@ -85,7 +85,6 @@ export default function AdminDashboardPage() {
       value: totalCompanies,
       icon: Building2,
       color: 'bg-orange-500',
-      href: '/admin/restaurants',
       hasError: hasAnyError,
     },
     {
@@ -93,7 +92,6 @@ export default function AdminDashboardPage() {
       value: activeCompanies,
       icon: CheckCircle2,
       color: 'bg-green-500',
-      href: '/admin/restaurants?status=active',
       hasError: hasAnyError,
     },
     {
@@ -101,7 +99,6 @@ export default function AdminDashboardPage() {
       value: inactiveCompanies,
       icon: Ban,
       color: 'bg-red-500',
-      href: '/admin/restaurants?status=suspended',
       hasError: hasAnyError,
     },
     {
@@ -109,7 +106,6 @@ export default function AdminDashboardPage() {
       value: pendingCompanies,
       icon: Clock,
       color: 'bg-amber-500',
-      href: '/admin/restaurants?status=pending',
       hasError: hasAnyError,
     },
   ];
@@ -150,27 +146,25 @@ export default function AdminDashboardPage() {
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {statsCards.map((stat) => (
-          <Link key={stat.title} href={stat.href}>
-            <Card className={`hover:shadow-lg transition-shadow cursor-pointer border-0 shadow-sm ${stat.hasError ? 'border-2 border-red-200' : ''}`}>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-slate-500">{stat.title}</p>
-                    <p className={`text-3xl font-bold mt-1 ${stat.hasError ? 'text-red-400' : 'text-slate-900'}`}>
-                      {stat.hasError ? '!' : stat.value}
-                    </p>
-                  </div>
-                  <div className={`p-3 rounded-xl ${stat.hasError ? 'bg-red-400' : stat.color}`}>
-                    {stat.hasError ? (
-                      <AlertTriangle className="h-6 w-6 text-white" />
-                    ) : (
-                      <stat.icon className="h-6 w-6 text-white" />
-                    )}
-                  </div>
+          <Card key={stat.title} className={`border-0 shadow-sm ${stat.hasError ? 'border-2 border-red-200' : ''}`}>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-slate-500">{stat.title}</p>
+                  <p className={`text-3xl font-bold mt-1 ${stat.hasError ? 'text-red-400' : 'text-slate-900'}`}>
+                    {stat.hasError ? '!' : stat.value}
+                  </p>
                 </div>
-              </CardContent>
-            </Card>
-          </Link>
+                <div className={`p-3 rounded-xl ${stat.hasError ? 'bg-red-400' : stat.color}`}>
+                  {stat.hasError ? (
+                    <AlertTriangle className="h-6 w-6 text-white" />
+                  ) : (
+                    <stat.icon className="h-6 w-6 text-white" />
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         ))}
       </div>
 

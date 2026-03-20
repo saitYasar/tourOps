@@ -272,6 +272,34 @@ export function LayoutInspector({
           </Select>
         </div>
 
+        {/* Chairs / Sandalyeler */}
+        {selectedTable.chairs.length > 0 && (
+          <div className="space-y-2">
+            <Label className="text-xs">Sandalyeler ({selectedTable.chairs.length})</Label>
+            <div className="space-y-1 max-h-40 overflow-y-auto">
+              {selectedTable.chairs
+                .slice()
+                .sort((a, b) => a.order - b.order)
+                .map((chair) => (
+                  <Input
+                    key={chair.id}
+                    value={chair.name}
+                    onChange={(e) =>
+                      dispatch({
+                        type: 'UPDATE_CHAIR_NAME',
+                        tableId: selectedTable.id,
+                        chairId: chair.id,
+                        name: e.target.value,
+                      })
+                    }
+                    className="h-7 text-xs"
+                    placeholder={`Sandalye ${chair.order}`}
+                  />
+                ))}
+            </div>
+          </div>
+        )}
+
         <Button
           variant="destructive"
           size="sm"

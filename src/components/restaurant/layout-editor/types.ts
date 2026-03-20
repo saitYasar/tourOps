@@ -132,6 +132,7 @@ export type EditorAction =
   | { type: 'MOVE_OBJECT'; id: number; x: number; y: number }
   | { type: 'ROTATE_OBJECT'; id: number; r: number }
   | { type: 'UPDATE_OBJECT_PROPERTY'; id: number; key: keyof Pick<EditorObject, 'name' | 'w' | 'h' | 'roomId' | 'color' | 'displayName'>; value: string | number }
+  | { type: 'UPDATE_CHAIR_NAME'; tableId: number; chairId: number; name: string }
   | { type: 'DELETE_ITEM'; itemType: 'room' | 'table' | 'object'; id: number }
   | { type: 'SET_ZOOM'; zoom: number }
   | { type: 'SET_PAN'; x: number; y: number }

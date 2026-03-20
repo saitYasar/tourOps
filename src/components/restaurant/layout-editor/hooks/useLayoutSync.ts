@@ -376,6 +376,19 @@ export function useLayoutSync(
         }
       }
 
+      // Save chairs of dirty tables
+      for (const table of dirtyTables) {
+        for (const chair of table.chairs) {
+          try {
+            await (apiRef.current || resourceApi).update(chair.id, { name: chair.name });
+            savedCount++;
+          } catch (error) {
+            console.error('[LayoutEditor] Chair save exception:', error);
+            errorCount++;
+          }
+        }
+      }
+
       // Save objects one by one
       for (const obj of dirtyObjects) {
         try {
@@ -470,7 +483,7 @@ export function useLayoutSync(
   );
 
   const createTable = useCallback(
-    async (roomId: number, capacity: number, room: EditorRoom, existingTablesCount: number, allTableNames: string[], nameOverride?: string) => {
+    async (roomId: number, capacity: number, room: EditorRoom, existingTablesCount: number, allTableNames: string[], nameOverride?: string, maxSeatNumber?: number) => {
       const tableType = typesRef.current.find((t) => t.code === 'table');
       if (!tableType) {
         toast.error('Masa tipi bulunamadı');
@@ -527,8 +540,9 @@ export function useLayoutSync(
               }
             }
 
+            const seatStart = (maxSeatNumber ?? 0);
             for (let i = 0; i < reordered.length; i++) {
-              const chairName = `${name}-${i + 1}`;
+              const chairName = `${seatStart + i + 1}`;
               const chairPos = reordered[i];
               const chairX = Math.round(x + defaults.w / 2 + chairPos.x);
               const chairY = Math.round(y + defaults.h / 2 + chairPos.y);

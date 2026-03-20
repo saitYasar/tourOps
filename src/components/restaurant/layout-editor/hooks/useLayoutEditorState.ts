@@ -205,6 +205,23 @@ function editorReducer(state: EditorState, action: EditorAction): EditorState {
       };
     }
 
+    case 'UPDATE_CHAIR_NAME': {
+      return {
+        ...state,
+        tables: state.tables.map((t) => {
+          if (t.id !== action.tableId) return t;
+          return {
+            ...t,
+            dirty: true,
+            chairs: t.chairs.map((ch) =>
+              ch.id === action.chairId ? { ...ch, name: action.name } : ch
+            ),
+          };
+        }),
+        isDirty: true,
+      };
+    }
+
     case 'UPDATE_ROOM_PROPERTY':
       return applyRoomPropertyChange(state, action.id, action.key, action.value);
 

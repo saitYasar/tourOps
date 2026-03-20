@@ -91,7 +91,7 @@ import {
 } from '@/components/ui/select';
 import {
   LoadingState, EmptyState, ErrorState, TourStatusBadge, ConfirmDialog,
-  CompactReceipt, DetailedListReceipt, KitchenSummaryReceipt,
+  CompactReceipt, DetailedListReceipt, KitchenSummaryReceipt, ReceiptServiceSummary,
   handleReceiptPrint, exportReceiptExcel,
 } from '@/components/shared';
 import type { ReceiptTemplate } from '@/components/shared';
@@ -1490,16 +1490,20 @@ export default function TourDetailPage() {
                                   <td colSpan={3} className="py-2 font-semibold text-right">{t.tours.grandTotal}</td>
                                   <td className="py-2 text-right font-bold text-lg">{Number(serviceSummary.grandTotal).toFixed(2)} ₺</td>
                                 </tr>
-                                {serviceSummary.commissionRate != null && (
+                                {serviceSummary.commissionRate != null && serviceSummary.commissionAmount != null && (
                                   <tr>
-                                    <td colSpan={3} className="py-1 text-right text-sm text-slate-500">{t.tours.commissionRate}</td>
-                                    <td className="py-1 text-right text-sm text-slate-500">%{serviceSummary.commissionRate}</td>
+                                    <td colSpan={3} className="py-1 text-right text-sm font-medium text-orange-600">
+                                      {t.tours.agencyCommission} %{serviceSummary.commissionRate}
+                                    </td>
+                                    <td className="py-1 text-right font-semibold text-orange-600">{Number(serviceSummary.commissionAmount).toFixed(2)} ₺</td>
                                   </tr>
                                 )}
-                                {serviceSummary.commissionAmount != null && (
+                                {(serviceSummary as Record<string, unknown>).systemCommissionRate != null && (serviceSummary as Record<string, unknown>).systemCommissionAmount != null && (
                                   <tr>
-                                    <td colSpan={3} className="py-1 text-right text-sm font-medium text-orange-600">{t.tours.commissionAmount}</td>
-                                    <td className="py-1 text-right font-semibold text-orange-600">{Number(serviceSummary.commissionAmount).toFixed(2)} ₺</td>
+                                    <td colSpan={3} className="py-1 text-right text-sm font-medium text-violet-600">
+                                      {t.tours.systemCommission} %{String((serviceSummary as Record<string, unknown>).systemCommissionRate)}
+                                    </td>
+                                    <td className="py-1 text-right font-semibold text-violet-600">{Number((serviceSummary as Record<string, unknown>).systemCommissionAmount).toFixed(2)} ₺</td>
                                   </tr>
                                 )}
                               </tfoot>
@@ -1588,7 +1592,7 @@ export default function TourDetailPage() {
                                               <div key={sc.id} className="flex items-center justify-between text-sm bg-white rounded p-2 border">
                                                 <span>{sc.service?.title || `#${sc.serviceId}`}</span>
                                                 <div className="flex items-center gap-3 text-slate-600">
-                                                  <span>x{sc.quantity}</span>
+                                                  <span>{sc.quantity}x</span>
                                                   {sc.service?.basePrice != null && (
                                                     <span className="font-medium">{(Number(sc.service.basePrice) * sc.quantity).toFixed(2)} ₺</span>
                                                   )}
@@ -1725,6 +1729,7 @@ export default function TourDetailPage() {
                 {receiptTemplate === 'kitchen' && (
                   <KitchenSummaryReceipt tourInfo={receiptTourInfo} choices={choicesArr} orgName={choicesOrgName} t={t} />
                 )}
+                <ReceiptServiceSummary serviceSummary={serviceSummary} t={t} />
               </>
             )}
           </div>
