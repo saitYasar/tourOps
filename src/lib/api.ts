@@ -1768,10 +1768,10 @@ class ApiClient {
     }, lang);
   }
 
-  async getServiceRequestsByTour(tourId: number, page = 1, limit = 10, lang: 'tr' | 'en' = 'tr') {
+  async getServiceRequestsByTour(tourId: number, page = 1, limit = 10) {
     return this.request<PaginatedResponse<ServiceRequestDto>>(`/service-requests/tour/${tourId}?page=${page}&limit=${limit}`, {
       method: 'GET',
-    }, lang);
+    }, 'tr', true);
   }
 
   async cancelServiceRequest(id: number, lang: 'tr' | 'en' = 'tr') {
@@ -3790,23 +3790,23 @@ class ApiClient {
   // Tour Participants
   // ============================================
 
-  async getTourClients(tourId: number, lang: 'tr' | 'en' = 'tr') {
-    const response = await this.request<{ data: TourClientDto[]; meta: unknown }>(`/agency/tours/${tourId}/participants`, {}, lang);
+  async getTourClients(tourId: number) {
+    const response = await this.request<{ data: TourClientDto[]; meta: unknown }>(`/agency/tours/${tourId}/participants`, {}, 'tr', true);
     return response.data;
   }
 
-  async addTourParticipant(tourId: number, clientId: number, notes?: string, lang: 'tr' | 'en' = 'tr') {
+  async addTourParticipant(tourId: number, clientId: number, notes?: string) {
     return this.request<TourClientDto>(`/agency/tours/${tourId}/participants`, {
       method: 'POST',
       body: JSON.stringify({ clientId, ...(notes ? { notes } : {}) }),
-    }, lang);
+    }, 'tr', true);
   }
 
-  async updateTourClientStatus(tourId: number, clientId: number, status: string, lang: 'tr' | 'en' = 'tr') {
+  async updateTourClientStatus(tourId: number, clientId: number, status: string) {
     return this.request<TourClientDto>(`/agency/tours/${tourId}/participants/${clientId}/status`, {
       method: 'PATCH',
       body: JSON.stringify({ status }),
-    }, lang);
+    }, 'tr', true);
   }
 
   // ============================================
