@@ -1768,10 +1768,10 @@ class ApiClient {
     }, lang);
   }
 
-  async getServiceRequestsByTour(tourId: number, page = 1, limit = 10) {
+  async getServiceRequestsByTour(tourId: number, page = 1, limit = 10, lang: 'tr' | 'en' = 'tr') {
     return this.request<PaginatedResponse<ServiceRequestDto>>(`/service-requests/tour/${tourId}?page=${page}&limit=${limit}`, {
       method: 'GET',
-    }, 'tr', true);
+    }, lang);
   }
 
   async cancelServiceRequest(id: number, lang: 'tr' | 'en' = 'tr') {
@@ -2196,31 +2196,31 @@ class ApiClient {
   // Agencies - Clients
   // ============================================
 
-  async getAgencyClients(page = 1, limit = 10) {
+  async getAgencyClients(page = 1, limit = 10, lang: 'tr' | 'en' = 'tr') {
     const url = `/agencies/clients?page=${page}&limit=${limit}`;
     return this.request<PaginatedResponse<AgencyClientDto>>(url, {
       method: 'GET',
-    }, 'tr', true);
+    }, lang);
   }
 
   // Note: GET /agencies/clients/{clientId} returns 404 - backend only supports list and delete
-  async getAgencyClient(clientId: number) {
+  async getAgencyClient(clientId: number, lang: 'tr' | 'en' = 'tr') {
     return this.request<AgencyClientDto>(`/agencies/clients/${clientId}`, {
       method: 'GET',
-    }, 'tr', true);
+    }, lang);
   }
 
-  async createAgencyClient(data: CreateAgencyClientDto) {
+  async createAgencyClient(data: CreateAgencyClientDto, lang: 'tr' | 'en' = 'tr') {
     return this.request<{ message: string; data: AgencyClientDto }>('/agencies/clients', {
       method: 'POST',
       body: JSON.stringify(data),
-    }, 'tr', true);
+    }, lang);
   }
 
-  async deleteAgencyClient(clientId: number) {
+  async deleteAgencyClient(clientId: number, lang: 'tr' | 'en' = 'tr') {
     return this.request<{ message: string }>(`/agencies/clients/${clientId}`, {
       method: 'DELETE',
-    }, 'tr', true);
+    }, lang);
   }
 
   // ============================================
@@ -2508,29 +2508,29 @@ class ApiClient {
     }
     return this.request<PaginatedResponse<ResourceTypeDto>>(url, {
       method: 'GET',
-    }, 'tr', true); // skipLang - backend doesn't accept lang param
+    }, 'tr', true);
   }
 
-  async getResourceLayout(parentId?: number | null) {
+  async getResourceLayout(parentId?: number | null, lang: 'tr' | 'en' = 'tr') {
     let url = '/resources/layout';
     if (parentId !== undefined && parentId !== null) {
       url += `?parentId=${parentId}`;
     }
     return this.request<ResourceDto[]>(url, {
       method: 'GET',
-    }, 'tr', true); // skipLang
+    }, lang);
   }
 
-  async getResourceById(id: number) {
+  async getResourceById(id: number, lang: 'tr' | 'en' = 'tr') {
     return this.request<ResourceDto>(`/resources/${id}`, {
       method: 'GET',
-    }, 'tr', true); // skipLang
+    }, lang);
   }
 
-  async getResourceChildren(parentId: number, page = 1, limit = 100) {
+  async getResourceChildren(parentId: number, page = 1, limit = 100, lang: 'tr' | 'en' = 'tr') {
     return this.request<PaginatedResponse<ResourceDto>>(`/resources/${parentId}/children?page=${page}&limit=${limit}`, {
       method: 'GET',
-    }, 'tr', true); // skipLang
+    }, lang);
   }
 
   async createResource(data: CreateResourceDto, image?: File) {
@@ -2684,81 +2684,81 @@ class ApiClient {
     return jsonResponse.data as ResourceDto;
   }
 
-  async deleteResource(id: number) {
+  async deleteResource(id: number, lang: 'tr' | 'en' = 'tr') {
     return this.request<{ message: string }>(`/resources/${id}`, {
       method: 'DELETE',
-    }, 'tr', true); // skipLang
+    }, lang);
   }
 
-  async moveResource(id: number, newParentId: number | null) {
+  async moveResource(id: number, newParentId: number | null, lang: 'tr' | 'en' = 'tr') {
     return this.request<ResourceDto>(`/resources/${id}/move`, {
       method: 'PUT',
       body: JSON.stringify({ newParentId }),
-    }, 'tr', true); // skipLang
+    }, lang);
   }
 
-  async activateResource(id: number) {
+  async activateResource(id: number, lang: 'tr' | 'en' = 'tr') {
     return this.request<ResourceDto>(`/resources/${id}/activate`, {
       method: 'PUT',
-    }, 'tr', true); // skipLang
+    }, lang);
   }
 
-  async deactivateResource(id: number) {
+  async deactivateResource(id: number, lang: 'tr' | 'en' = 'tr') {
     return this.request<ResourceDto>(`/resources/${id}/deactivate`, {
       method: 'PUT',
-    }, 'tr', true); // skipLang
+    }, lang);
   }
 
   // ============================================
   // Service Categories
   // ============================================
 
-  async getServiceCategories(lang: string = 'tr') {
-    return this.request<ServiceCategoryDto[]>(`/service-categories/tree?lang=${lang}`, {
+  async getServiceCategories(lang: 'tr' | 'en' = 'tr') {
+    return this.request<ServiceCategoryDto[]>(`/service-categories/tree`, {
       method: 'GET',
-    }, 'tr', true);
+    }, lang);
   }
 
-  async getServiceCategoriesMenu(lang: string = 'tr') {
-    return this.request<ClientStopMenuCategoryDto[]>(`/service-categories/menu?lang=${lang}`, {
+  async getServiceCategoriesMenu(lang: 'tr' | 'en' = 'tr') {
+    return this.request<ClientStopMenuCategoryDto[]>(`/service-categories/menu`, {
       method: 'GET',
-    }, 'tr', true);
+    }, lang);
   }
 
-  async getServiceCategory(id: number) {
+  async getServiceCategory(id: number, lang: 'tr' | 'en' = 'tr') {
     return this.request<ServiceCategoryDto>(`/service-categories/${id}`, {
       method: 'GET',
-    }, 'tr', true);
+    }, lang);
   }
 
-  async createServiceCategory(data: CreateServiceCategoryDto) {
+  async createServiceCategory(data: CreateServiceCategoryDto, lang: 'tr' | 'en' = 'tr') {
     return this.request<ServiceCategoryDto>('/service-categories', {
       method: 'POST',
       body: JSON.stringify(data),
-    }, 'tr', true);
+    }, lang);
   }
 
-  async updateServiceCategory(id: number, data: UpdateServiceCategoryDto) {
+  async updateServiceCategory(id: number, data: UpdateServiceCategoryDto, lang: 'tr' | 'en' = 'tr') {
     return this.request<ServiceCategoryDto>(`/service-categories/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
-    }, 'tr', true);
+    }, lang);
   }
 
-  async deleteServiceCategory(id: number) {
+  async deleteServiceCategory(id: number, lang: 'tr' | 'en' = 'tr') {
     return this.request<{ message: string }>(`/service-categories/${id}`, {
       method: 'DELETE',
-    }, 'tr', true);
+    }, lang);
   }
 
   // ============================================
   // Services
   // ============================================
 
-  async getService(id: number) {
+  async getService(id: number, lang: 'tr' | 'en' = 'tr') {
     return this.request<ServiceDto>(`/services/${id}`, {
       method: 'GET',
-    }, 'tr', true);
+    }, lang);
   }
 
   async createService(data: CreateServiceDto, image?: File) {
@@ -2825,28 +2825,28 @@ class ApiClient {
     return (jsonResponse.data !== undefined ? jsonResponse.data : jsonResponse) as ServiceDto;
   }
 
-  async deleteService(id: number) {
+  async deleteService(id: number, lang: 'tr' | 'en' = 'tr') {
     return this.request<{ message: string }>(`/services/${id}`, {
       method: 'DELETE',
-    }, 'tr', true);
+    }, lang);
   }
 
-  async getServicesByCategory(categoryId: number, page = 1, limit = 100, lang: string = 'tr') {
-    return this.request<PaginatedResponse<ServiceDto>>(`/services/category/${categoryId}?page=${page}&limit=${limit}&lang=${lang}`, {
+  async getServicesByCategory(categoryId: number, page = 1, limit = 100, lang: 'tr' | 'en' = 'tr') {
+    return this.request<PaginatedResponse<ServiceDto>>(`/services/category/${categoryId}?page=${page}&limit=${limit}`, {
       method: 'GET',
-    }, 'tr', true);
+    }, lang);
   }
 
-  async getServicesByOrganization(orgId: number, page = 1, limit = 100) {
+  async getServicesByOrganization(orgId: number, page = 1, limit = 100, lang: 'tr' | 'en' = 'tr') {
     return this.request<PaginatedResponse<ServiceDto>>(`/services/organization/${orgId}?page=${page}&limit=${limit}`, {
       method: 'GET',
-    }, 'tr', true);
+    }, lang);
   }
 
-  async getActiveServicesByOrganization(orgId: number, page = 1, limit = 100) {
+  async getActiveServicesByOrganization(orgId: number, page = 1, limit = 100, lang: 'tr' | 'en' = 'tr') {
     return this.request<PaginatedResponse<ServiceDto>>(`/services/organization/${orgId}/active?page=${page}&limit=${limit}`, {
       method: 'GET',
-    }, 'tr', true);
+    }, lang);
   }
 
   // ============================================
@@ -3167,10 +3167,10 @@ class ApiClient {
   // Admin - İşletme Kaynakları/Yerleşim Yönetimi
   // ============================================
 
-  async getAdminOrgResources(orgId: number) {
+  async getAdminOrgResources(orgId: number, lang: 'tr' | 'en' = 'tr') {
     return this.request<ResourceDto[]>(`/admin/organizations/${orgId}/resources`, {
       method: 'GET',
-    }, 'tr', true);
+    }, lang);
   }
 
   async createAdminOrgResource(orgId: number, data: CreateResourceDto) {
@@ -3285,10 +3285,10 @@ class ApiClient {
     return jsonResponse.data as ResourceDto;
   }
 
-  async deleteAdminOrgResource(orgId: number, resourceId: number) {
+  async deleteAdminOrgResource(orgId: number, resourceId: number, lang: 'tr' | 'en' = 'tr') {
     return this.request<{ message: string }>(`/admin/organizations/${orgId}/resources/${resourceId}`, {
       method: 'DELETE',
-    }, 'tr', true);
+    }, lang);
   }
 
   // ============================================
@@ -3468,11 +3468,11 @@ class ApiClient {
   // Admin - Organization Categories
   // ============================================
 
-  async getAdminOrganizationCategories(page = 1, limit = 100) {
+  async getAdminOrganizationCategories(page = 1, limit = 100, lang: 'tr' | 'en' = 'tr') {
     const url = `/admin/organization-categories?page=${page}&limit=${limit}`;
     return this.request<PaginatedResponse<CategoryDto>>(url, {
       method: 'GET',
-    }, 'tr', true);
+    }, lang);
   }
 
   async createAdminOrganizationCategory(data: { name: string; description?: string }, lang: 'tr' | 'en' = 'tr') {
@@ -3516,11 +3516,11 @@ class ApiClient {
     defaultCapacity?: number;
     order?: number;
     childId?: number;
-  }, lang: 'tr' | 'en' = 'tr') {
+  }) {
     return this.request<ResourceTypeDto>('/admin/resource-types', {
       method: 'POST',
       body: JSON.stringify(data),
-    }, lang);
+    }, 'tr', true);
   }
 
   async updateAdminResourceType(id: number, data: {
@@ -3531,24 +3531,24 @@ class ApiClient {
     defaultCapacity?: number;
     order?: number;
     childId?: number;
-  }, lang: 'tr' | 'en' = 'tr') {
+  }) {
     return this.request<ResourceTypeDto>(`/admin/resource-types/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
-    }, lang);
+    }, 'tr', true);
   }
 
-  async deleteAdminResourceType(id: number, lang: 'tr' | 'en' = 'tr') {
+  async deleteAdminResourceType(id: number) {
     return this.request<{ message: string }>(`/admin/resource-types/${id}`, {
       method: 'DELETE',
-    }, lang);
+    }, 'tr', true);
   }
 
   // ============================================
   // Admin - Users
   // ============================================
 
-  async getUsers(page = 1, limit = 100, filters?: { role?: string; status?: string; search?: string }) {
+  async getUsers(page = 1, limit = 100, filters?: { role?: string; status?: string; search?: string }, lang: 'tr' | 'en' = 'tr') {
     const params = new URLSearchParams();
     params.set('page', String(page));
     params.set('limit', String(limit));
@@ -3557,33 +3557,33 @@ class ApiClient {
     if (filters?.search) params.set('search', filters.search);
     return this.request<PaginatedResponse<AdminUserDto>>(`/admin/users?${params.toString()}`, {
       method: 'GET',
-    }, 'tr', true);
+    }, lang);
   }
 
-  async getUserById(id: number) {
+  async getUserById(id: number, lang: 'tr' | 'en' = 'tr') {
     return this.request<AdminUserDto>(`/admin/users/${id}`, {
       method: 'GET',
-    }, 'tr', true); // skipLang
+    }, lang);
   }
 
-  async createUser(data: CreateAdminUserDto) {
+  async createUser(data: CreateAdminUserDto, lang: 'tr' | 'en' = 'tr') {
     return this.request<AdminUserDto>('/admin/users', {
       method: 'POST',
       body: JSON.stringify(data),
-    }, 'tr', true); // skipLang
+    }, lang);
   }
 
-  async updateUser(id: number, data: UpdateAdminUserDto) {
+  async updateUser(id: number, data: UpdateAdminUserDto, lang: 'tr' | 'en' = 'tr') {
     return this.request<AdminUserDto>(`/admin/users/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
-    }, 'tr', true); // skipLang
+    }, lang);
   }
 
-  async deleteUser(id: number) {
+  async deleteUser(id: number, lang: 'tr' | 'en' = 'tr') {
     return this.request<{ message: string }>(`/admin/users/${id}`, {
       method: 'DELETE',
-    }, 'tr', true); // skipLang
+    }, lang);
   }
 
   // ============================================
@@ -3631,8 +3631,8 @@ class ApiClient {
   // Tour Stop - Public
   // ============================================
 
-  async getChoiceDeadlineRemaining(tourStopId: number) {
-    return this.request<ChoiceDeadlineRemainingDto>(`/tour-stops/${tourStopId}/choice-deadline-remaining`, { method: 'GET' }, 'tr', true);
+  async getChoiceDeadlineRemaining(tourStopId: number, lang: 'tr' | 'en' = 'tr') {
+    return this.request<ChoiceDeadlineRemainingDto>(`/tour-stops/${tourStopId}/choice-deadline-remaining`, { method: 'GET' }, lang);
   }
 
   // ============================================
@@ -3756,57 +3756,57 @@ class ApiClient {
     return jsonResponse.data as ApiTourDto;
   }
 
-  async deleteAgencyTour(id: number) {
+  async deleteAgencyTour(id: number, lang: 'tr' | 'en' = 'tr') {
     return this.request<{ message: string }>(`/agency/tours/${id}`, {
       method: 'DELETE',
-    }, 'tr', true);
+    }, lang);
   }
 
-  async publishTour(id: number) {
+  async publishTour(id: number, lang: 'tr' | 'en' = 'tr') {
     return this.request<ApiTourDto>(`/agency/tours/${id}/publish`, {
       method: 'PUT',
-    }, 'tr', true);
+    }, lang);
   }
 
-  async cancelTour(id: number) {
+  async cancelTour(id: number, lang: 'tr' | 'en' = 'tr') {
     return this.request<ApiTourDto>(`/agency/tours/${id}/cancel`, {
       method: 'PUT',
-    }, 'tr', true);
+    }, lang);
   }
 
-  async completeTour(id: number) {
+  async completeTour(id: number, lang: 'tr' | 'en' = 'tr') {
     return this.request<ApiTourDto>(`/agency/tours/${id}/complete`, {
       method: 'PUT',
-    }, 'tr', true);
+    }, lang);
   }
 
-  async deleteTourPhoto(tourId: number, photoId: number) {
+  async deleteTourPhoto(tourId: number, photoId: number, lang: 'tr' | 'en' = 'tr') {
     return this.request<{ message: string }>(`/agency/tours/${tourId}/photos/${photoId}`, {
       method: 'DELETE',
-    }, 'tr', true);
+    }, lang);
   }
 
   // ============================================
   // Tour Participants
   // ============================================
 
-  async getTourClients(tourId: number) {
-    const response = await this.request<{ data: TourClientDto[]; meta: unknown }>(`/agency/tours/${tourId}/participants`, {}, 'tr', true);
+  async getTourClients(tourId: number, lang: 'tr' | 'en' = 'tr') {
+    const response = await this.request<{ data: TourClientDto[]; meta: unknown }>(`/agency/tours/${tourId}/participants`, {}, lang);
     return response.data;
   }
 
-  async addTourParticipant(tourId: number, clientId: number, notes?: string) {
+  async addTourParticipant(tourId: number, clientId: number, notes?: string, lang: 'tr' | 'en' = 'tr') {
     return this.request<TourClientDto>(`/agency/tours/${tourId}/participants`, {
       method: 'POST',
       body: JSON.stringify({ clientId, ...(notes ? { notes } : {}) }),
-    }, 'tr', true);
+    }, lang);
   }
 
-  async updateTourClientStatus(tourId: number, clientId: number, status: string) {
+  async updateTourClientStatus(tourId: number, clientId: number, status: string, lang: 'tr' | 'en' = 'tr') {
     return this.request<TourClientDto>(`/agency/tours/${tourId}/participants/${clientId}/status`, {
       method: 'PATCH',
       body: JSON.stringify({ status }),
-    }, 'tr', true);
+    }, lang);
   }
 
   // ============================================
@@ -3950,8 +3950,8 @@ class ApiClient {
     return jsonResponse.data !== undefined ? jsonResponse.data as AdminNotificationDto : jsonResponse as AdminNotificationDto;
   }
 
-  async listNotifications(page = 1, limit = 10) {
-    return this.request<{ data: AdminNotificationDto[]; meta: { total: number; totalCount?: number; page: number; limit: number } }>(`/admin/notifications?page=${page}&limit=${limit}`, { method: 'GET' }, 'tr', true);
+  async listNotifications(page = 1, limit = 10, lang: 'tr' | 'en' = 'tr') {
+    return this.request<{ data: AdminNotificationDto[]; meta: { total: number; totalCount?: number; page: number; limit: number } }>(`/admin/notifications?page=${page}&limit=${limit}`, { method: 'GET' }, lang);
   }
 
   async updateNotification(id: number, formData: FormData) {
@@ -3971,56 +3971,56 @@ class ApiClient {
     return jsonResponse.data !== undefined ? jsonResponse.data as AdminNotificationDto : jsonResponse as AdminNotificationDto;
   }
 
-  async deleteNotification(id: number) {
-    return this.request<{ message: string }>(`/admin/notifications/${id}`, { method: 'DELETE' }, 'tr', true);
+  async deleteNotification(id: number, lang: 'tr' | 'en' = 'tr') {
+    return this.request<{ message: string }>(`/admin/notifications/${id}`, { method: 'DELETE' }, lang);
   }
 
   // ============================================
   // Panel Notifications - Agency
   // ============================================
 
-  async getAgencyNotifications(page = 1, limit = 10) {
-    return this.request<{ data: PanelNotificationDto[]; meta: { total: number; totalCount?: number; page: number; limit: number } }>(`/agencies/my/notifications?page=${page}&limit=${limit}`, { method: 'GET' }, 'tr', true);
+  async getAgencyNotifications(page = 1, limit = 10, lang: 'tr' | 'en' = 'tr') {
+    return this.request<{ data: PanelNotificationDto[]; meta: { total: number; totalCount?: number; page: number; limit: number } }>(`/agencies/my/notifications?page=${page}&limit=${limit}`, { method: 'GET' }, lang);
   }
 
-  async markAgencyNotificationRead(id: number) {
-    return this.request<PanelNotificationDto>(`/agencies/my/notifications/${id}/read`, { method: 'PATCH' }, 'tr', true);
+  async markAgencyNotificationRead(id: number, lang: 'tr' | 'en' = 'tr') {
+    return this.request<PanelNotificationDto>(`/agencies/my/notifications/${id}/read`, { method: 'PATCH' }, lang);
   }
 
-  async getAgencyUnreadCount() {
-    return this.request<{ unreadCount: number }>('/agencies/my/notifications/unread-count', { method: 'GET' }, 'tr', true);
+  async getAgencyUnreadCount(lang: 'tr' | 'en' = 'tr') {
+    return this.request<{ unreadCount: number }>('/agencies/my/notifications/unread-count', { method: 'GET' }, lang);
   }
 
   // ============================================
   // Panel Notifications - Organization
   // ============================================
 
-  async getOrganizationNotifications(page = 1, limit = 10) {
-    return this.request<{ data: PanelNotificationDto[]; meta: { total: number; totalCount?: number; page: number; limit: number } }>(`/organizations/my/notifications?page=${page}&limit=${limit}`, { method: 'GET' }, 'tr', true);
+  async getOrganizationNotifications(page = 1, limit = 10, lang: 'tr' | 'en' = 'tr') {
+    return this.request<{ data: PanelNotificationDto[]; meta: { total: number; totalCount?: number; page: number; limit: number } }>(`/organizations/my/notifications?page=${page}&limit=${limit}`, { method: 'GET' }, lang);
   }
 
-  async markOrganizationNotificationRead(id: number) {
-    return this.request<PanelNotificationDto>(`/organizations/my/notifications/${id}/read`, { method: 'PATCH' }, 'tr', true);
+  async markOrganizationNotificationRead(id: number, lang: 'tr' | 'en' = 'tr') {
+    return this.request<PanelNotificationDto>(`/organizations/my/notifications/${id}/read`, { method: 'PATCH' }, lang);
   }
 
-  async getOrganizationUnreadCount() {
-    return this.request<{ unreadCount: number }>('/organizations/my/notifications/unread-count', { method: 'GET' }, 'tr', true);
+  async getOrganizationUnreadCount(lang: 'tr' | 'en' = 'tr') {
+    return this.request<{ unreadCount: number }>('/organizations/my/notifications/unread-count', { method: 'GET' }, lang);
   }
 
   // ============================================
   // Panel Notifications - Client
   // ============================================
 
-  async getClientNotifications(page = 1, limit = 10) {
-    return this.request<{ data: PanelNotificationDto[]; meta: { total: number; totalCount?: number; page: number; limit: number } }>(`/client/notifications?page=${page}&limit=${limit}`, { method: 'GET' }, 'tr', true);
+  async getClientNotifications(page = 1, limit = 10, lang: 'tr' | 'en' = 'tr') {
+    return this.request<{ data: PanelNotificationDto[]; meta: { total: number; totalCount?: number; page: number; limit: number } }>(`/client/notifications?page=${page}&limit=${limit}`, { method: 'GET' }, lang);
   }
 
-  async markClientNotificationRead(id: number) {
-    return this.request<PanelNotificationDto>(`/client/notifications/${id}/read`, { method: 'PATCH' }, 'tr', true);
+  async markClientNotificationRead(id: number, lang: 'tr' | 'en' = 'tr') {
+    return this.request<PanelNotificationDto>(`/client/notifications/${id}/read`, { method: 'PATCH' }, lang);
   }
 
-  async getClientUnreadCount() {
-    return this.request<{ unreadCount: number }>('/client/notifications/unread-count', { method: 'GET' }, 'tr', true);
+  async getClientUnreadCount(lang: 'tr' | 'en' = 'tr') {
+    return this.request<{ unreadCount: number }>('/client/notifications/unread-count', { method: 'GET' }, lang);
   }
 
   // ============================================
@@ -4030,6 +4030,7 @@ class ApiClient {
   async listSystemCommissions(filters: {
     page?: number;
     limit?: number;
+    lang?: 'tr' | 'en';
     scope?: string;
     scopeId?: number;
     active?: boolean;
@@ -4046,29 +4047,29 @@ class ApiClient {
     if (filters.search) params.set('search', filters.search);
     if (filters.sortBy) params.set('sortBy', filters.sortBy);
     if (filters.sortOrder) params.set('sortOrder', filters.sortOrder);
-    return this.request<{ data: SystemCommissionDto[]; meta: { total: number; totalCount?: number; page: number; limit: number } }>(`/admin/system-commissions?${params.toString()}`, { method: 'GET' }, 'tr', true);
+    return this.request<{ data: SystemCommissionDto[]; meta: { total: number; totalCount?: number; page: number; limit: number } }>(`/admin/system-commissions?${params.toString()}`, { method: 'GET' }, filters.lang || 'tr');
   }
 
-  async getSystemCommission(id: number) {
-    return this.request<SystemCommissionDto>(`/admin/system-commissions/${id}`, { method: 'GET' }, 'tr', true);
+  async getSystemCommission(id: number, lang: 'tr' | 'en' = 'tr') {
+    return this.request<SystemCommissionDto>(`/admin/system-commissions/${id}`, { method: 'GET' }, lang);
   }
 
-  async createSystemCommission(data: CreateSystemCommissionDto) {
+  async createSystemCommission(data: CreateSystemCommissionDto, lang: 'tr' | 'en' = 'tr') {
     return this.request<SystemCommissionDto>('/admin/system-commissions', {
       method: 'POST',
       body: JSON.stringify(data),
-    }, 'tr', true);
+    }, lang);
   }
 
-  async updateSystemCommission(id: number, data: UpdateSystemCommissionDto) {
+  async updateSystemCommission(id: number, data: UpdateSystemCommissionDto, lang: 'tr' | 'en' = 'tr') {
     return this.request<SystemCommissionDto>(`/admin/system-commissions/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
-    }, 'tr', true);
+    }, lang);
   }
 
-  async deleteSystemCommission(id: number) {
-    return this.request<{ message: string }>(`/admin/system-commissions/${id}`, { method: 'DELETE' }, 'tr', true);
+  async deleteSystemCommission(id: number, lang: 'tr' | 'en' = 'tr') {
+    return this.request<{ message: string }>(`/admin/system-commissions/${id}`, { method: 'DELETE' }, lang);
   }
 }
 
@@ -5721,7 +5722,7 @@ export const adminApi = {
 // ============================================
 
 export const serviceCategoryApi = {
-  async getAll(lang: string = 'tr'): Promise<{ success: boolean; data?: ServiceCategoryDto[]; error?: string }> {
+  async getAll(lang: 'tr' | 'en' = 'tr'): Promise<{ success: boolean; data?: ServiceCategoryDto[]; error?: string }> {
     try {
       const response = await apiClient.getServiceCategories(lang);
       const data = Array.isArray(response) ? response : (response as any).data ?? [];
@@ -5733,7 +5734,7 @@ export const serviceCategoryApi = {
 
   async getMenu(lang: 'tr' | 'en' | 'de' = 'tr'): Promise<{ success: boolean; data?: ClientStopMenuCategoryDto[]; error?: string }> {
     try {
-      const response = await apiClient.getServiceCategoriesMenu(lang);
+      const response = await apiClient.getServiceCategoriesMenu(lang as 'tr' | 'en');
       const data = Array.isArray(response) ? response : (response as any).data ?? [];
       return { success: true, data };
     } catch (error) {
@@ -5819,7 +5820,7 @@ export const serviceApi = {
     }
   },
 
-  async getByCategory(categoryId: number, page = 1, limit = 100, lang: string = 'tr'): Promise<{ success: boolean; data?: ServiceDto[]; error?: string }> {
+  async getByCategory(categoryId: number, page = 1, limit = 100, lang: 'tr' | 'en' = 'tr'): Promise<{ success: boolean; data?: ServiceDto[]; error?: string }> {
     try {
       const response = await apiClient.getServicesByCategory(categoryId, page, limit, lang);
       return { success: true, data: response.data };
