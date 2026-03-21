@@ -273,7 +273,7 @@ export default function RestaurantDashboard() {
   // Query: Service categories from real API
   const { data: categoriesResult, isLoading: categoriesLoading } = useQuery({
     queryKey: ['service-categories', locale],
-    queryFn: () => serviceCategoryApi.getAll(locale),
+    queryFn: () => serviceCategoryApi.getAll(locale as 'tr' | 'en'),
     enabled: !!organization,
   });
 
