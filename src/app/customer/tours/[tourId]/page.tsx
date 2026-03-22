@@ -559,27 +559,6 @@ export default function CustomerTourDetailPage() {
           </CardContent>
         </Card>
 
-        {/* Gallery */}
-        {tour.photos && tour.photos.length > 0 && (
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <ImageIcon className="h-5 w-5 text-orange-500" />
-              <h3 className="text-lg font-bold text-slate-800">{t.customer.gallery}</h3>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {tour.photos.map((photo, i) => (
-                <div key={photo.id || i} className="aspect-square rounded-xl overflow-hidden bg-slate-100">
-                  <img
-                    src={photo.imageUrl || ''}
-                    alt=""
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Stops */}
         <div>
           {/* Filter out rejected pre-reservations — only show pending & approved */}
@@ -765,6 +744,27 @@ export default function CustomerTourDetailPage() {
             );
           })()}
         </div>
+
+        {/* Gallery */}
+        {tour.photos && tour.photos.length > 0 && (
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <ImageIcon className="h-5 w-5 text-orange-500" />
+              <h3 className="text-lg font-bold text-slate-800">{t.customer.gallery}</h3>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {tour.photos.map((photo, i) => (
+                <div key={photo.id || i} className="aspect-square rounded-xl overflow-hidden bg-slate-100">
+                  <img
+                    src={photo.imageUrl || ''}
+                    alt=""
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ============================================ */}

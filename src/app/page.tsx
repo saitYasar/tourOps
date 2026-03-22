@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
 import { AuthRedirect } from '@/components/landing/AuthRedirect';
+import { LanguageSwitcher } from '@/components/shared/LanguageSwitcher';
 
 export const metadata: Metadata = {
   title: 'HerHafta - Tur Yönetiminin Dijital Merkezi',
@@ -52,7 +53,8 @@ export default function HomePage() {
             </div>
             <span className="text-xl font-bold text-slate-900">HerHafta</span>
           </Link>
-          <nav className="flex items-center gap-2">
+          <nav className="flex items-center gap-3">
+            <LanguageSwitcher />
             <Link
               href="/login/customer"
               className="px-4 py-2 text-sm font-medium text-slate-700 hover:text-slate-900 border border-slate-200 hover:border-slate-300 rounded-lg transition-colors"

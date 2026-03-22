@@ -51,7 +51,7 @@ export default function CustomerDashboard() {
   const { t, locale } = useLanguage();
   const apiLang = locale as 'tr' | 'en' | 'de';
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'reservations' | 'serviceRequests' | 'profile'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'reservations' | 'serviceRequests'>('dashboard');
   const queryClient = useQueryClient();
   const [notifOpen, setNotifOpen] = useState(false);
   const [selectedNotif, setSelectedNotif] = useState<PanelNotificationDto | null>(null);
@@ -243,12 +243,6 @@ export default function CustomerDashboard() {
                 icon={FileText}
                 label={t.customer.serviceRequests}
               />
-              <NavTab
-                active={activeTab === 'profile'}
-                onClick={() => setActiveTab('profile')}
-                icon={User}
-                label={t.common.profile}
-              />
             </div>
 
             {/* Right actions */}
@@ -345,12 +339,6 @@ export default function CustomerDashboard() {
             icon={FileText}
             label={t.customer.serviceRequests}
           />
-          <MobileNavTab
-            active={activeTab === 'profile'}
-            onClick={() => setActiveTab('profile')}
-            icon={User}
-            label={t.common.profile}
-          />
         </div>
       </nav>
 
@@ -386,9 +374,6 @@ export default function CustomerDashboard() {
             loading={choicesLoading}
             t={t}
           />
-        )}
-        {activeTab === 'profile' && (
-          <ProfileView profile={profile} t={t} locale={locale} />
         )}
       </div>
 
@@ -815,73 +800,6 @@ function ServiceChoicesView({
 }
 
 // ============================================
-// Profile View
-// ============================================
-function ProfileView({
-  profile,
-  t,
-  locale,
-}: {
-  profile: ClientProfileDto;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  t: any;
-  locale: string;
-}) {
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-2">
-        <User className="h-5 w-5 text-orange-500" />
-        <h3 className="text-lg font-bold text-slate-800">{t.common.profile}</h3>
-      </div>
-
-      <Card className="bg-white border-0 shadow-md">
-        <CardContent className="p-6">
-          {/* Avatar */}
-          <div className="flex items-center gap-3 sm:gap-4 mb-4 sm:mb-6 pb-4 sm:pb-6 border-b border-slate-100">
-            <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-gradient-to-r from-sky-400 to-orange-400 flex items-center justify-center text-white text-xl sm:text-2xl font-bold">
-              {profile.profilePhoto ? (
-                <img src={profile.profilePhoto} alt="" className="w-full h-full rounded-full object-cover" />
-              ) : (
-                profile.firstName.charAt(0) + profile.lastName.charAt(0)
-              )}
-            </div>
-            <div>
-              <h4 className="text-lg sm:text-xl font-bold text-slate-800">{profile.firstName} {profile.lastName}</h4>
-              <p className="text-sm text-slate-500">@{profile.username}</p>
-            </div>
-          </div>
-
-          {/* Info Rows */}
-          <div className="space-y-4">
-            <ProfileRow label={t.auth.firstName} value={profile.firstName} />
-            <ProfileRow label={t.auth.lastName} value={profile.lastName} />
-            <ProfileRow label={t.auth.username} value={profile.username} />
-            <ProfileRow label={t.auth.email} value={profile.email || '-'} />
-            <ProfileRow label={t.common.phone} value={
-              profile.phone ? `+${profile.phoneCountryCode || ''} ${profile.phone}` : '-'
-            } />
-            <ProfileRow label={t.admin.lastLogin} value={
-              profile.lastLoginAt ? new Date(profile.lastLoginAt).toLocaleString(locale) : '-'
-            } />
-            <ProfileRow label={t.customer.statusLabel} value={profile.active ? t.customer.statusActiveLabel : t.customer.statusInactiveLabel} />
-          </div>
-
-          {/* Profile Edit - Link to dedicated page */}
-          <div className="mt-6 pt-6 border-t border-slate-100">
-            <Link href="/customer/profile">
-              <Button className="w-full bg-gradient-to-r from-sky-500 to-orange-500 hover:from-sky-600 hover:to-orange-600 text-white">
-                <User className="h-4 w-4 mr-2" />
-                {t.common.edit}
-              </Button>
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-// ============================================
 // Helper Components
 // ============================================
 
@@ -957,15 +875,6 @@ function StatCard({ icon: Icon, label, value, color }: {
         <p className="text-[10px] sm:text-xs text-slate-500 truncate">{label}</p>
       </CardContent>
     </Card>
-  );
-}
-
-function ProfileRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-1.5 sm:py-2 gap-0.5 sm:gap-4">
-      <span className="text-xs sm:text-sm text-slate-500">{label}</span>
-      <span className="text-sm font-medium text-slate-800 break-all">{value}</span>
-    </div>
   );
 }
 
