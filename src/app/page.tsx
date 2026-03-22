@@ -57,7 +57,7 @@ export default function HomePage() {
               href="/login/customer"
               className="px-4 py-2 text-sm font-medium text-slate-700 hover:text-slate-900 border border-slate-200 hover:border-slate-300 rounded-lg transition-colors"
             >
-              Müşteri Girisi
+              Müşteri Girissi
             </Link>
             <Link
               href="/login"
