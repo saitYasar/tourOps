@@ -1264,7 +1264,7 @@ export default function TourDetailPage() {
                         ))}
                       </div>
                     )}
-                    {(tour.status === 'draft' || tour.status === 'published') && stops?.length > 0 && (
+                    {(tour.status === 'draft' || tour.status === 'published') && (stops?.length ?? 0) > 0 && (
                       <Button className="w-full mt-3" onClick={openCreateStopForm}>
                         <Plus className="h-4 w-4 mr-1.5" />
                         {t.tours.addStop}
