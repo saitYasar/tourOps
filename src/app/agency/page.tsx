@@ -216,7 +216,7 @@ export default function AgencyDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{teamCount}</div>
-              <p className="text-xs text-muted-foreground">Ekip uyesi</p>
+              <p className="text-xs text-muted-foreground">{t.agency.teamMember}</p>
             </CardContent>
           </Card>
 
@@ -353,14 +353,14 @@ export default function AgencyDashboard() {
                     <div>
                       <CardTitle className="text-lg">{t.nav.tours}</CardTitle>
                       <p className="text-sm text-slate-500">
-                        {tours.length} tur
+                        {tours.length} {t.agency.tourCount}
                       </p>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-slate-600">
-                    Turlarinizi olusturun ve yonetin
+                    {t.agency.toursDesc}
                   </p>
                 </CardContent>
               </Card>
@@ -376,14 +376,14 @@ export default function AgencyDashboard() {
                     <div>
                       <CardTitle className="text-lg">{t.nav.team}</CardTitle>
                       <p className="text-sm text-slate-500">
-                        {teamCount} uye
+                        {teamCount} {t.agency.memberCount}
                       </p>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-slate-600">
-                    Ekip uyelerinizi davet edin ve yonetin
+                    {t.agency.teamDesc}
                   </p>
                 </CardContent>
               </Card>

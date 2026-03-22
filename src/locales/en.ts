@@ -781,6 +781,11 @@ export const en = {
     createOrg: 'Create Organization',
   },
   agency: {
+    toursDesc: 'Create and manage your tours',
+    teamDesc: 'Invite and manage your team members',
+    tourCount: 'tours',
+    memberCount: 'members',
+    teamMember: 'Team member',
     agencyInfo: 'Agency Info',
     agencyName: 'Agency Name',
     agencyStatus: 'Agency status',

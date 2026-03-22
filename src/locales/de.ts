@@ -781,6 +781,11 @@ export const de = {
     createOrg: 'Organisation erstellen',
   },
   agency: {
+    toursDesc: 'Erstellen und verwalten Sie Ihre Touren',
+    teamDesc: 'Laden Sie Ihre Teammitglieder ein und verwalten Sie sie',
+    tourCount: 'Touren',
+    memberCount: 'Mitglieder',
+    teamMember: 'Teammitglied',
     agencyInfo: 'Agenturinfo',
     agencyName: 'Agenturname',
     agencyStatus: 'Agenturstatus',

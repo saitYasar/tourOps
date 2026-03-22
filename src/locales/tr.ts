@@ -785,6 +785,12 @@ export const tr = {
     createOrg: 'İşletmeyi Oluştur',
   },
   agency: {
+    // Agency dashboard
+    toursDesc: 'Turlarınızı oluşturun ve yönetin',
+    teamDesc: 'Ekip üyelerinizi davet edin ve yönetin',
+    tourCount: 'tur',
+    memberCount: 'üye',
+    teamMember: 'Ekip üyesi',
     // Agency main page
     agencyInfo: 'Acente Bilgileri',
     agencyName: 'Acente Adı',
