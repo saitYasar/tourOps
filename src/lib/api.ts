@@ -1818,12 +1818,13 @@ class ApiClient {
   // Organizations - Public
   // ============================================
 
-  async getOrganizationsPublic(page = 1, limit = 10, name?: string, lang: 'tr' | 'en' | 'de' = 'tr', filters?: { cityId?: number; districtId?: number; categoryId?: number }) {
+  async getOrganizationsPublic(page = 1, limit = 10, name?: string, lang: 'tr' | 'en' | 'de' = 'tr', filters?: { cityId?: number; districtId?: number; categoryId?: number; sortByCommission?: string }) {
     const params = new URLSearchParams({ page: String(page), limit: String(limit), status: 'active' });
     if (name) params.set('name', name);
     if (filters?.cityId) params.set('cityId', String(filters.cityId));
     if (filters?.districtId) params.set('districtId', String(filters.districtId));
     if (filters?.categoryId) params.set('categoryId', String(filters.categoryId));
+    if (filters?.sortByCommission) params.set('sortByCommission', filters.sortByCommission);
     return this.request<PaginatedResponse<OrganizationPublicDto>>(`/organizations?${params}`, {
       method: 'GET',
     }, lang);
@@ -1831,6 +1832,12 @@ class ApiClient {
 
   async getOrganizationById(id: number, lang: 'tr' | 'en' | 'de' = 'tr') {
     return this.request<OrganizationPublicDto>(`/organizations/${id}`, {
+      method: 'GET',
+    }, lang);
+  }
+
+  async getOrganizationMenu(orgId: number, lang: 'tr' | 'en' | 'de' = 'tr') {
+    return this.request<ClientStopMenuCategoryDto[]>(`/service-categories/menu?organizationId=${orgId}`, {
       method: 'GET',
     }, lang);
   }

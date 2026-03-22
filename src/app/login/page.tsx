@@ -17,6 +17,7 @@ import {
   AlertCircle,
   UserPlus,
   Loader2,
+  Home,
 } from 'lucide-react';
 
 import { useAuth } from '@/contexts/AuthContext';
@@ -253,12 +254,12 @@ function LoginPageContent() {
 
         {/* Icerik */}
         <div className="relative z-10">
-          <div className="flex items-center gap-3 mb-2">
+          <Link href="/" className="flex items-center gap-3 mb-2 hover:opacity-80 transition-opacity">
             <div className="p-2 rounded-xl bg-white/20 transition-transform duration-500">
               <ThemeIcon className="h-6 w-6" />
             </div>
             <h1 className="text-3xl xl:text-4xl font-bold tracking-tight">{t.common.appName}</h1>
-          </div>
+          </Link>
           <p className="text-white/70 mt-2 text-sm xl:text-base">{t.common.appDescription}</p>
         </div>
 
@@ -301,8 +302,15 @@ function LoginPageContent() {
       <div className={`flex-1 lg:w-1/2 flex flex-col transition-colors duration-500 bg-gradient-to-br ${theme.lightGradient}`}>
         <div className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8 overflow-y-auto">
           <div className="w-full max-w-sm">
-            {/* Dil Secici */}
-            <div className="flex justify-end mb-4">
+            {/* Anasayfa + Dil Seçici */}
+            <div className="flex items-center justify-between mb-4">
+              <Link
+                href="/"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-600 hover:text-slate-900 border border-slate-200 hover:border-slate-300 rounded-lg transition-colors"
+              >
+                <Home className="h-4 w-4" />
+                <span className="hidden sm:inline">{t.common.home}</span>
+              </Link>
               <LanguageSwitcher />
             </div>
 

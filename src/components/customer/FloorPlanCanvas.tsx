@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, useEffect, useLayoutEffect, useCallback } from 'react';
+import { useRef, useState, useMemo, useLayoutEffect, useCallback } from 'react';
 import { Stage, Layer, Rect, Group, Text, Circle, Line } from 'react-konva';
 import type Konva from 'konva';
 import type { ResourceDto } from '@/lib/api';
@@ -326,12 +326,12 @@ export function FloorPlanCanvas({ rooms, tablesMap, objectsMap, selectedTableId,
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
-  const [zoom, setZoom] = useState(1);
-  const [panX, setPanX] = useState(0);
-  const [panY, setPanY] = useState(0);
   const [hoveredTableId, setHoveredTableId] = useState<number | null>(null);
-  const [fitted, setFitted] = useState(false);
-  const hasFitted = useRef(false);
+
+  // User-initiated zoom/pan (wheel & drag) — null means "use auto-fit values"
+  const [userZoom, setUserZoom] = useState<number | null>(null);
+  const [userPanX, setUserPanX] = useState<number | null>(null);
+  const [userPanY, setUserPanY] = useState<number | null>(null);
 
   // Convert rooms and tables to editor types
   const editorRooms = rooms.map((r, i) => resourceToRoom(r, i));
@@ -348,7 +348,35 @@ export function FloorPlanCanvas({ rooms, tablesMap, objectsMap, selectedTableId,
     });
   }
 
-  // Measure container synchronously before paint
+  // Compute auto-fit zoom/pan synchronously (no animation possible)
+  const fitResult = useMemo(() => {
+    if (editorRooms.length === 0 || containerSize.width === 0) return null;
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const room of editorRooms) {
+      minX = Math.min(minX, room.x);
+      minY = Math.min(minY, room.y);
+      maxX = Math.max(maxX, room.x + room.w);
+      maxY = Math.max(maxY, room.y + room.h);
+    }
+    if (minX === Infinity) return null;
+
+    const padding = 20;
+    const contentW = maxX - minX + padding * 2;
+    const contentH = maxY - minY + padding * 2;
+    const scaleX = containerSize.width / contentW;
+    const scaleY = containerSize.height / contentH;
+    const z = Math.min(scaleX, scaleY, 1.5);
+
+    return { zoom: z, panX: -minX * z + padding * z, panY: -minY * z + padding * z };
+  }, [editorRooms, containerSize]);
+
+  // Final values: user overrides or auto-fit
+  const zoom = userZoom ?? fitResult?.zoom ?? 1;
+  const panX = userPanX ?? fitResult?.panX ?? 0;
+  const panY = userPanY ?? fitResult?.panY ?? 0;
+
+  // Measure container
   useLayoutEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -408,19 +436,24 @@ export function FloorPlanCanvas({ rooms, tablesMap, objectsMap, selectedTableId,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomsKey, containerSize]);
 
+
   const handleWheel = useCallback((e: Konva.KonvaEventObject<WheelEvent>) => {
     e.evt.preventDefault();
     const scaleBy = 1.08;
-    const newZoom = e.evt.deltaY < 0 ? zoom * scaleBy : zoom / scaleBy;
-    setZoom(Math.min(Math.max(newZoom, 0.1), 5));
-  }, [zoom]);
+    const cur = userZoom ?? fitResult?.zoom ?? 1;
+    const newZoom = e.evt.deltaY < 0 ? cur * scaleBy : cur / scaleBy;
+    setUserZoom(Math.min(Math.max(newZoom, 0.1), 5));
+  }, [userZoom, fitResult]);
 
   const handleDragEnd = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
     if (e.target === stageRef.current) {
-      setPanX(e.target.x());
-      setPanY(e.target.y());
+      setUserPanX(e.target.x());
+      setUserPanY(e.target.y());
     }
   }, []);
+
+  // Only render Stage when we have a valid auto-fit
+  const ready = containerSize.width > 0 && containerSize.height > 0 && fitResult !== null;
 
   return (
     <div
@@ -428,7 +461,7 @@ export function FloorPlanCanvas({ rooms, tablesMap, objectsMap, selectedTableId,
       className="bg-slate-50 rounded-xl border overflow-hidden"
       style={{ height: 450 }}
     >
-      {containerSize.width > 0 && containerSize.height > 0 && fitted && (
+      {ready && (
         <Stage
           ref={stageRef}
           width={containerSize.width}
