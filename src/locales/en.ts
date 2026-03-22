@@ -353,8 +353,9 @@ export const en = {
     choicesStatusRejected: 'Choices Rejected',
     choicesStatusRevisionRequested: 'Revision Requested',
     choicesStatus: 'Choices Status',
-    deadlineExpired: 'Deadline expired',
+    deadlineExpired: 'Selection time expired',
     deadlineRemaining: 'Time remaining',
+    lastSelectionTime: 'Last selection time',
   },
   requests: {
     title: 'Reservation Requests',

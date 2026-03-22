@@ -19,6 +19,7 @@ export function useChoiceDeadline(tourStopId: number | null | undefined, enabled
     enabled: enabled && !!tourStopId,
     refetchInterval: 60_000,
     staleTime: 30_000,
+    retry: false,
   });
 
   const deadline = data as ChoiceDeadlineRemainingDto | undefined;
@@ -47,7 +48,7 @@ export function useChoiceDeadline(tourStopId: number | null | undefined, enabled
     };
 
     tick();
-    const interval = setInterval(tick, 1000); // update every second
+    const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
   }, [deadline?.deadlineTime]);
 

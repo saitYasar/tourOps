@@ -942,6 +942,8 @@ export interface ClientTourStopDto {
   scheduledEndTime: string | null;
   preReservationStatus: string | null;
   showPriceToCustomer: boolean;
+  choiceDeadline?: number | null;
+  choicesStatus?: string | null;
   organization: {
     name: string;
     categoryId: number;

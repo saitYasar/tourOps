@@ -628,7 +628,12 @@ export default function CustomerTourDetailPage() {
 
                           {/* Choice Deadline Countdown */}
                           <div className="mt-1">
-                            <ChoiceDeadlineCountdown tourStopId={stop.id} compact />
+                            <ChoiceDeadlineCountdown
+                              tourStopId={stop.id}
+                              compact
+                              scheduledEndTime={stop.scheduledEndTime}
+                              choiceDeadlineHours={stop.choiceDeadline}
+                            />
                           </div>
 
                           {/* Rating */}

@@ -353,8 +353,9 @@ export const de = {
     choicesStatusRejected: 'Auswahlen abgelehnt',
     choicesStatusRevisionRequested: 'Überarbeitung angefordert',
     choicesStatus: 'Auswahlstatus',
-    deadlineExpired: 'Frist abgelaufen',
+    deadlineExpired: 'Auswahlzeit abgelaufen',
     deadlineRemaining: 'Verbleibende Zeit',
+    lastSelectionTime: 'Letzte Auswahlzeit',
   },
   requests: {
     title: 'Reservierungsanfragen',

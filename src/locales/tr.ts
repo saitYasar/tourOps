@@ -353,8 +353,9 @@ export const tr = {
     choicesStatusRejected: 'Seçimler Reddedildi',
     choicesStatusRevisionRequested: 'Revizyon Talep Edildi',
     choicesStatus: 'Seçim Durumu',
-    deadlineExpired: 'Süre doldu',
+    deadlineExpired: 'Seçim süresi doldu',
     deadlineRemaining: 'Kalan süre',
+    lastSelectionTime: 'Son seçim saati',
   },
   requests: {
     title: 'Rezervasyon İstekleri',
