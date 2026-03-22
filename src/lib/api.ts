@@ -3682,7 +3682,7 @@ class ApiClient {
     return this.request<ApiTourDto>(`/admin/tours/${id}`, {}, lang);
   }
 
-  async getAdminTourClients(tourId: number, lang: 'tr' | 'en' | 'de' = 'tr', limit = 500) {
+  async getAdminTourClients(tourId: number, lang: 'tr' | 'en' | 'de' = 'tr', limit = 100) {
     const response = await this.request<{ data: TourClientDto[]; meta: unknown }>(`/admin/tours/${tourId}/participants?limit=${limit}`, {}, lang, true);
     return Array.isArray(response) ? response : (response.data || []);
   }
@@ -3890,7 +3890,7 @@ class ApiClient {
   // Tour Participants
   // ============================================
 
-  async getTourClients(tourId: number, limit = 500) {
+  async getTourClients(tourId: number, limit = 100) {
     const response = await this.request<{ data: TourClientDto[]; meta: unknown }>(`/agency/tours/${tourId}/participants?limit=${limit}`, {}, 'tr', true);
     return Array.isArray(response) ? response : (response.data || []);
   }
