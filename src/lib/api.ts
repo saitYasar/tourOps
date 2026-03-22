@@ -2221,31 +2221,31 @@ class ApiClient {
   // Agencies - Clients
   // ============================================
 
-  async getAgencyClients(page = 1, limit = 10, lang: 'tr' | 'en' | 'de' = 'tr') {
+  async getAgencyClients(page = 1, limit = 10) {
     const url = `/agencies/clients?page=${page}&limit=${limit}`;
     return this.request<PaginatedResponse<AgencyClientDto>>(url, {
       method: 'GET',
-    }, lang);
+    }, 'tr', true);
   }
 
   // Note: GET /agencies/clients/{clientId} returns 404 - backend only supports list and delete
-  async getAgencyClient(clientId: number, lang: 'tr' | 'en' | 'de' = 'tr') {
+  async getAgencyClient(clientId: number) {
     return this.request<AgencyClientDto>(`/agencies/clients/${clientId}`, {
       method: 'GET',
-    }, lang);
+    }, 'tr', true);
   }
 
-  async createAgencyClient(data: CreateAgencyClientDto, lang: 'tr' | 'en' | 'de' = 'tr') {
+  async createAgencyClient(data: CreateAgencyClientDto) {
     return this.request<{ message: string; data: AgencyClientDto }>('/agencies/clients', {
       method: 'POST',
       body: JSON.stringify(data),
-    }, lang);
+    }, 'tr', true);
   }
 
-  async deleteAgencyClient(clientId: number, lang: 'tr' | 'en' | 'de' = 'tr') {
+  async deleteAgencyClient(clientId: number) {
     return this.request<{ message: string }>(`/agencies/clients/${clientId}`, {
       method: 'DELETE',
-    }, lang);
+    }, 'tr', true);
   }
 
   // ============================================

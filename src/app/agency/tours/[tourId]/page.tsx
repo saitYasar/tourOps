@@ -1636,16 +1636,6 @@ export default function TourDetailPage() {
                             <ClipboardList className="h-5 w-5" />
                             {t.tours.customerChoices}
                           </CardTitle>
-                          {(() => {
-                            const s = stops?.find(st => st.id === choicesStopId);
-                            return s?.preReservationStatus === 'approved' && s?.choicesStatus !== 'approved' ? (
-                              <ChoiceDeadlineCountdown
-                                tourStopId={choicesStopId}
-                                scheduledEndTime={s.scheduledEndTime}
-                                choiceDeadlineHours={s.choiceDeadline}
-                              />
-                            ) : null;
-                          })()}
                         </div>
                       </CardHeader>
                       <CardContent>
@@ -1767,13 +1757,6 @@ export default function TourDetailPage() {
                                   {choicesConfig[cs].label}
                                 </Badge>
                               </>
-                            )}
-                            {preResApproved && cs !== 'approved' && (
-                              <ChoiceDeadlineCountdown
-                                tourStopId={choicesStopId}
-                                scheduledEndTime={currentStop?.scheduledEndTime}
-                                choiceDeadlineHours={currentStop?.choiceDeadline}
-                              />
                             )}
                           </div>
                           <div className="flex items-center gap-2">
