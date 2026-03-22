@@ -68,10 +68,10 @@ export default function RootLayout({
           <LanguageProvider>
             <AuthProvider>
               <MainLayout>{children}</MainLayout>
+              <Toaster position="top-right" richColors />
             </AuthProvider>
           </LanguageProvider>
         </QueryProvider>
-        <Toaster position="top-right" richColors />
       </body>
     </html>
   );

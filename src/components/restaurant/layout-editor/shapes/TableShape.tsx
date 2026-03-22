@@ -191,7 +191,7 @@ export function TableShape({
             x={table.w / 2 + pos.x}
             y={table.h / 2 + pos.y}
             angle={pos.angle}
-            label={isSelected ? String(i + 1) : undefined}
+            label={isSelected ? (dbChairs[i]?.name ?? String(i + 1)) : undefined}
           />
         ))}
 

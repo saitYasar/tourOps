@@ -5,30 +5,14 @@ import { Stage, Layer, Rect, Group, Text, Circle, Line } from 'react-konva';
 import type Konva from 'konva';
 import type { ResourceDto } from '@/lib/api';
 
+import { getTableDefault } from '@/components/restaurant/layout-editor/utils/tableDefaults';
+
 // ── Constants (matching LayoutEditor) ──────────────────────────
 const ROOM_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
 
 const CHAIR_W = 10;
 const CHAIR_H = 10;
 const CHAIR_GAP = 6;
-
-// Table size defaults by capacity — wide/slim proportions
-const TABLE_DEFAULTS: Record<number, { w: number; h: number; isRound: boolean }> = {
-  2: { w: 50, h: 50, isRound: true },
-  4: { w: 90, h: 35, isRound: false },
-  6: { w: 120, h: 38, isRound: false },
-  8: { w: 160, h: 40, isRound: false },
-};
-
-function getTableDefault(capacity: number) {
-  if (TABLE_DEFAULTS[capacity]) return TABLE_DEFAULTS[capacity];
-  if (capacity > 8) {
-    const perSide = Math.ceil(capacity / 2);
-    // Wide and slim: width grows with chairs, height stays thin
-    return { w: Math.min(600, perSide * (CHAIR_W + CHAIR_GAP) + 40), h: 40, isRound: false };
-  }
-  return TABLE_DEFAULTS[4];
-}
 
 // ── Coordinate parsing (handles string, object, array) ─────────
 interface CoordinateData {
@@ -153,14 +137,17 @@ function resourceToTable(
   // Get number of chairs from children
   const chairCount = table.children?.length ?? capacity;
 
-  // Always use capacity-based slim dimensions (ignore stored width/height for customer view)
+  // Use stored dimensions from DB if available, otherwise fall back to defaults
+  const w = (table.width && table.width > 0) ? table.width : (coords.w && coords.w > 0) ? coords.w : defaults.w;
+  const h = (table.height && table.height > 0) ? table.height : (coords.h && coords.h > 0) ? coords.h : defaults.h;
+
   return {
     id: table.id,
     name: table.name,
     x,
     y,
-    w: defaults.w,
-    h: defaults.h,
+    w,
+    h,
     r: table.rotation ?? coords.r ?? 0,
     capacity,
     isRound: defaults.isRound,

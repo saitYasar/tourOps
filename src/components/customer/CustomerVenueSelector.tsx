@@ -147,9 +147,10 @@ export function CustomerVenueSelector({
 
   // ─── Level 3: Chair selection (bus-seat style layout) ────────
   if (selectedTableId) {
-    // Split chairs into two sides for table layout
-    const topRow = chairResources.slice(0, Math.ceil(chairResources.length / 2));
-    const bottomRow = chairResources.slice(Math.ceil(chairResources.length / 2));
+    // Chairs come from DB in opposite-pair order: 1↔2, 3↔4, 5↔6, ...
+    // Split into top (odd indices: 0,2,4,...) and bottom (even indices: 1,3,5,...)
+    const topRow = chairResources.filter((_, i) => i % 2 === 0);
+    const bottomRow = chairResources.filter((_, i) => i % 2 === 1);
 
     const renderSeatTile = (chair: ResourceDto) => {
       const occupant = chair.client;
