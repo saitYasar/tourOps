@@ -222,13 +222,6 @@ export default function AdminDashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-blue-50 rounded-xl">
-                <div className="flex items-center gap-3">
-                  <Briefcase className="h-5 w-5 text-blue-600" />
-                  <span className="text-sm font-medium text-blue-800">{t.admin.totalAgencyLabel}</span>
-                </div>
-                <Badge className="bg-blue-500">{totalAgencies}</Badge>
-              </div>
               <div className="flex items-center justify-between p-4 bg-amber-50 rounded-xl">
                 <div className="flex items-center gap-3">
                   <Clock className="h-5 w-5 text-amber-600" />
@@ -236,12 +229,19 @@ export default function AdminDashboardPage() {
                 </div>
                 <Badge className="bg-amber-500">{pendingAgencies}</Badge>
               </div>
-              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
+              <div className="flex items-center justify-between p-4 bg-green-50 rounded-xl">
                 <div className="flex items-center gap-3">
-                  <Activity className="h-5 w-5 text-slate-600" />
-                  <span className="text-sm font-medium text-slate-800">{t.admin.systemStatus}</span>
+                  <CheckCircle2 className="h-5 w-5 text-green-600" />
+                  <span className="text-sm font-medium text-green-800">{t.admin.statusActive}</span>
                 </div>
-                <Badge className="bg-green-500">{t.admin.statusActive}</Badge>
+                <Badge className="bg-green-500">{activeAgencies}</Badge>
+              </div>
+              <div className="flex items-center justify-between p-4 bg-red-50 rounded-xl">
+                <div className="flex items-center gap-3">
+                  <Ban className="h-5 w-5 text-red-600" />
+                  <span className="text-sm font-medium text-red-800">{t.admin.statusSuspended}</span>
+                </div>
+                <Badge className="bg-red-500">{suspendedAgencies}</Badge>
               </div>
             </div>
             <Link href="/admin/agencies">
