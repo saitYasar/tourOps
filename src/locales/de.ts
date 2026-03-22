@@ -258,6 +258,7 @@ export const de = {
     tourCode: 'Tour-Code',
     maxParticipants: 'Max. Teilnehmer',
     minParticipants: 'Min. Teilnehmer',
+    estimatedParticipation: 'Geschätzte Teilnahme',
     stops: 'Haltestellen',
     info: 'Informationen',
     publish: 'Veröffentlichen',

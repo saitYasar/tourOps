@@ -258,6 +258,7 @@ export const tr = {
     tourCode: 'Tur Kodu',
     maxParticipants: 'Maks Katılımcı',
     minParticipants: 'Min Katılımcı',
+    estimatedParticipation: 'Tahmini Katılım',
     stops: 'Duraklar',
     info: 'Bilgiler',
     publish: 'Yayınla',
