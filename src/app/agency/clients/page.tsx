@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2, User, Search, Users, Eye, EyeOff, Navigation, Calendar, Hash, UserPlus } from 'lucide-react';
+import { Plus, Trash2, User, Search, Users, Eye, EyeOff, Navigation, Calendar, Hash, UserPlus, FileSpreadsheet, Upload, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { agencyApi, tourApi, type AgencyClientDto, type CreateAgencyClientDto } from '@/lib/api';
@@ -49,6 +49,13 @@ export default function AgencyClientsPage() {
   const [formData, setFormData] = useState<ClientFormData>(initialFormData);
   const [errors, setErrors] = useState<Partial<Record<keyof ClientFormData, string>>>({});
   const [showPassword, setShowPassword] = useState(false);
+  const [isBatchOpen, setIsBatchOpen] = useState(false);
+  const [batchFile, setBatchFile] = useState<File | null>(null);
+  const [batchTourId, setBatchTourId] = useState<number | null>(null);
+  const [batchTourSearch, setBatchTourSearch] = useState('');
+  const [batchTourSearchDebounced, setBatchTourSearchDebounced] = useState('');
+  const [batchSelectedTourName, setBatchSelectedTourName] = useState('');
+  const batchFileRef = useRef<HTMLInputElement>(null);
 
   // Fetch agency data for status badge
   const { data: agencyResult } = useQuery({
@@ -69,7 +76,7 @@ export default function AgencyClientsPage() {
 
   const clients = clientsData?.success ? clientsData.data?.data || [] : [];
 
-  // Fetch tours and their participants to map clientId -> tour names
+  // Fetch tours and use embedded participants to map clientId -> tour names
   const { data: toursData } = useQuery({
     queryKey: ['agency-tours-for-clients'],
     queryFn: async () => {
@@ -77,23 +84,14 @@ export default function AgencyClientsPage() {
       if (!toursResult.success || !toursResult.data) return new Map<number, string[]>();
 
       const map = new Map<number, string[]>();
-      const participantResults = await Promise.allSettled(
-        toursResult.data.map(async (tour) => {
-          const res = await tourApi.getClients(tour.id);
-          return { tourName: tour.tourName, clients: res.success ? res.data || [] : [] };
-        })
-      );
-
-      for (const result of participantResults) {
-        if (result.status === 'fulfilled') {
-          const { tourName, clients: tourClients } = result.value;
-          for (const tc of tourClients) {
-            const existing = map.get(tc.clientId) || [];
-            if (!existing.includes(tourName)) {
-              existing.push(tourName);
-            }
-            map.set(tc.clientId, existing);
+      for (const tour of toursResult.data) {
+        const participants = (tour as any).participants || [];
+        for (const p of participants) {
+          const existing = map.get(p.clientId) || [];
+          if (!existing.includes(tour.tourName)) {
+            existing.push(tour.tourName);
           }
+          map.set(p.clientId, existing);
         }
       }
       return map;
@@ -143,6 +141,22 @@ export default function AgencyClientsPage() {
     },
   });
 
+  // Debounce batch tour search
+  useEffect(() => {
+    const timer = setTimeout(() => setBatchTourSearchDebounced(batchTourSearch), 300);
+    return () => clearTimeout(timer);
+  }, [batchTourSearch]);
+
+  // Search tours for batch import dialog
+  const { data: batchTourResults, isFetching: batchToursLoading } = useQuery({
+    queryKey: ['batch-tour-search', batchTourSearchDebounced],
+    queryFn: async () => {
+      const result = await tourApi.list(1, 20, locale as 'tr' | 'en' | 'de', batchTourSearchDebounced || undefined);
+      return result.success ? result.data || [] : [];
+    },
+    enabled: isBatchOpen,
+  });
+
   const addToTourMutation = useMutation({
     mutationFn: ({ tourId, clientId }: { tourId: number; clientId: number }) =>
       tourApi.addParticipant(tourId, clientId),
@@ -160,6 +174,37 @@ export default function AgencyClientsPage() {
       toast.error('Tura ekleme başarısız');
     },
   });
+
+  const batchImportMutation = useMutation({
+    mutationFn: ({ file, tourId }: { file: File; tourId?: number }) =>
+      agencyApi.batchImportClients(file, locale as 'tr' | 'en' | 'de', tourId || undefined),
+    onSuccess: (result) => {
+      if (result.success) {
+        const data = result.data;
+        const msg = t.invitations.batchImportSuccess
+          .replace('{successful}', String(data?.successful ?? 0))
+          .replace('{totalRows}', String(data?.totalRows ?? 0));
+        toast.success(msg);
+        queryClient.invalidateQueries({ queryKey: ['agency-clients'] });
+        queryClient.invalidateQueries({ queryKey: ['agency-tours-for-clients'] });
+        closeBatchDialog();
+      } else {
+        toast.error(result.error || t.invitations.batchImportFailed);
+      }
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || t.invitations.batchImportFailed);
+    },
+  });
+
+  const closeBatchDialog = () => {
+    setIsBatchOpen(false);
+    setBatchFile(null);
+    setBatchTourId(null);
+    setBatchTourSearch('');
+    setBatchTourSearchDebounced('');
+    setBatchSelectedTourName('');
+  };
 
   const closeForm = () => {
     setIsFormOpen(false);
@@ -258,10 +303,16 @@ export default function AgencyClientsPage() {
                     <CardDescription>{clients.length} müşteri kayıtlı</CardDescription>
                   </div>
                 </div>
-                <Button onClick={() => setIsFormOpen(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Yeni Müşteri
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" onClick={() => setIsBatchOpen(true)}>
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                    {t.invitations.batchImport}
+                  </Button>
+                  <Button onClick={() => setIsFormOpen(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Yeni Müşteri
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -516,6 +567,143 @@ export default function AgencyClientsPage() {
         onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
         variant="destructive"
       />
+
+      {/* Batch Import Dialog */}
+      <Dialog open={isBatchOpen} onOpenChange={(open) => !open && closeBatchDialog()}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileSpreadsheet className="h-5 w-5 text-green-600" />
+              {t.invitations.batchImportTitle}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {/* File Select */}
+            <div className="space-y-2">
+              <Label>{t.invitations.selectExcelFile}</Label>
+              <div
+                className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition-colors"
+                onClick={() => batchFileRef.current?.click()}
+              >
+                {batchFile ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <FileSpreadsheet className="h-5 w-5 text-green-600" />
+                    <span className="text-sm font-medium">{batchFile.name}</span>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setBatchFile(null); }}
+                      className="text-slate-400 hover:text-red-500"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div>
+                    <Upload className="h-8 w-8 mx-auto mb-2 text-slate-400" />
+                    <p className="text-sm text-slate-500">{t.invitations.selectExcelFile}</p>
+                  </div>
+                )}
+              </div>
+              <input
+                ref={batchFileRef}
+                type="file"
+                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) setBatchFile(file);
+                  e.target.value = '';
+                }}
+              />
+            </div>
+
+            {/* Optional Tour Select */}
+            <div className="space-y-2">
+              <Label>{t.invitations.assignToTour}</Label>
+              {batchTourId ? (
+                <div className="flex items-center gap-2 p-2.5 bg-blue-50 border border-blue-200 rounded-lg">
+                  <Navigation className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                  <span className="text-sm font-medium text-blue-800 truncate flex-1">{batchSelectedTourName}</span>
+                  <button
+                    type="button"
+                    onClick={() => { setBatchTourId(null); setBatchSelectedTourName(''); setBatchTourSearch(''); }}
+                    className="text-blue-400 hover:text-red-500 flex-shrink-0"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <Input
+                      placeholder={t.invitations.noTourSelected}
+                      value={batchTourSearch}
+                      onChange={(e) => setBatchTourSearch(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                  {isBatchOpen && (
+                    <div className="max-h-[180px] overflow-y-auto space-y-1 border rounded-lg p-1">
+                      {batchToursLoading ? (
+                        <div className="text-center py-4 text-xs text-slate-400">
+                          <span className="animate-spin inline-block mr-1">&#9696;</span>
+                        </div>
+                      ) : !batchTourResults || batchTourResults.length === 0 ? (
+                        <div className="text-center py-4 text-xs text-slate-400">
+                          {batchTourSearch ? t.common.noData : ''}
+                        </div>
+                      ) : (
+                        batchTourResults.map((tour) => (
+                          <button
+                            key={tour.id}
+                            type="button"
+                            onClick={() => {
+                              setBatchTourId(tour.id);
+                              setBatchSelectedTourName(`${tour.tourName} (${tour.tourCode})`);
+                              setBatchTourSearch('');
+                            }}
+                            className="w-full text-left px-3 py-2 rounded-md hover:bg-blue-50 transition-colors text-sm"
+                          >
+                            <span className="font-medium">{tour.tourName}</span>
+                            <span className="text-slate-400 ml-1.5">({tour.tourCode})</span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={closeBatchDialog}>
+              {t.common.cancel}
+            </Button>
+            <Button
+              disabled={!batchFile || batchImportMutation.isPending}
+              onClick={() => {
+                if (batchFile) {
+                  batchImportMutation.mutate({ file: batchFile, tourId: batchTourId || undefined });
+                }
+              }}
+            >
+              {batchImportMutation.isPending ? (
+                <>
+                  <span className="animate-spin mr-2">&#9696;</span>
+                  {t.invitations.startImport}...
+                </>
+              ) : (
+                <>
+                  <Upload className="h-4 w-4 mr-2" />
+                  {t.invitations.startImport}
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Add to Tour Dialog */}
       <Dialog open={!!addToTourTarget} onOpenChange={(open) => { if (!open) { setAddToTourTarget(null); setSelectedTourId(null); setTourSearch(''); } }}>

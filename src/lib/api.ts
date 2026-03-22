@@ -2243,6 +2243,34 @@ class ApiClient {
     }, 'tr', true);
   }
 
+  async batchImportClients(file: File, lang: 'tr' | 'en' | 'de' = 'tr', tourId?: number) {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const params = new URLSearchParams({ lang });
+    if (tourId) params.set('tourId', String(tourId));
+    const url = `${this.baseUrl}/agencies/clients/batch-import?${params.toString()}`;
+
+    const headers: HeadersInit = {};
+    const token = this.resolveToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.message || `HTTP ${res.status}`);
+    }
+
+    return res.json();
+  }
+
   async deleteAgencyClient(clientId: number) {
     return this.request<{ message: string }>(`/agencies/clients/${clientId}`, {
       method: 'DELETE',
@@ -3654,8 +3682,9 @@ class ApiClient {
     return this.request<ApiTourDto>(`/admin/tours/${id}`, {}, lang);
   }
 
-  async getAdminTourClients(tourId: number, lang: 'tr' | 'en' | 'de' = 'tr') {
-    return this.request<{ data: TourClientDto[]; meta: unknown }>(`/admin/tours/${tourId}/participants`, {}, lang, true);
+  async getAdminTourClients(tourId: number, lang: 'tr' | 'en' | 'de' = 'tr', limit = 500) {
+    const response = await this.request<{ data: TourClientDto[]; meta: unknown }>(`/admin/tours/${tourId}/participants?limit=${limit}`, {}, lang, true);
+    return Array.isArray(response) ? response : (response.data || []);
   }
 
   async getAdminStopChoices(stopId: number, lang: 'tr' | 'en' | 'de' = 'tr') {
@@ -3682,8 +3711,10 @@ class ApiClient {
   // Agency Tours
   // ============================================
 
-  async getAgencyTours(page = 1, limit = 10, lang: 'tr' | 'en' | 'de' = 'tr') {
-    return this.request<PaginatedResponse<ApiTourDto>>(`/agency/tours?page=${page}&limit=${limit}`, {}, lang);
+  async getAgencyTours(page = 1, limit = 10, lang: 'tr' | 'en' | 'de' = 'tr', name?: string) {
+    const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+    if (name) params.set('name', name);
+    return this.request<PaginatedResponse<ApiTourDto>>(`/agency/tours?${params.toString()}`, {}, lang);
   }
 
   async getAgencyTourById(id: number, lang: 'tr' | 'en' | 'de' = 'tr') {
@@ -3859,9 +3890,9 @@ class ApiClient {
   // Tour Participants
   // ============================================
 
-  async getTourClients(tourId: number) {
-    const response = await this.request<{ data: TourClientDto[]; meta: unknown }>(`/agency/tours/${tourId}/participants`, {}, 'tr', true);
-    return response.data;
+  async getTourClients(tourId: number, limit = 500) {
+    const response = await this.request<{ data: TourClientDto[]; meta: unknown }>(`/agency/tours/${tourId}/participants?limit=${limit}`, {}, 'tr', true);
+    return Array.isArray(response) ? response : (response.data || []);
   }
 
   async addTourParticipant(tourId: number, clientId: number, notes?: string) {
@@ -4836,6 +4867,16 @@ export const agencyApi = {
   async createClient(data: CreateAgencyClientDto) {
     try {
       const response = await apiClient.createAgencyClient(data);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  // Batch import clients from Excel
+  async batchImportClients(file: File, lang: 'tr' | 'en' | 'de' = 'tr', tourId?: number): Promise<{ success: boolean; data?: any; error?: string }> {
+    try {
+      const response = await apiClient.batchImportClients(file, lang, tourId);
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
@@ -5994,9 +6035,9 @@ export const serviceApi = {
 // ============================================
 
 export const tourApi = {
-  async list(page = 1, limit = 10, lang: 'tr' | 'en' | 'de' = 'tr'): Promise<{ success: boolean; data?: ApiTourDto[]; meta?: { total: number; page: number; limit: number; totalPages: number }; error?: string }> {
+  async list(page = 1, limit = 10, lang: 'tr' | 'en' | 'de' = 'tr', name?: string): Promise<{ success: boolean; data?: ApiTourDto[]; meta?: { total: number; page: number; limit: number; totalPages: number }; error?: string }> {
     try {
-      const response = await apiClient.getAgencyTours(page, limit, lang);
+      const response = await apiClient.getAgencyTours(page, limit, lang, name);
       // Normalize: backend may return tourPhotos/photos instead of galleryImages
       const data = (response.data || []).map((tour: any) => {
         if (!tour.galleryImages) {
