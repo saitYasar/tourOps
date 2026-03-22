@@ -14,14 +14,14 @@ interface ChoiceDeadlineCountdownProps {
   choiceDeadlineHours?: number | null;
 }
 
-function useLocalCountdown(deadlineTime: string | null | undefined) {
+function useLocalCountdown(deadlineMs: number | null) {
   const [state, setState] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0, isExpired: true });
 
   useEffect(() => {
-    if (!deadlineTime) return;
+    if (deadlineMs === null) return;
 
     const tick = () => {
-      const diff = new Date(deadlineTime).getTime() - Date.now();
+      const diff = deadlineMs - Date.now();
       if (diff <= 0) {
         setState({ days: 0, hours: 0, minutes: 0, seconds: 0, isExpired: true });
         return;
@@ -39,7 +39,7 @@ function useLocalCountdown(deadlineTime: string | null | undefined) {
     tick();
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [deadlineTime]);
+  }, [deadlineMs]);
 
   return state;
 }
@@ -56,22 +56,24 @@ export function ChoiceDeadlineCountdown({
   const label = tours.lastSelectionTime || 'Son seçim saati';
 
   // Compute deadline from props if provided (default: scheduledEndTime itself)
-  const localDeadlineTime = useMemo(() => {
+  // Strip timezone suffix so the DB value is treated as local time
+  const localDeadlineMs = useMemo(() => {
     if (!scheduledEndTime) return null;
+    const stripped = scheduledEndTime.replace(/[Zz]$/, '').replace(/[+-]\d{2}:\d{2}$/, '');
     const hours = choiceDeadlineHours ?? 0;
-    return new Date(new Date(scheduledEndTime).getTime() - hours * 3600000).toISOString();
+    return new Date(stripped).getTime() - hours * 3600000;
   }, [scheduledEndTime, choiceDeadlineHours]);
 
   // Use API hook only when no local data available
-  const useApi = !localDeadlineTime;
+  const useApi = localDeadlineMs === null;
   const apiData = useChoiceDeadline(useApi ? tourStopId : null, useApi && enabled);
-  const localData = useLocalCountdown(localDeadlineTime);
+  const localData = useLocalCountdown(localDeadlineMs);
 
-  const { days, hours, minutes, seconds, isExpired } = localDeadlineTime ? localData : apiData;
-  const deadlineTime = localDeadlineTime || apiData.deadlineTime;
+  const { days, hours, minutes, seconds, isExpired } = localDeadlineMs !== null ? localData : apiData;
+  const hasDeadline = localDeadlineMs !== null || apiData.deadlineTime;
   const isLoading = useApi ? apiData.isLoading : false;
 
-  if (isLoading || !deadlineTime) return null;
+  if (isLoading || !hasDeadline) return null;
 
   if (isExpired) {
     if (compact) {

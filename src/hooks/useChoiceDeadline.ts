@@ -33,7 +33,8 @@ export function useChoiceDeadline(tourStopId: number | null | undefined, enabled
 
     const tick = () => {
       const now = Date.now();
-      const end = new Date(deadline.deadlineTime).getTime();
+      const stripped = deadline.deadlineTime.replace(/[Zz]$/, '').replace(/[+-]\d{2}:\d{2}$/, '');
+      const end = new Date(stripped).getTime();
       const diff = end - now;
       if (diff <= 0) {
         setRemaining({ days: 0, hours: 0, minutes: 0, seconds: 0, isExpired: true });
