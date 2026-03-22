@@ -20,6 +20,7 @@ export const de = {
     close: 'Schliessen',
     actions: 'Aktionen',
     noData: 'Keine Daten gefunden',
+    home: 'Startseite',
     error: 'Fehler',
     errorDescription: 'Beim Laden der Daten ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.',
     retry: 'Erneut versuchen',

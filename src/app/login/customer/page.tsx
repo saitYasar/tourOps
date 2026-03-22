@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useState } from 'react';
+import Link from 'next/link';
 import {
   Compass,
   Sparkles,
@@ -22,6 +23,7 @@ import {
   UserPlus,
   ArrowLeft,
   CheckCircle2,
+  Home,
 } from 'lucide-react';
 
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -232,7 +234,7 @@ function CustomerLoginContent() {
           </div>
 
           <div className="relative z-10">
-            <div className="flex items-center gap-3 mb-2">
+            <Link href="/" className="flex items-center gap-3 mb-2 hover:opacity-80 transition-opacity">
               <div className="p-3 rounded-2xl bg-white/20 backdrop-blur-sm">
                 <Compass className="h-8 w-8" />
               </div>
@@ -240,7 +242,7 @@ function CustomerLoginContent() {
                 <h1 className="text-3xl xl:text-4xl font-bold tracking-tight">{t.common.appName}</h1>
                 <p className="text-white/80 text-sm">{t.auth.discoverLiveRemember}</p>
               </div>
-            </div>
+            </Link>
           </div>
 
           <div className="relative z-10 space-y-6">
@@ -272,8 +274,15 @@ function CustomerLoginContent() {
       <div className="flex-1 lg:w-1/2 flex flex-col bg-gradient-to-br from-rose-50 via-red-50 to-amber-50">
         <div className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8 overflow-y-auto">
           <div className="w-full max-w-sm">
-            {/* Dil Seçici */}
-            <div className="flex justify-end mb-4">
+            {/* Anasayfa + Dil Seçici */}
+            <div className="flex items-center justify-between mb-4">
+              <Link
+                href="/"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-600 hover:text-slate-900 border border-slate-200 hover:border-slate-300 rounded-lg transition-colors"
+              >
+                <Home className="h-4 w-4" />
+                <span className="hidden sm:inline">{t.common.home}</span>
+              </Link>
               <LanguageSwitcher />
             </div>
 

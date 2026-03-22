@@ -20,6 +20,7 @@ export const tr = {
     close: 'Kapat',
     actions: 'İşlemler',
     noData: 'Veri bulunamadı',
+    home: 'Anasayfa',
     error: 'Hata',
     errorDescription: 'Veriler yüklenirken bir sorun oluştu. Lütfen tekrar deneyin.',
     retry: 'Tekrar Dene',

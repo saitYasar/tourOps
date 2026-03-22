@@ -20,6 +20,7 @@ export const en = {
     close: 'Close',
     actions: 'Actions',
     noData: 'No data found',
+    home: 'Home',
     error: 'Error',
     errorDescription: 'An error occurred while loading data. Please try again.',
     retry: 'Try Again',
