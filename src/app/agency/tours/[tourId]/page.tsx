@@ -1115,14 +1115,14 @@ export default function TourDetailPage() {
                     <div className="flex items-center gap-2">
                       <Input
                         readOnly
-                        value={`${typeof window !== 'undefined' ? window.location.origin : ''}/agency/login?${agencyResult?.data?.uuid ? `uuid=${agencyResult.data.uuid}&` : ''}tourUuid=${tour.uuid}`}
+                        value={`${process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '')}/agency/login?${agencyResult?.data?.uuid ? `uuid=${agencyResult.data.uuid}&` : ''}tourUuid=${tour.uuid}`}
                         className="text-xs font-mono bg-slate-50"
                       />
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          const link = `${window.location.origin}/agency/login?${agencyResult?.data?.uuid ? `uuid=${agencyResult.data.uuid}&` : ''}tourUuid=${tour.uuid}`;
+                          const link = `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/agency/login?${agencyResult?.data?.uuid ? `uuid=${agencyResult.data.uuid}&` : ''}tourUuid=${tour.uuid}`;
                           navigator.clipboard.writeText(link);
                           toast.success(t.tours.linkCopied || 'Link kopyalandı');
                         }}
@@ -1141,14 +1141,14 @@ export default function TourDetailPage() {
                     <div className="flex items-center gap-2">
                       <Input
                         readOnly
-                        value={`${typeof window !== 'undefined' ? window.location.origin : ''}/agency/login?uuid=${agencyResult.data.uuid}`}
+                        value={`${process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '')}/agency/login?uuid=${agencyResult.data.uuid}`}
                         className="text-xs font-mono bg-slate-50"
                       />
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          const link = `${window.location.origin}/agency/login?uuid=${agencyResult.data!.uuid}`;
+                          const link = `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/agency/login?uuid=${agencyResult.data!.uuid}`;
                           navigator.clipboard.writeText(link);
                           toast.success(t.tours.linkCopied || 'Link kopyalandı');
                         }}
