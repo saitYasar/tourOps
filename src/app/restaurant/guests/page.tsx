@@ -30,7 +30,7 @@ import {
 import { getCurrencySymbol } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { formatDate } from '@/lib/dateUtils';
+import { formatDate, formatShortDateTime } from '@/lib/dateUtils';
 
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
@@ -50,7 +50,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip
 import {
   LoadingState, EmptyState, ErrorState,
   CompactReceipt, DetailedListReceipt, KitchenSummaryReceipt, ReceiptServiceSummary,
-  handleReceiptPrint, exportReceiptExcel,
+  handleReceiptPrint, exportReceiptExcel, ChoiceDeadlineCountdown,
 } from '@/components/shared';
 import type { ReceiptTemplate } from '@/components/shared';
 
@@ -259,6 +259,16 @@ export default function RestaurantGuestsPage() {
                       {res.tour?.agency?.name && (
                         <p className="text-xs text-slate-400 mt-0.5">{res.tour.agency.name}</p>
                       )}
+                      {res.choicesStatus !== 'approved' && (
+                        <div className="mt-1">
+                          <ChoiceDeadlineCountdown
+                            tourStopId={res.tourStopId}
+                            compact
+                            scheduledEndTime={res.scheduledEndTime}
+                            choiceDeadlineHours={res.choiceDeadline}
+                          />
+                        </div>
+                      )}
                     </div>
                     <div className="shrink-0">
                       <ChoicesStatusBadge status={res.choicesStatus} t={t} />
@@ -339,9 +349,18 @@ export default function RestaurantGuestsPage() {
                           <p className="text-xs text-slate-500 mb-0.5">{t.guests.scheduledTime}</p>
                           <p className="text-sm font-medium flex items-center gap-1">
                             <Clock className="h-3.5 w-3.5 text-slate-400" />
-                            {selectedReservation.scheduledStartTime?.slice(0, 5) || ''}
-                            {selectedReservation.scheduledEndTime ? ` - ${selectedReservation.scheduledEndTime.slice(0, 5)}` : ''}
+                            {selectedReservation.scheduledStartTime && formatShortDateTime(selectedReservation.scheduledStartTime)}
+                            {selectedReservation.scheduledStartTime && selectedReservation.scheduledEndTime && ' - '}
+                            {selectedReservation.scheduledEndTime && formatShortDateTime(selectedReservation.scheduledEndTime)}
                           </p>
+                          <div className="mt-1">
+                            <ChoiceDeadlineCountdown
+                              tourStopId={selectedReservation.tourStopId}
+                              compact
+                              scheduledEndTime={selectedReservation.scheduledEndTime}
+                              choiceDeadlineHours={selectedReservation.choiceDeadline}
+                            />
+                          </div>
                         </div>
                       )}
                       <div>
@@ -349,6 +368,15 @@ export default function RestaurantGuestsPage() {
                         <ChoicesStatusBadge status={selectedReservation.choicesStatus} t={t} />
                       </div>
                     </div>
+                    {selectedReservation.choicesStatus !== 'approved' && (
+                      <div className="mt-3 pt-3 border-t">
+                        <ChoiceDeadlineCountdown
+                          tourStopId={selectedReservation.tourStopId}
+                          scheduledEndTime={selectedReservation.scheduledEndTime}
+                          choiceDeadlineHours={selectedReservation.choiceDeadline}
+                        />
+                      </div>
+                    )}
                     {selectedReservation.note && (
                       <div className="mt-3 pt-3 border-t">
                         <p className="text-xs text-slate-500 mb-0.5">{t.guests.note}</p>

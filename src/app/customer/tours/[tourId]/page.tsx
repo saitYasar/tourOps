@@ -43,9 +43,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { LoadingState, ErrorState, LanguageSwitcher, ChoiceDeadlineCountdown, ServiceDetailDialog } from '@/components/shared';
-import { formatShortDateTime } from '@/lib/dateUtils';
+import { formatDate, formatShortDateTime } from '@/lib/dateUtils';
 import { toast } from 'sonner';
 import { CustomerVenueSelector } from '@/components/customer/CustomerVenueSelector';
+import { StopVenuePreview } from '@/components/customer/StopVenuePreview';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 // ============================================
@@ -71,6 +72,8 @@ export default function CustomerTourDetailPage() {
 
   // Table selection dialog
   const [tableStopId, setTableStopId] = useState<number | null>(null);
+  // 3D model → 2D selector navigation bridge
+  const [navigateToTableId, setNavigateToTableId] = useState<number | null>(null);
   // Menu selection dialog
   const [menuStopId, setMenuStopId] = useState<number | null>(null);
   // Service detail popup
@@ -282,6 +285,7 @@ export default function CustomerTourDetailPage() {
   const closeTableDialog = () => {
     setTableStopId(null);
     setPendingChair(null);
+    setNavigateToTableId(null);
   };
 
   // Trace parent hierarchy for a chair through childrenCache
@@ -463,7 +467,7 @@ export default function CustomerTourDetailPage() {
               <h1 className="text-sm sm:text-lg font-bold text-slate-800 truncate">{tour.tourName}</h1>
               <div className="flex items-center gap-1.5 text-[10px] sm:text-xs text-slate-500">
                 <Calendar className="h-3 w-3 shrink-0" />
-                <span className="truncate">{new Date(tour.startDate).toLocaleDateString(locale)} - {new Date(tour.endDate).toLocaleDateString(locale)}</span>
+                <span className="truncate">{formatDate(tour.startDate)} - {formatDate(tour.endDate)}</span>
               </div>
             </div>
             <div className="shrink-0">
@@ -512,12 +516,12 @@ export default function CustomerTourDetailPage() {
               <InfoBadge
                 icon={Calendar}
                 label={t.tours.startDate}
-                value={new Date(tour.startDate).toLocaleDateString(locale)}
+                value={formatDate(tour.startDate)}
               />
               <InfoBadge
                 icon={Calendar}
                 label={t.tours.endDate}
-                value={new Date(tour.endDate).toLocaleDateString(locale)}
+                value={formatDate(tour.endDate)}
               />
               {tour.agency && (
                 <InfoBadge icon={Building2} label={t.customer.agency} value={tour.agency.name} />
@@ -757,6 +761,20 @@ export default function CustomerTourDetailPage() {
                 <p className="text-slate-500">{t.customer.noLayout}</p>
               </div>
             ) : (
+              <>
+              <StopVenuePreview
+                stopId={tableStopId!}
+                floors={floors}
+                childrenCache={childrenCache}
+                onTableSelect={(tableResourceId) => {
+                  setNavigateToTableId(tableResourceId);
+                  // Scroll to 2D selector after 3D collapses
+                  setTimeout(() => {
+                    document.getElementById('venue-selector')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }, 200);
+                }}
+              />
+              <div id="venue-selector" />
               <CustomerVenueSelector
                 floors={floors}
                 childrenCache={childrenCache}
@@ -767,7 +785,9 @@ export default function CustomerTourDetailPage() {
                 existingResourceId={tableStopId ? selectedTables[tableStopId]?.resourceId : undefined}
                 pendingChairId={pendingChair?.id}
                 currentClientId={clientProfile?.id}
+                navigateToTableId={navigateToTableId}
               />
+              </>
             )}
           </div>
 
