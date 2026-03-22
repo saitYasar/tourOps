@@ -3823,6 +3823,32 @@ class ApiClient {
     }, lang);
   }
 
+  async addTourPhoto(tourId: number, image: File, lang: 'tr' | 'en' | 'de' = 'tr') {
+    const formData = new FormData();
+    formData.append('galleryImages', image);
+
+    const url = `${this.baseUrl}/agency/tours/${tourId}/photos?lang=${lang}`;
+
+    const headers: HeadersInit = {};
+    const token = this.resolveToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.message || `HTTP ${res.status}`);
+    }
+
+    return res.json();
+  }
+
   async deleteTourPhoto(tourId: number, photoId: number, lang: 'tr' | 'en' | 'de' = 'tr') {
     return this.request<{ message: string }>(`/agency/tours/${tourId}/photos/${photoId}`, {
       method: 'DELETE',
@@ -5604,13 +5630,16 @@ export const adminApi = {
   } = {}) {
     try {
       const response = await apiClient.getAdminTours(filters);
-      // Normalize: backend may return tourPhotos instead of galleryImages
+      // Normalize: backend may return tourPhotos/photos instead of galleryImages
       const data = (response.data || []).map((tour: any) => {
-        if (!tour.galleryImages && tour.tourPhotos) {
-          tour.galleryImages = tour.tourPhotos.map((p: any) => ({
-            id: p.id,
-            imageUrl: p.imageUrl || p.url || p.photoUrl,
-          }));
+        if (!tour.galleryImages) {
+          const src = tour.tourPhotos || tour.photos;
+          if (src) {
+            tour.galleryImages = src.map((p: any) => ({
+              id: p.id,
+              imageUrl: p.imageUrl || p.url || p.photoUrl,
+            }));
+          }
         }
         return tour;
       });
@@ -5623,12 +5652,15 @@ export const adminApi = {
   async getTourById(id: number, lang: 'tr' | 'en' | 'de' = 'tr') {
     try {
       const response = await apiClient.getAdminTourById(id, lang) as any;
-      // Normalize: backend may return tourPhotos instead of galleryImages
-      if (!response.galleryImages && response.tourPhotos) {
-        response.galleryImages = response.tourPhotos.map((p: any) => ({
-          id: p.id,
-          imageUrl: p.imageUrl || p.url || p.photoUrl,
-        }));
+      // Normalize: backend may return tourPhotos/photos instead of galleryImages
+      if (!response.galleryImages) {
+        const src = response.tourPhotos || response.photos;
+        if (src) {
+          response.galleryImages = src.map((p: any) => ({
+            id: p.id,
+            imageUrl: p.imageUrl || p.url || p.photoUrl,
+          }));
+        }
       }
       // Normalize participants: backend may nest client data under 'user' instead of 'client'
       if (response.participants?.length) {
@@ -5965,13 +5997,16 @@ export const tourApi = {
   async list(page = 1, limit = 10, lang: 'tr' | 'en' | 'de' = 'tr'): Promise<{ success: boolean; data?: ApiTourDto[]; meta?: { total: number; page: number; limit: number; totalPages: number }; error?: string }> {
     try {
       const response = await apiClient.getAgencyTours(page, limit, lang);
-      // Normalize: backend may return tourPhotos instead of galleryImages
+      // Normalize: backend may return tourPhotos/photos instead of galleryImages
       const data = (response.data || []).map((tour: any) => {
-        if (!tour.galleryImages && tour.tourPhotos) {
-          tour.galleryImages = tour.tourPhotos.map((p: any) => ({
-            id: p.id,
-            imageUrl: p.imageUrl || p.url || p.photoUrl,
-          }));
+        if (!tour.galleryImages) {
+          const src = tour.tourPhotos || tour.photos;
+          if (src) {
+            tour.galleryImages = src.map((p: any) => ({
+              id: p.id,
+              imageUrl: p.imageUrl || p.url || p.photoUrl,
+            }));
+          }
         }
         return tour;
       });
@@ -5984,12 +6019,15 @@ export const tourApi = {
   async getById(id: number, lang: 'tr' | 'en' | 'de' = 'tr'): Promise<{ success: boolean; data?: ApiTourDto; error?: string }> {
     try {
       const response = await apiClient.getAgencyTourById(id, lang) as any;
-      // Normalize: backend may return tourPhotos instead of galleryImages
-      if (!response.galleryImages && response.tourPhotos) {
-        response.galleryImages = response.tourPhotos.map((p: any) => ({
-          id: p.id,
-          imageUrl: p.imageUrl || p.url || p.photoUrl,
-        }));
+      // Normalize: backend may return tourPhotos/photos instead of galleryImages
+      if (!response.galleryImages) {
+        const src = response.tourPhotos || response.photos;
+        if (src) {
+          response.galleryImages = src.map((p: any) => ({
+            id: p.id,
+            imageUrl: p.imageUrl || p.url || p.photoUrl,
+          }));
+        }
       }
       return { success: true, data: response as ApiTourDto };
     } catch (error) {
@@ -6045,6 +6083,15 @@ export const tourApi = {
   async complete(id: number): Promise<{ success: boolean; data?: ApiTourDto; error?: string }> {
     try {
       const response = await apiClient.completeTour(id);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async addPhoto(tourId: number, image: File): Promise<{ success: boolean; data?: any; error?: string }> {
+    try {
+      const response = await apiClient.addTourPhoto(tourId, image);
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };

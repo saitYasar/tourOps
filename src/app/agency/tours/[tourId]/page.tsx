@@ -203,6 +203,8 @@ export default function TourDetailPage() {
   const [statusAction, setStatusAction] = useState<'publish' | 'cancel' | 'complete' | null>(null);
   const [highlightedStopId, setHighlightedStopId] = useState<number | null>(null);
   const [deletePhotoId, setDeletePhotoId] = useState<number | null>(null);
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
   const [isAddParticipantOpen, setIsAddParticipantOpen] = useState(false);
   const [addParticipantSearch, setAddParticipantSearch] = useState('');
   const [addParticipantNotes, setAddParticipantNotes] = useState('');
@@ -572,6 +574,20 @@ export default function TourDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['agency-tour', tourId] });
       toast.success(t.tours.photoDeleted);
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || t.common.error);
+    },
+  });
+
+  const addPhotoMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const result = await tourApi.addPhoto(tourId, file);
+      if (!result.success) throw new Error(result.error);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agency-tour', tourId] });
+      toast.success(t.tours.photoAdded);
     },
     onError: (err: Error) => {
       toast.error(err.message || t.common.error);
@@ -962,78 +978,122 @@ export default function TourDetailPage() {
                 </CardContent>
               </Card>
 
-              {/* Images */}
+              {/* Cover Image */}
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
                     <ImageIcon className="h-5 w-5" />
-                    {t.tours.gallery}
+                    {t.tours.coverImage}
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Cover Image */}
-                  {resolveImageUrl(tour.coverImageUrl) && (
-                    <div>
-                      <p className="text-sm text-slate-500 mb-2">{t.tours.coverImage}</p>
-                      <div className="w-full h-48 rounded-lg overflow-hidden bg-slate-100">
-                        <img
-                          src={resolveImageUrl(tour.coverImageUrl)!}
-                          alt={tour.tourName}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
+                <CardContent>
+                  {resolveImageUrl(tour.coverImageUrl) ? (
+                    <div className="w-full h-48 rounded-lg overflow-hidden bg-slate-100 cursor-pointer" onClick={() => setLightboxImage(resolveImageUrl(tour.coverImageUrl))}>
+                      <img
+                        src={resolveImageUrl(tour.coverImageUrl)!}
+                        alt={tour.tourName}
+                        className="w-full h-full object-cover"
+                      />
                     </div>
-                  )}
-
-                  {/* Gallery Images */}
-                  {tour.galleryImages && tour.galleryImages.length > 0 && (
-                    <div>
-                      <p className="text-sm text-slate-500 mb-2">{t.tours.gallery} ({tour.galleryImages.length})</p>
-                      <div className="grid grid-cols-3 gap-2">
-                        {tour.galleryImages.map((img) => {
-                          const imgSrc = resolveImageUrl(img.imageUrl);
-                          if (!imgSrc) return null;
-                          return (
-                            <div key={img.id} className="relative group">
-                              <div className="w-full h-24 rounded-lg overflow-hidden bg-slate-100">
-                                <img
-                                  src={imgSrc}
-                                  alt=""
-                                  className="w-full h-full object-cover"
-                                />
-                              </div>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span tabIndex={0} className="absolute top-1 right-1">
-                                    <button
-                                      type="button"
-                                      onClick={() => setDeletePhotoId(img.id)}
-                                      disabled={tour.status !== 'draft' && tour.status !== 'published'}
-                                      className="bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                      <X className="h-3 w-3" />
-                                    </button>
-                                  </span>
-                                </TooltipTrigger>
-                                {tour.status !== 'draft' && tour.status !== 'published' && <TooltipContent>{t.tooltips.tourNotDraftOrPublished}</TooltipContent>}
-                              </Tooltip>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {!resolveImageUrl(tour.coverImageUrl) && (!tour.galleryImages || tour.galleryImages.length === 0) && (
+                  ) : (
                     <EmptyState
                       icon={ImageIcon}
-                      title={t.tours.gallery}
+                      title={t.tours.coverImage}
                       description={t.tours.noTours}
                     />
                   )}
                 </CardContent>
               </Card>
+
             </div>
+
+            {/* Gallery */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <ImageIcon className="h-5 w-5" />
+                    {t.tours.gallery}
+                    {tour.galleryImages && tour.galleryImages.length > 0 && (
+                      <span className="text-sm font-normal text-slate-500">({tour.galleryImages.length})</span>
+                    )}
+                  </CardTitle>
+                  {(tour.status === 'draft' || tour.status === 'published') && (
+                    <>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => galleryInputRef.current?.click()}
+                        disabled={addPhotoMutation.isPending}
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        {t.tours.addPhoto}
+                      </Button>
+                      <input
+                        ref={galleryInputRef}
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={(e) => {
+                          const files = e.target.files;
+                          if (files) {
+                            Array.from(files).forEach((file) => addPhotoMutation.mutate(file));
+                          }
+                          e.target.value = '';
+                        }}
+                      />
+                    </>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                {tour.galleryImages && tour.galleryImages.length > 0 ? (
+                  <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 justify-center">
+                    {tour.galleryImages.map((img) => {
+                      const imgSrc = resolveImageUrl(img.imageUrl);
+                      if (!imgSrc) return null;
+                      return (
+                        <div key={img.id} className="relative group flex-shrink-0 w-36 h-28">
+                          <div
+                            className="w-full h-full rounded-lg overflow-hidden bg-slate-100 cursor-pointer"
+                            onClick={() => setLightboxImage(imgSrc)}
+                          >
+                            <img
+                              src={imgSrc}
+                              alt=""
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span tabIndex={0} className="absolute top-1 right-1">
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); setDeletePhotoId(img.id); }}
+                                  disabled={tour.status !== 'draft' && tour.status !== 'published'}
+                                  className="bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </span>
+                            </TooltipTrigger>
+                            {tour.status !== 'draft' && tour.status !== 'published' && <TooltipContent>{t.tooltips.tourNotDraftOrPublished}</TooltipContent>}
+                          </Tooltip>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <EmptyState
+                    icon={ImageIcon}
+                    title={t.tours.gallery}
+                    description={t.tours.noGalleryPhotos}
+                  />
+                )}
+              </CardContent>
+            </Card>
 
             {/* Registration Links */}
             <Card>
@@ -2366,6 +2426,19 @@ export default function TourDetailPage() {
         }}
         variant="destructive"
       />
+
+      {/* Lightbox Dialog */}
+      <Dialog open={!!lightboxImage} onOpenChange={(open) => !open && setLightboxImage(null)}>
+        <DialogContent className="max-w-3xl p-2 bg-black/90 border-0">
+          {lightboxImage && (
+            <img
+              src={lightboxImage}
+              alt=""
+              className="w-full h-auto max-h-[80vh] object-contain rounded"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Add Participant Dialog */}
       <Dialog open={isAddParticipantOpen} onOpenChange={(open) => {
