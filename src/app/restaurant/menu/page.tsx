@@ -22,6 +22,7 @@ import {
   serviceApi,
   organizationApi,
 } from '@/lib/api';
+import { getCurrencySymbol } from '@/lib/utils';
 import type {
   ClientStopMenuCategoryDto,
   ClientStopMenuServiceDto,
@@ -55,7 +56,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
-import { LoadingState, EmptyState, ErrorState, ConfirmDialog, ImageCropper } from '@/components/shared';
+import { LoadingState, EmptyState, ErrorState, ConfirmDialog, ImageCropper, ServiceDetailDialog } from '@/components/shared';
 
 // ============================================
 // Types
@@ -118,9 +119,11 @@ function PriceTypeBadge({ priceType, t }: { priceType: PriceType; t: ReturnType<
 function PreviewServiceList({
   services,
   t,
+  onServiceClick,
 }: {
   services: ClientStopMenuServiceDto[];
   t: ReturnType<typeof useLanguage>['t'];
+  onServiceClick?: (svc: ClientStopMenuServiceDto) => void;
 }) {
   if (!services.length) return null;
 
@@ -135,7 +138,7 @@ function PreviewServiceList({
   return (
     <div className="space-y-1">
       {services.map((s) => (
-        <div key={s.id} className="flex gap-3 p-2 rounded-lg hover:bg-white/60 transition-colors">
+        <div key={s.id} className="flex gap-3 p-2 rounded-lg hover:bg-white/60 transition-colors cursor-pointer" onClick={() => onServiceClick?.(s)}>
           {s.imageUrl ? (
             <img src={s.imageUrl} alt={s.title} className="w-14 h-14 rounded-md object-cover flex-shrink-0 shadow-sm" />
           ) : (
@@ -146,10 +149,10 @@ function PreviewServiceList({
           <div className="flex-1 min-w-0 py-0.5">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-stone-800 leading-tight truncate" title={s.title}>{s.title}</p>
+                <p className="text-sm font-semibold text-stone-800 leading-tight truncate hover:text-orange-700 transition-colors" title={s.title}>{s.title}</p>
               </div>
               <div className="text-right flex-shrink-0">
-                <p className="text-sm font-bold text-emerald-700">{Number(s.basePrice).toFixed(2)} ₺</p>
+                <p className="text-sm font-bold text-emerald-700">{Number(s.basePrice).toFixed(2)} {getCurrencySymbol(s.currency)}</p>
                 {s.priceType !== 'fixed' && (
                   <p className="text-[10px] text-stone-400">{priceLabel(s.priceType)}</p>
                 )}
@@ -170,10 +173,12 @@ function PreviewCategoryItem({
   cat,
   depth,
   t,
+  onServiceClick,
 }: {
   cat: ClientStopMenuCategoryDto;
   depth: number;
   t: ReturnType<typeof useLanguage>['t'];
+  onServiceClick?: (svc: ClientStopMenuServiceDto) => void;
 }) {
   const [open, setOpen] = useState(depth === 0);
   const hasServices = cat.services?.length > 0;
@@ -203,9 +208,9 @@ function PreviewCategoryItem({
       )}
       {open && (
         <>
-          {hasServices && <PreviewServiceList services={cat.services} t={t} />}
+          {hasServices && <PreviewServiceList services={cat.services} t={t} onServiceClick={onServiceClick} />}
           {hasChildren && (
-            <PreviewCategoryTree categories={cat.child_service_categories} depth={depth + 1} t={t} />
+            <PreviewCategoryTree categories={cat.child_service_categories} depth={depth + 1} t={t} onServiceClick={onServiceClick} />
           )}
         </>
       )}
@@ -218,15 +223,17 @@ function PreviewCategoryTree({
   categories,
   depth,
   t,
+  onServiceClick,
 }: {
   categories: ClientStopMenuCategoryDto[];
   depth: number;
   t: ReturnType<typeof useLanguage>['t'];
+  onServiceClick?: (svc: ClientStopMenuServiceDto) => void;
 }) {
   return (
     <>
       {categories.map((cat) => (
-        <PreviewCategoryItem key={cat.id} cat={cat} depth={depth} t={t} />
+        <PreviewCategoryItem key={cat.id} cat={cat} depth={depth} t={t} onServiceClick={onServiceClick} />
       ))}
     </>
   );
@@ -390,6 +397,7 @@ export default function MenuPage() {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewLang, setPreviewLang] = useState<'tr' | 'en' | 'de'>('tr');
   const [cropperOpen, setCropperOpen] = useState(false);
+  const [detailService, setDetailService] = useState<ClientStopMenuServiceDto | null>(null);
   const [cropperSrc, setCropperSrc] = useState('');
   const serviceFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -953,7 +961,7 @@ export default function MenuPage() {
                                   )}
                                   <div className="flex items-center gap-1.5 mt-1">
                                     <span className="text-sm font-semibold text-primary">
-                                      {Number(service.basePrice).toFixed(2)} TL
+                                      {Number(service.basePrice).toFixed(2)} {getCurrencySymbol(service.currency)}
                                     </span>
                                     <PriceTypeBadge priceType={service.priceType as PriceType} t={t} />
                                   </div>
@@ -1121,7 +1129,7 @@ export default function MenuPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="basePrice">{t.menu.basePrice} (TL) *</Label>
+                  <Label htmlFor="basePrice">{t.menu.basePrice} *</Label>
                   <Input
                     id="basePrice"
                     type="number"
@@ -1306,7 +1314,7 @@ export default function MenuPage() {
               {/* Menu content */}
               <div className="px-4 py-4 space-y-5">
                 {previewMenu && previewMenu.length > 0 ? (
-                  <PreviewCategoryTree categories={previewMenu} depth={0} t={t} />
+                  <PreviewCategoryTree categories={previewMenu} depth={0} t={t} onServiceClick={setDetailService} />
                 ) : (
                   <div className="py-16 text-center">
                     <FolderTree className="h-10 w-10 text-stone-300 mx-auto mb-3" />
@@ -1317,7 +1325,7 @@ export default function MenuPage() {
 
               {/* Footer */}
               <div className="px-5 py-4 text-center border-t border-stone-200 bg-white">
-                <p className="text-[10px] text-stone-400">Powered by TourOps</p>
+                <p className="text-[10px] text-stone-400">Powered by HerHafta</p>
               </div>
             </div>
 
@@ -1328,6 +1336,14 @@ export default function MenuPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Service Detail Popup */}
+      <ServiceDetailDialog
+        service={detailService}
+        open={!!detailService}
+        onOpenChange={(open) => { if (!open) setDetailService(null); }}
+        t={t}
+      />
     </div>
   );
 }

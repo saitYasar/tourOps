@@ -10,7 +10,7 @@ export default function RestaurantSupportPage() {
   const { t } = useLanguage();
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
-  const supportEmail = 'destek@tourops.com';
+  const supportEmail = 'destek@herhafta.com';
 
   const faqs = [
     { q: t.support.faq1Q, a: t.support.faq1A },

@@ -40,7 +40,7 @@ export default function RestaurantRequestsPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { t, locale } = useLanguage();
-  const apiLang = (locale === 'de' ? 'en' : locale) as 'tr' | 'en';
+  const apiLang = locale as 'tr' | 'en' | 'de';
 
   const { data: orgResult } = useQuery({
     queryKey: ['my-organization'],

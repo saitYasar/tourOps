@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
       `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1`,
       {
         headers: {
-          'User-Agent': 'TourOps/1.0',
+          'User-Agent': 'HerHafta/1.0',
           'Accept-Language': 'tr',
         },
         signal: AbortSignal.timeout(5000),

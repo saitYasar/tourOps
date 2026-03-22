@@ -157,43 +157,41 @@
 }
 
 @keyframes fade-in {
-  0% { opacity: 0; transform: translateY(10px); }
-  100% { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 .animate-fade-in {
-  animation: fade-in 0.4s ease-out both;
+  animation: fade-in 30ms ease-out both;
 }
 
 @keyframes fadeIn {
-  0% { opacity: 0; transform: translateY(10px); }
-  100% { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 .animate-fadeIn {
-  animation: fadeIn 0.3s ease-out;
+  animation: fadeIn 30ms ease-out;
 }
 
 @keyframes menu-item-in {
-  0% { opacity: 0; transform: translateX(-20px); }
-  100% { opacity: 1; transform: translateX(0); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 @keyframes pop-in {
-  0% { transform: scale(0); }
-  50% { transform: scale(1.3); }
+  0% { transform: scale(0.8); }
   100% { transform: scale(1); }
 }
 @keyframes bounce-in {
-  0% { transform: scale(0); }
-  50% { transform: scale(1.2); }
+  0% { transform: scale(0.8); }
   100% { transform: scale(1); }
 }
 .animate-menu-item-in {
-  animation: menu-item-in 0.4s ease-out both;
+  animation: menu-item-in 30ms ease-out both;
 }
 .animate-pop-in {
-  animation: pop-in 0.3s ease-out;
+  animation: pop-in 40ms ease-out;
 }
 .animate-bounce-in {
-  animation: bounce-in 0.4s ease-out;
+  animation: bounce-in 40ms ease-out;
 }
 
 /* Leaflet Map Overrides */

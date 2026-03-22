@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { Building2, Armchair, Check, Loader2, ChevronLeft, ChevronRight, Layers, DoorOpen, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
@@ -26,10 +26,10 @@ function filterTables(resources: ResourceDto[]): ResourceDto[] {
   });
 }
 
-// Lazy load Konva canvas (heavy dependency)
+// Lazy load Konva canvas (heavy dependency) — no loading placeholder to avoid flash
 const FloorPlanCanvas = dynamic(
   () => import('./FloorPlanCanvas').then(m => ({ default: m.FloorPlanCanvas })),
-  { ssr: false, loading: () => <div className="h-[450px] bg-slate-100 rounded-xl animate-pulse" /> }
+  { ssr: false }
 );
 
 interface CustomerVenueSelectorProps {
@@ -74,10 +74,39 @@ export function CustomerVenueSelector({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [floorResources]);
 
+  // Track which parent IDs we've already auto-skipped (prevents loops on back navigation)
+  const autoSkippedFrom = useRef(new Set<number>());
+
   // Derived data
   const activeRooms = activeFloorId ? (childrenCache[activeFloorId] ?? []) : [];
   const roomTables = activeRoomId ? filterTables(childrenCache[activeRoomId] ?? []) : [];
   const chairResources = selectedTableId ? (childrenCache[selectedTableId] ?? []) : [];
+
+  // Auto-skip room selection when floor has only one room
+  useEffect(() => {
+    if (activeFloorId && !activeRoomId) {
+      const rooms = childrenCache[activeFloorId];
+      if (rooms && rooms.length === 1 && !autoSkippedFrom.current.has(activeFloorId)) {
+        autoSkippedFrom.current.add(activeFloorId);
+        setActiveRoomId(rooms[0].id);
+        if (!childrenCache[rooms[0].id]) {
+          fetchChildren(rooms[0].id);
+        }
+      }
+    }
+  }, [activeFloorId, activeRoomId, childrenCache, fetchChildren]);
+
+  // Auto-skip table selection when room has only one table
+  useEffect(() => {
+    if (activeRoomId && !selectedTableId) {
+      const tables = filterTables(childrenCache[activeRoomId] ?? []);
+      if (tables.length === 1 && !autoSkippedFrom.current.has(activeRoomId)) {
+        autoSkippedFrom.current.add(activeRoomId);
+        setSelectedTableId(tables[0].id);
+        fetchChildren(tables[0].id, true);
+      }
+    }
+  }, [activeRoomId, selectedTableId, childrenCache, fetchChildren]);
 
   // Breadcrumb data
   const activeFloor = floorResources.find(f => f.id === activeFloorId);
@@ -246,27 +275,29 @@ export function CustomerVenueSelector({
             <p className="text-slate-500">{t.customer.noChairs}</p>
           </div>
         ) : (
-          <div className="flex flex-col items-center gap-2 py-4">
-            {/* Top row of seats */}
-            <div className="flex flex-wrap justify-center gap-2">
-              {topRow.map(renderSeatTile)}
-            </div>
-
-            {/* Table visual */}
-            <div className="relative mx-4 my-1">
-              <div className={`flex items-center justify-center px-8 sm:px-12 py-3 sm:py-4 border-2 border-amber-300 bg-amber-50 text-amber-800 font-bold text-sm sm:text-base ${
-                chairResources.length <= 2 ? 'rounded-full min-w-[80px]' : 'rounded-2xl min-w-[140px] sm:min-w-[200px]'
-              }`}>
-                <span className="truncate">{activeTable?.name}</span>
+          <div className="overflow-x-auto pb-2 -mx-2 px-2">
+            <div className="flex flex-col items-center gap-1.5 py-4" style={{ minWidth: 'fit-content' }}>
+              {/* Top row of seats */}
+              <div className="flex justify-center gap-1.5">
+                {topRow.map(renderSeatTile)}
               </div>
-            </div>
 
-            {/* Bottom row of seats */}
-            {bottomRow.length > 0 && (
-              <div className="flex flex-wrap justify-center gap-2">
-                {bottomRow.map(renderSeatTile)}
+              {/* Table visual — stretches to match seat rows */}
+              <div className="w-full px-4 my-0.5">
+                <div className={`flex items-center justify-center py-2.5 sm:py-3 border-2 border-amber-300 bg-amber-50 text-amber-800 font-bold text-sm sm:text-base ${
+                  chairResources.length <= 2 ? 'rounded-full' : 'rounded-xl'
+                }`}>
+                  <span className="truncate px-4">{activeTable?.name}</span>
+                </div>
               </div>
-            )}
+
+              {/* Bottom row of seats */}
+              {bottomRow.length > 0 && (
+                <div className="flex justify-center gap-1.5">
+                  {bottomRow.map(renderSeatTile)}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>

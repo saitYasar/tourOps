@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { useLanguage } from '@/contexts/LanguageContext';
 import type { MenuCategory, MenuItem, OrderItem } from '@/types';
+import { getCurrencySymbol } from '@/lib/utils';
 
 interface AnimatedMenuProps {
   categories: MenuCategory[];
@@ -73,14 +74,14 @@ export function AnimatedMenu({
           <div
             key={category.id}
             className="border rounded-xl overflow-hidden bg-white shadow-sm animate-fade-in"
-            style={{ animationDelay: `${categoryIndex * 100}ms` }}
+            style={{ animationDelay: '0ms' }}
           >
             {/* Kategori Başlığı */}
             <button
               onClick={() => toggleCategory(category.id)}
               className={`
                 w-full px-5 py-4 flex items-center justify-between
-                transition-all duration-300
+                transition-all duration-0
                 ${isExpanded
                   ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white'
                   : 'bg-gradient-to-r from-slate-50 to-white hover:from-orange-50 hover:to-amber-50'
@@ -89,7 +90,7 @@ export function AnimatedMenu({
             >
               <div className="flex items-center gap-3">
                 <div className={`
-                  w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-300
+                  w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-0
                   ${isExpanded ? 'bg-white/20' : 'bg-orange-100'}
                 `}>
                   <UtensilsCrossed className={`h-5 w-5 ${isExpanded ? 'text-white' : 'text-orange-500'}`} />
@@ -105,14 +106,14 @@ export function AnimatedMenu({
                 )}
               </div>
               <ChevronDown
-                className={`h-5 w-5 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}
+                className={`h-5 w-5 transition-transform duration-0 ${isExpanded ? 'rotate-180' : ''}`}
               />
             </button>
 
             {/* Kategori İçeriği */}
             <div
               className={`
-                transition-all duration-500 ease-out overflow-hidden
+                transition-all duration-0 ease-out overflow-hidden
                 ${isExpanded ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'}
               `}
             >
@@ -128,7 +129,7 @@ export function AnimatedMenu({
                       key={item.id}
                       className={`
                         relative flex items-center gap-3 p-3 rounded-xl border-2
-                        transition-all duration-300 cursor-pointer
+                        transition-all duration-0 cursor-pointer
                         animate-menu-item-in
                         ${qty > 0
                           ? 'border-orange-300 bg-orange-50 shadow-md shadow-orange-100'
@@ -137,7 +138,7 @@ export function AnimatedMenu({
                           : 'border-transparent bg-slate-50/50 hover:bg-slate-50'
                         }
                       `}
-                      style={{ animationDelay: `${itemIndex * 50}ms` }}
+                      style={{ animationDelay: '0ms' }}
                       onMouseEnter={() => setHoveredItem(item.id)}
                       onMouseLeave={() => setHoveredItem(null)}
                     >
@@ -145,7 +146,7 @@ export function AnimatedMenu({
                       <div
                         className={`
                           w-20 h-20 rounded-xl overflow-hidden flex-shrink-0
-                          transition-all duration-300
+                          transition-all duration-0
                           ${isHovered ? 'scale-105 shadow-lg' : ''}
                         `}
                         onClick={() => onOpenItemDetail(item)}
@@ -174,7 +175,7 @@ export function AnimatedMenu({
                         )}
                         <div className="flex items-center gap-2 mt-1 flex-wrap">
                           <span className="text-lg font-bold text-orange-600">
-                            {item.price.toFixed(2)} ₺
+                            {item.price.toFixed(2)} {getCurrencySymbol(item.currency)}
                           </span>
                           {excludedItems.length > 0 && (
                             <span className="text-xs text-red-600 flex items-center gap-1 bg-red-50 px-1.5 py-0.5 rounded">
@@ -197,7 +198,7 @@ export function AnimatedMenu({
                           variant={qty > 0 ? 'default' : 'outline'}
                           size="icon"
                           className={`
-                            h-9 w-9 rounded-full transition-all duration-300
+                            h-9 w-9 rounded-full transition-all duration-0
                             ${qty > 0 ? 'bg-orange-500 hover:bg-orange-600' : ''}
                           `}
                           onClick={(e) => {

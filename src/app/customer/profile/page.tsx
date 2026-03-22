@@ -22,7 +22,7 @@ import { toast } from 'sonner';
 
 export default function CustomerProfilePage() {
   const { t, locale } = useLanguage();
-  const apiLang = (locale === 'de' ? 'en' : locale) as 'tr' | 'en';
+  const apiLang = locale as 'tr' | 'en' | 'de';
   const router = useRouter();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);

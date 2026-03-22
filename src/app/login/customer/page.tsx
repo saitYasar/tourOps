@@ -263,7 +263,7 @@ function CustomerLoginContent() {
           </div>
 
           <p className="text-white/50 text-sm relative z-10">
-            &copy; 2026 TourOps. {t.auth.allRightsReserved}
+            &copy; 2026 HerHafta. {t.auth.allRightsReserved}
           </p>
         </div>
       </div>

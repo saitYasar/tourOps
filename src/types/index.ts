@@ -1,5 +1,5 @@
 // ============================================
-// TourOps - Veri Modelleri
+// HerHafta - Veri Modelleri
 // ============================================
 
 // Base entity with common fields
@@ -139,6 +139,7 @@ export interface MenuItem extends BaseEntity {
   name: string;
   description?: string;
   price: number;
+  currency?: string;
   photoUrl?: string;
   isActive: boolean;
   order: number;

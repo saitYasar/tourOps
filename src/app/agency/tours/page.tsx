@@ -71,7 +71,7 @@ export default function ToursPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { t, locale } = useLanguage();
-  const apiLang = (locale === 'de' ? 'en' : locale) as 'tr' | 'en';
+  const apiLang = locale as 'tr' | 'en' | 'de';
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<TourStatus | 'all'>('all');
   const [page, setPage] = useState(1);

@@ -652,10 +652,24 @@ export default function VenuePage() {
     }
   };
 
-  const handleDelete = () => {
-    if (deleteTarget) {
-      deleteMutation.mutate(deleteTarget.id);
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    // Find children (chairs/seats) from cache or resource tree
+    const findResource = (nodes: ResourceDto[]): ResourceDto | undefined => {
+      for (const n of nodes) {
+        if (n.id === deleteTarget.id) return n;
+        const found = findResource(n.children || []);
+        if (found) return found;
+      }
+      return undefined;
+    };
+    const resource = findResource(resources);
+    const children = childrenCache[deleteTarget.id] || resource?.children || [];
+    // Delete all children first (e.g. chairs before table)
+    for (const child of children) {
+      try { await resourceApi.delete(child.id); } catch { /* ignore */ }
     }
+    deleteMutation.mutate(deleteTarget.id);
   };
 
   const isPending = createMutation.isPending || updateMutation.isPending || multipleCreating;
@@ -1168,7 +1182,7 @@ export default function VenuePage() {
               {form.resourceTypeId && getTypeById(form.resourceTypeId)?.code === 'table' ? (
                 <div className="space-y-2">
                   <Label>{t.venue.personCount}</Label>
-                  <div className="grid grid-cols-4 gap-2">
+                  <div className="grid grid-cols-5 gap-2">
                     {[2, 4, 6, 8].map((cap) => (
                       <TablePreview
                         key={cap}
@@ -1177,7 +1191,40 @@ export default function VenuePage() {
                         onClick={() => setForm((prev) => ({ ...prev, capacity: cap }))}
                       />
                     ))}
+                    <button
+                      type="button"
+                      onClick={() => setForm((prev) => ({ ...prev, capacity: prev.capacity > 8 ? prev.capacity : 10 }))}
+                      className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-lg border-2 transition-all cursor-pointer ${
+                        ![2, 4, 6, 8].includes(form.capacity)
+                          ? 'border-blue-500 bg-blue-50 shadow-sm'
+                          : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span className="text-2xl font-bold text-slate-400">+</span>
+                      <span className={`text-sm font-medium ${
+                        ![2, 4, 6, 8].includes(form.capacity) ? 'text-blue-700' : 'text-slate-600'
+                      }`}>
+                        {t.venue.customCapacity}
+                      </span>
+                    </button>
                   </div>
+                  {![2, 4, 6, 8].includes(form.capacity) && (
+                    <div className="mt-2">
+                      <Input
+                        type="number"
+                        min={1}
+                        value={form.capacity || ''}
+                        onFocus={(e) => e.target.select()}
+                        placeholder={t.venue.personCount}
+                        onChange={(e) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            capacity: Math.max(1, parseInt(e.target.value) || 1),
+                          }))
+                        }
+                      />
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-2">

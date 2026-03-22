@@ -46,6 +46,7 @@ import {
 import { toast } from 'sonner';
 
 import { useLanguage } from '@/contexts/LanguageContext';
+import { getCurrencySymbol } from '@/lib/utils';
 import {
   adminApi,
   locationApi,
@@ -92,7 +93,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { LoadingState, ConfirmDialog, EmptyState, ErrorState, ImageCropper } from '@/components/shared';
+import { LoadingState, ConfirmDialog, EmptyState, ErrorState, ImageCropper, ServiceDetailDialog } from '@/components/shared';
 import {
   Collapsible,
   CollapsibleContent,
@@ -370,6 +371,7 @@ export default function OrganizationDetailPage() {
       taxNumber: org.taxNumber || '',
       taxOffice: org.taxOffice || '',
       agencyCommissionRate: org.agencyCommissionRate ?? undefined,
+      currency: (org.currency as 'TRY' | 'EUR' | 'USD') || undefined,
       socialMediaUrls: {
         instagram: org.socialMediaUrls?.instagram || '',
         facebook: org.socialMediaUrls?.facebook || '',
@@ -995,6 +997,22 @@ export default function OrganizationDetailPage() {
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">%</span>
                   </div>
                 </div>
+                <div>
+                  <label className="text-xs text-slate-500 mb-1 block">{a.currencyLabel}</label>
+                  <Select
+                    value={form.currency || 'TRY'}
+                    onValueChange={(val) => setForm({ ...form, currency: val as 'TRY' | 'EUR' | 'USD' })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="TRY">TRY (₺)</SelectItem>
+                      <SelectItem value="EUR">EUR (€)</SelectItem>
+                      <SelectItem value="USD">USD ($)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             ) : (
               <div className="space-y-3">
@@ -1002,6 +1020,7 @@ export default function OrganizationDetailPage() {
                 <InfoRow label={a.taxNumberLabel} value={org.taxNumber} icon={Hash} />
                 <InfoRow label={a.taxOfficeLabel} value={org.taxOffice} icon={Landmark} />
                 <InfoRow label={a.agencyCommissionRateLabel} value={org.agencyCommissionRate != null ? `%${org.agencyCommissionRate}` : null} />
+                <InfoRow label={a.currencyLabel} value={org.currency ? `${org.currency} (${getCurrencySymbol(org.currency)})` : 'TRY (₺)'} />
               </div>
             )}
           </CardContent>
@@ -1250,7 +1269,7 @@ function PriceTypeBadge({ priceType, t: tl }: { priceType: PriceType; t: ReturnT
 // ===================================================================
 // Menu Preview Components — matching restaurant/menu/page.tsx
 // ===================================================================
-function PreviewServiceList({ services, t: tl }: { services: ClientStopMenuServiceDto[]; t: ReturnType<typeof useLanguage>['t'] }) {
+function PreviewServiceList({ services, t: tl, onServiceClick }: { services: ClientStopMenuServiceDto[]; t: ReturnType<typeof useLanguage>['t']; onServiceClick?: (svc: ClientStopMenuServiceDto) => void }) {
   if (!services.length) return null;
   const priceLabel = (type: string) => {
     if (type === 'fixed') return '';
@@ -1262,7 +1281,7 @@ function PreviewServiceList({ services, t: tl }: { services: ClientStopMenuServi
   return (
     <div className="space-y-1">
       {services.map((s) => (
-        <div key={s.id} className="flex gap-3 p-2 rounded-lg hover:bg-white/60 transition-colors">
+        <div key={s.id} className="flex gap-3 p-2 rounded-lg hover:bg-white/60 transition-colors cursor-pointer" onClick={() => onServiceClick?.(s)}>
           {s.imageUrl ? (
             <img src={s.imageUrl} alt={s.title} className="w-14 h-14 rounded-md object-cover flex-shrink-0 shadow-sm" />
           ) : (
@@ -1272,9 +1291,9 @@ function PreviewServiceList({ services, t: tl }: { services: ClientStopMenuServi
           )}
           <div className="flex-1 min-w-0 py-0.5">
             <div className="flex items-start justify-between gap-2">
-              <p className="text-sm font-semibold text-stone-800 leading-tight truncate" title={s.title}>{s.title}</p>
+              <p className="text-sm font-semibold text-stone-800 leading-tight truncate hover:text-orange-700 transition-colors" title={s.title}>{s.title}</p>
               <div className="text-right flex-shrink-0">
-                <p className="text-sm font-bold text-emerald-700">{Number(s.basePrice).toFixed(2)} ₺</p>
+                <p className="text-sm font-bold text-emerald-700">{Number(s.basePrice).toFixed(2)} {getCurrencySymbol(s.currency)}</p>
                 {s.priceType !== 'fixed' && <p className="text-[10px] text-stone-400">{priceLabel(s.priceType)}</p>}
               </div>
             </div>
@@ -1286,7 +1305,7 @@ function PreviewServiceList({ services, t: tl }: { services: ClientStopMenuServi
   );
 }
 
-function PreviewCategoryItem({ cat, depth, t: tl }: { cat: ClientStopMenuCategoryDto; depth: number; t: ReturnType<typeof useLanguage>['t'] }) {
+function PreviewCategoryItem({ cat, depth, t: tl, onServiceClick }: { cat: ClientStopMenuCategoryDto; depth: number; t: ReturnType<typeof useLanguage>['t']; onServiceClick?: (svc: ClientStopMenuServiceDto) => void }) {
   const [open, setOpen] = useState(depth === 0);
   const hasServices = cat.services?.length > 0;
   const hasChildren = cat.child_service_categories?.length > 0;
@@ -1306,16 +1325,16 @@ function PreviewCategoryItem({ cat, depth, t: tl }: { cat: ClientStopMenuCategor
       )}
       {open && (
         <>
-          {hasServices && <PreviewServiceList services={cat.services} t={tl} />}
-          {hasChildren && <PreviewCategoryTree categories={cat.child_service_categories} depth={depth + 1} t={tl} />}
+          {hasServices && <PreviewServiceList services={cat.services} t={tl} onServiceClick={onServiceClick} />}
+          {hasChildren && <PreviewCategoryTree categories={cat.child_service_categories} depth={depth + 1} t={tl} onServiceClick={onServiceClick} />}
         </>
       )}
     </div>
   );
 }
 
-function PreviewCategoryTree({ categories: cats, depth, t: tl }: { categories: ClientStopMenuCategoryDto[]; depth: number; t: ReturnType<typeof useLanguage>['t'] }) {
-  return <>{cats.map((cat) => <PreviewCategoryItem key={cat.id} cat={cat} depth={depth} t={tl} />)}</>;
+function PreviewCategoryTree({ categories: cats, depth, t: tl, onServiceClick }: { categories: ClientStopMenuCategoryDto[]; depth: number; t: ReturnType<typeof useLanguage>['t']; onServiceClick?: (svc: ClientStopMenuServiceDto) => void }) {
+  return <>{cats.map((cat) => <PreviewCategoryItem key={cat.id} cat={cat} depth={depth} t={tl} onServiceClick={onServiceClick} />)}</>;
 }
 
 // ===================================================================
@@ -1453,6 +1472,7 @@ function MenuTab({ orgId }: { orgId: number }) {
   const [serviceImagePreview, setServiceImagePreview] = useState<string | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewLang, setPreviewLang] = useState<'tr' | 'en' | 'de'>('tr');
+  const [detailService, setDetailService] = useState<ClientStopMenuServiceDto | null>(null);
   const [cropperOpen, setCropperOpen] = useState(false);
   const [cropperSrc, setCropperSrc] = useState('');
   const serviceFileInputRef = useRef<HTMLInputElement>(null);
@@ -1990,7 +2010,7 @@ function MenuTab({ orgId }: { orgId: number }) {
                                 )}
                                 <div className="flex items-center gap-1.5 mt-1">
                                   <span className="text-sm font-semibold text-primary">
-                                    {Number(service.basePrice).toFixed(2)} TL
+                                    {Number(service.basePrice).toFixed(2)} {getCurrencySymbol(service.currency)}
                                   </span>
                                   <AdminPriceTypeBadge priceType={service.priceType as PriceType} t={t} />
                                 </div>
@@ -2153,7 +2173,7 @@ function MenuTab({ orgId }: { orgId: number }) {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="basePrice">{t.menu.basePrice} (TL) *</Label>
+                  <Label htmlFor="basePrice">{t.menu.basePrice} *</Label>
                   <Input
                     id="basePrice"
                     type="number"
@@ -2324,7 +2344,7 @@ function MenuTab({ orgId }: { orgId: number }) {
               </div>
               <div className="px-4 py-4 space-y-5">
                 {previewMenu && previewMenu.length > 0 ? (
-                  <PreviewCategoryTree categories={previewMenu} depth={0} t={t} />
+                  <PreviewCategoryTree categories={previewMenu} depth={0} t={t} onServiceClick={setDetailService} />
                 ) : (
                   <div className="py-16 text-center">
                     <FolderTree className="h-10 w-10 text-stone-300 mx-auto mb-3" />
@@ -2333,7 +2353,7 @@ function MenuTab({ orgId }: { orgId: number }) {
                 )}
               </div>
               <div className="px-5 py-4 text-center border-t border-stone-200 bg-white">
-                <p className="text-[10px] text-stone-400">Powered by TourOps</p>
+                <p className="text-[10px] text-stone-400">Powered by HerHafta</p>
               </div>
             </div>
             <div className="bg-stone-800 flex justify-center py-2">
@@ -2342,6 +2362,14 @@ function MenuTab({ orgId }: { orgId: number }) {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Service Detail Popup */}
+      <ServiceDetailDialog
+        service={detailService}
+        open={!!detailService}
+        onOpenChange={(open) => { if (!open) setDetailService(null); }}
+        t={t}
+      />
     </div>
   );
 }
@@ -2696,8 +2724,14 @@ function ResourcesTab({ orgId }: { orgId: number }) {
     }
   };
 
-  const handleDelete = () => {
-    if (deleteTarget) deleteMutation.mutate(deleteTarget.id);
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    // Delete all children first (e.g. chairs before table)
+    const children = getChildren(deleteTarget.id);
+    for (const child of children) {
+      try { await adminApi.deleteOrgResource(orgId, child.id); } catch { /* ignore */ }
+    }
+    deleteMutation.mutate(deleteTarget.id);
   };
 
   const isPending = createMutation.isPending || updateMutation.isPending || multipleCreating;
@@ -2957,7 +2991,7 @@ function ResourcesTab({ orgId }: { orgId: number }) {
               {form.resourceTypeId && getTypeById(form.resourceTypeId)?.code === 'table' ? (
                 <div className="space-y-2">
                   <Label>{t.venue.personCount}</Label>
-                  <div className="grid grid-cols-4 gap-2">
+                  <div className="grid grid-cols-5 gap-2">
                     {[2, 4, 6, 8].map((cap) => (
                       <TablePreview
                         key={cap}
@@ -2966,7 +3000,35 @@ function ResourcesTab({ orgId }: { orgId: number }) {
                         onClick={() => setForm((prev) => ({ ...prev, capacity: cap }))}
                       />
                     ))}
+                    <button
+                      type="button"
+                      onClick={() => setForm((prev) => ({ ...prev, capacity: prev.capacity > 8 ? prev.capacity : 10 }))}
+                      className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-lg border-2 transition-all cursor-pointer ${
+                        ![2, 4, 6, 8].includes(form.capacity)
+                          ? 'border-blue-500 bg-blue-50 shadow-sm'
+                          : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span className="text-2xl font-bold text-slate-400">+</span>
+                      <span className={`text-sm font-medium ${
+                        ![2, 4, 6, 8].includes(form.capacity) ? 'text-blue-700' : 'text-slate-600'
+                      }`}>
+                        {t.venue.customCapacity}
+                      </span>
+                    </button>
                   </div>
+                  {![2, 4, 6, 8].includes(form.capacity) && (
+                    <div className="mt-2">
+                      <Input
+                        type="number"
+                        min={1}
+                        value={form.capacity || ''}
+                        onFocus={(e) => e.target.select()}
+                        placeholder={t.venue.personCount}
+                        onChange={(e) => setForm((prev) => ({ ...prev, capacity: Math.max(1, parseInt(e.target.value) || 1) }))}
+                      />
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-2">

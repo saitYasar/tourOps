@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { AuthRedirect } from '@/components/landing/AuthRedirect';
 
 export const metadata: Metadata = {
-  title: 'TourOps - Tur Yönetiminin Dijital Merkezi',
+  title: 'HerHafta - Tur Yönetiminin Dijital Merkezi',
   description:
     'Acenteler, işletmeler ve gezginler için hepsi bir arada tur yönetim platformu. Turları planlayın, işletmelerle bağlantı kurun, müşterilerinize unutulmaz deneyimler sunun.',
   keywords: [
@@ -23,7 +23,7 @@ export default function HomePage() {
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'SoftwareApplication',
-    name: 'TourOps',
+    name: 'HerHafta',
     applicationCategory: 'BusinessApplication',
     operatingSystem: 'Web',
     description:
@@ -48,22 +48,22 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-red-600 to-rose-700 flex items-center justify-center">
-              <span className="text-white font-bold text-sm">T</span>
+              <span className="text-white font-bold text-sm">H</span>
             </div>
-            <span className="text-xl font-bold text-slate-900">TourOps</span>
+            <span className="text-xl font-bold text-slate-900">HerHafta</span>
           </Link>
-          <nav className="flex items-center gap-3">
+          <nav className="flex items-center gap-2">
             <Link
-              href="/login"
-              className="px-4 py-2 text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors"
+              href="/login/customer"
+              className="px-4 py-2 text-sm font-medium text-slate-700 hover:text-slate-900 border border-slate-200 hover:border-slate-300 rounded-lg transition-colors"
             >
-              Giriş Yap
+              Müşteri Girişi
             </Link>
             <Link
-              href="/register"
+              href="/login"
               className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
             >
-              Kayıt Ol
+              Firma Girişi
             </Link>
           </nav>
         </div>
@@ -175,7 +175,7 @@ export default function HomePage() {
                 Herkes İçin Tasarlandı
               </h2>
               <p className="mt-4 text-lg text-slate-600">
-                Rolünüz ne olursa olsun, TourOps size uygun araçlar sunar.
+                Rolünüz ne olursa olsun, HerHafta size uygun araçlar sunar.
               </p>
             </div>
             <div className="mt-16 grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -385,7 +385,7 @@ export default function HomePage() {
       {/* Footer */}
       <footer className="bg-slate-900 text-slate-400 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-sm">
-          <p>&copy; {new Date().getFullYear()} TourOps. Tüm hakları saklıdır.</p>
+          <p>&copy; {new Date().getFullYear()} HerHafta. Tüm hakları saklıdır.</p>
         </div>
       </footer>
     </>

@@ -21,6 +21,7 @@ import {
   MessageSquare,
 } from 'lucide-react';
 
+import { getCurrencySymbol } from '@/lib/utils';
 import {
   apiClient,
   type ClientTourStopDto,
@@ -41,7 +42,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { LoadingState, ErrorState, LanguageSwitcher, ChoiceDeadlineCountdown } from '@/components/shared';
+import { LoadingState, ErrorState, LanguageSwitcher, ChoiceDeadlineCountdown, ServiceDetailDialog } from '@/components/shared';
 import { formatShortDateTime } from '@/lib/dateUtils';
 import { toast } from 'sonner';
 import { CustomerVenueSelector } from '@/components/customer/CustomerVenueSelector';
@@ -63,7 +64,7 @@ export default function CustomerTourDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { t, locale } = useLanguage();
-  const apiLang = (locale === 'de' ? 'en' : locale) as 'tr' | 'en';
+  const apiLang = locale as 'tr' | 'en' | 'de';
   const tourId = Number(params.tourId);
 
   const queryClient = useQueryClient();
@@ -72,6 +73,8 @@ export default function CustomerTourDetailPage() {
   const [tableStopId, setTableStopId] = useState<number | null>(null);
   // Menu selection dialog
   const [menuStopId, setMenuStopId] = useState<number | null>(null);
+  // Service detail popup
+  const [detailService, setDetailService] = useState<ClientStopMenuServiceDto | null>(null);
 
   // Persisted selections across stops (synced from backend)
   const [selectedTables, setSelectedTables] = useState<Record<number, SelectedTableInfo>>({});
@@ -793,7 +796,7 @@ export default function CustomerTourDetailPage() {
       {/* ============================================ */}
       {/* Menu Selection Dialog */}
       {/* ============================================ */}
-      <Dialog open={!!menuStopId} onOpenChange={() => setMenuStopId(null)}>
+      <Dialog open={!!menuStopId} onOpenChange={(open) => { if (!open && !detailService) setMenuStopId(null); }}>
         <DialogContent className="sm:max-w-lg max-h-[95vh] sm:max-h-[85vh] w-[95vw] sm:w-auto flex flex-col">
           <DialogHeader className="flex-shrink-0">
             <DialogTitle className="flex items-center gap-2">
@@ -826,6 +829,7 @@ export default function CustomerTourDetailPage() {
                     setItemQty={setItemQty}
                     getItemNote={getItemNote}
                     setItemNote={setItemNote}
+                    onServiceClick={setDetailService}
                   />
                 ))}
               </div>
@@ -846,6 +850,15 @@ export default function CustomerTourDetailPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Service Detail Popup */}
+      <ServiceDetailDialog
+        service={detailService}
+        open={!!detailService}
+        onOpenChange={(open) => { if (!open) setDetailService(null); }}
+        showPrice={menuStopId ? (tour?.stops?.find(s => s.id === menuStopId)?.showPriceToCustomer ?? true) : true}
+        t={t}
+      />
 
     </div>
   );
@@ -877,6 +890,7 @@ function InteractiveMenuCategory({
   setItemQty,
   getItemNote,
   setItemNote,
+  onServiceClick,
 }: {
   category: ClientStopMenuCategoryDto;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -888,6 +902,7 @@ function InteractiveMenuCategory({
   setItemQty: (stopId: number, serviceId: number, qty: number) => void;
   getItemNote: (stopId: number, serviceId: number) => string;
   setItemNote: (stopId: number, serviceId: number, note: string) => void;
+  onServiceClick?: (svc: ClientStopMenuServiceDto) => void;
 }) {
   const priceLabel = (type: string) => {
     if (type === 'fixed') return '';
@@ -919,15 +934,17 @@ function InteractiveMenuCategory({
             const qty = getItemQty(stopId, svc.id);
             const note = getItemNote(stopId, svc.id);
             return (
-              <div key={svc.id} className={`rounded-lg transition-colors ${qty > 0 ? 'bg-orange-50/80 ring-1 ring-orange-200' : 'hover:bg-white/60'}`}>
+              <div key={svc.id} className={`rounded-lg transition-colors cursor-pointer ${qty > 0 ? 'bg-orange-50/80 ring-1 ring-orange-200' : 'hover:bg-white/60'}`} onClick={() => onServiceClick?.(svc)}>
                 <div className="flex gap-2 sm:gap-3 p-2">
-                  {svc.imageUrl ? (
-                    <img src={svc.imageUrl} alt={svc.title} className="w-10 h-10 sm:w-14 sm:h-14 rounded-md object-cover flex-shrink-0 shadow-sm" />
-                  ) : (
-                    <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-md bg-stone-100 flex items-center justify-center flex-shrink-0">
-                      <ImageIcon className="h-4 w-4 sm:h-5 sm:w-5 text-stone-300" />
-                    </div>
-                  )}
+                  <div className="flex-shrink-0">
+                    {svc.imageUrl ? (
+                      <img src={svc.imageUrl} alt={svc.title} className="w-10 h-10 sm:w-14 sm:h-14 rounded-md object-cover shadow-sm" />
+                    ) : (
+                      <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-md bg-stone-100 flex items-center justify-center">
+                        <ImageIcon className="h-4 w-4 sm:h-5 sm:w-5 text-stone-300" />
+                      </div>
+                    )}
+                  </div>
                   <div className="flex-1 min-w-0 py-0.5">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
@@ -938,7 +955,7 @@ function InteractiveMenuCategory({
                       </div>
                       {showPrice && (
                         <div className="text-right flex-shrink-0">
-                          <p className="text-sm font-bold text-emerald-700">{Number(svc.basePrice).toFixed(2)} ₺</p>
+                          <p className="text-sm font-bold text-emerald-700">{Number(svc.basePrice).toFixed(2)} {getCurrencySymbol(svc.currency)}</p>
                           {svc.priceType !== 'fixed' && (
                             <p className="text-[10px] text-stone-400">{priceLabel(svc.priceType)}</p>
                           )}
@@ -963,7 +980,7 @@ function InteractiveMenuCategory({
                     )}
                   </div>
                   {/* Quantity controls */}
-                  <div className="shrink-0 flex items-center gap-0.5 sm:gap-1 self-center">
+                  <div className="shrink-0 flex items-center gap-0.5 sm:gap-1 self-center" onClick={(e) => e.stopPropagation()}>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <span tabIndex={0}>
@@ -995,7 +1012,7 @@ function InteractiveMenuCategory({
                 </div>
                 {/* Note input — visible when item is selected */}
                 {qty > 0 && (
-                  <div className="px-2 pb-2">
+                  <div className="px-2 pb-2" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-start gap-2 ml-0 sm:ml-[68px]">
                       <MessageSquare className="h-3.5 w-3.5 text-stone-400 mt-1.5 shrink-0" />
                       <input
@@ -1029,6 +1046,7 @@ function InteractiveMenuCategory({
               setItemQty={setItemQty}
               getItemNote={getItemNote}
               setItemNote={setItemNote}
+              onServiceClick={onServiceClick}
             />
           ))}
         </div>
@@ -1058,6 +1076,10 @@ function MenuBottomBar({
   const totalItems = menuTotalItemCount(stopId);
   const totalPrice = getMenuTotal(stopId, categories);
 
+  // Extract currency from first available service
+  const firstCurrency = categories.flatMap(c => c.services).find(s => s?.currency)?.currency;
+  const currSymbol = getCurrencySymbol(firstCurrency);
+
   if (totalItems === 0) return null;
 
   return (
@@ -1069,7 +1091,7 @@ function MenuBottomBar({
           </p>
           {showPrice && (
             <p className="text-lg font-bold text-orange-600">
-              {t.customer.total}: ₺{totalPrice.toFixed(2)}
+              {t.customer.total}: {currSymbol}{totalPrice.toFixed(2)}
             </p>
           )}
         </div>

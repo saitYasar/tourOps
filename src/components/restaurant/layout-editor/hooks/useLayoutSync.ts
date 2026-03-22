@@ -6,6 +6,7 @@ import { ROOM_COLORS, OBJECT_KIND_LABELS, OBJECT_KIND_CONFIG } from '../types';
 import { parseCoordinates, serializeCoordinates } from '../utils/coordinates';
 import { getTableDefault } from '../utils/tableDefaults';
 import { getChairPositions } from '../utils/chairPositions';
+import { snapToGrid } from '../utils/collision';
 
 // Default dimensions per object kind
 const OBJECT_DEFAULTS: Record<ObjectKind, { w: number; h: number }> = {
@@ -433,8 +434,8 @@ export function useLayoutSync(
         return null;
       }
 
-      const x = 40 + existingRoomsCount * 260;
-      const y = 40;
+      const x = snapToGrid(40 + existingRoomsCount * 260);
+      const y = snapToGrid(40);
 
       try {
         const createData: import('@/lib/api').CreateResourceDto = {
@@ -465,7 +466,7 @@ export function useLayoutSync(
             color: ROOM_COLORS[existingRoomsCount % ROOM_COLORS.length],
             floorId,
             capacity,
-            dirty: false,
+            dirty: true,
             resource: result.data,
           };
           dispatch({ type: 'ADD_ROOM', room: newRoom });
@@ -491,8 +492,8 @@ export function useLayoutSync(
       }
 
       const defaults = getTableDefault(capacity);
-      const x = room.x + 30 + (existingTablesCount % 4) * (defaults.w + 30);
-      const y = room.y + 60 + Math.floor(existingTablesCount / 4) * (defaults.h + 40);
+      const x = snapToGrid(room.x + 30 + (existingTablesCount % 4) * (defaults.w + 30));
+      const y = snapToGrid(room.y + 60 + Math.floor(existingTablesCount / 4) * (defaults.h + 40));
 
       const name = nameOverride ?? (() => {
         const nameSet = new Set(allTableNames);
@@ -582,7 +583,7 @@ export function useLayoutSync(
             capacity,
             isRound: defaults.isRound,
             roomId,
-            dirty: false,
+            dirty: true,
             resource: result.data,
             chairs: createdChairs,
           };
@@ -612,8 +613,8 @@ export function useLayoutSync(
       const tempName = `${label}`;
 
       // Position objects along the bottom of the room, stacked
-      const x = room.x + 10;
-      const y = room.y + room.h - 20 - existingObjectsCount * (defaults.h + 10);
+      const x = snapToGrid(room.x + 10);
+      const y = snapToGrid(room.y + room.h - 20 - existingObjectsCount * (defaults.h + 10));
 
       const color = customColor || (kind === 'free' ? OBJECT_KIND_CONFIG.free.defaultColor : undefined);
 

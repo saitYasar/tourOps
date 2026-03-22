@@ -184,6 +184,16 @@ export function LayoutEditor({
       // Delete / Backspace → delete selected item (clears undo history)
       if ((e.key === 'Delete' || e.key === 'Backspace') && state.selectedItem) {
         e.preventDefault();
+        // Delete children (chairs) first when deleting a table
+        if (state.selectedItem.type === 'table') {
+          const table = state.tables.find(t => t.id === state.selectedItem!.id);
+          if (table?.chairs?.length) {
+            const api = apiAdapter || resourceApi;
+            for (const chair of table.chairs) {
+              try { await api.delete(chair.id); } catch { /* ignore */ }
+            }
+          }
+        }
         await deleteItem(state.selectedItem.type, state.selectedItem.id);
         clearUndoHistory();
         return;
@@ -366,7 +376,7 @@ export function LayoutEditor({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [state.selectedItem, state.tables, state.objects, state.rooms, state.activeFloorId, deleteItem, createTable, createObject, createRoom, dispatch, handleUndo, creating, clearUndoHistory, takeSnapshot, pushUndo, t]);
+  }, [state.selectedItem, state.tables, state.objects, state.rooms, state.activeFloorId, deleteItem, createTable, createObject, createRoom, dispatch, handleUndo, creating, clearUndoHistory, takeSnapshot, pushUndo, t, apiAdapter]);
 
   useEffect(() => {
     if (resources.length > 0 && loadedFloorRef.current === null) {
@@ -488,10 +498,20 @@ export function LayoutEditor({
 
   const handleDelete = useCallback(
     async (itemType: 'room' | 'table' | 'object', id: number) => {
+      // Delete children (chairs) first when deleting a table
+      if (itemType === 'table') {
+        const table = state.tables.find(t => t.id === id);
+        if (table?.chairs?.length) {
+          const api = apiAdapter || resourceApi;
+          for (const chair of table.chairs) {
+            try { await api.delete(chair.id); } catch { /* ignore */ }
+          }
+        }
+      }
       await deleteItem(itemType, id);
       clearUndoHistory();
     },
-    [deleteItem, clearUndoHistory],
+    [deleteItem, clearUndoHistory, state.tables, apiAdapter],
   );
 
   if (!resources.length) {
@@ -595,10 +615,13 @@ export function LayoutEditor({
                 <Label>Salon Kapasitesi (Kişi)</Label>
                 <Input
                   type="number"
-                  value={addRoomCapacity || ''}
+                  value={addRoomCapacity ?? ''}
                   onFocus={(e) => e.target.select()}
-                  onChange={(e) => setAddRoomCapacity(Math.max(1, Number(e.target.value)))}
-                  min={1}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    setAddRoomCapacity(raw === '' ? 0 : Number(raw));
+                  }}
+                  min={0}
                   step={1}
                   placeholder="Örn: 30"
                   onKeyDown={(e) => { if (e.key === 'Enter') handleAddConfirm(); }}
@@ -610,7 +633,7 @@ export function LayoutEditor({
             {addDialog?.type === 'table' && (
               <div className="space-y-2">
                 <Label>{t.venue.capacity}</Label>
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-5 gap-2">
                   {[2, 4, 6, 8].map((cap) => (
                     <TablePreview
                       key={cap}
@@ -619,7 +642,43 @@ export function LayoutEditor({
                       onClick={() => setAddCapacity(cap)}
                     />
                   ))}
+                  <button
+                    type="button"
+                    onClick={() => setAddCapacity(addCapacity > 8 ? addCapacity : 10)}
+                    className={cn(
+                      'flex flex-col items-center justify-center gap-1.5 p-3 rounded-lg border-2 transition-all cursor-pointer',
+                      ![2, 4, 6, 8].includes(addCapacity)
+                        ? 'border-blue-500 bg-blue-50 shadow-sm'
+                        : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                    )}
+                  >
+                    <span className="text-2xl font-bold text-slate-400">+</span>
+                    <span className={cn(
+                      'text-sm font-medium',
+                      ![2, 4, 6, 8].includes(addCapacity) ? 'text-blue-700' : 'text-slate-600',
+                    )}>
+                      {t.venue.customCapacity}
+                    </span>
+                  </button>
                 </div>
+                {![2, 4, 6, 8].includes(addCapacity) && (
+                  <div className="mt-2">
+                    <Input
+                      type="number"
+                      min={0}
+                      value={addCapacity ?? ''}
+                      onFocus={(e) => e.target.select()}
+                      placeholder={t.venue.personCount}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        setAddCapacity(raw === '' ? 0 : parseInt(raw) || 0);
+                      }}
+                      onBlur={() => {
+                        if (addCapacity < 1) setAddCapacity(1);
+                      }}
+                    />
+                  </div>
+                )}
               </div>
             )}
 

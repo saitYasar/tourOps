@@ -66,6 +66,7 @@ type FormData = {
   taxNumber: number;
   taxOffice: string;
   agencyCommissionRate?: number;
+  currency?: 'TRY' | 'EUR' | 'USD';
 };
 
 const countryCodes = [
@@ -866,6 +867,24 @@ export default function OrganizationSetupPage() {
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">%</span>
                     </div>
                     {errors.agencyCommissionRate && <p className="text-xs text-red-500">{errors.agencyCommissionRate.message}</p>}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>{t.restaurant.currency}</Label>
+                    <p className="text-xs text-slate-500">{t.restaurant.currencyDesc}</p>
+                    <Select
+                      value={watch('currency') || 'TRY'}
+                      onValueChange={(val) => setValue('currency', val as 'TRY' | 'EUR' | 'USD')}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="TRY">TRY (₺)</SelectItem>
+                        <SelectItem value="EUR">EUR (€)</SelectItem>
+                        <SelectItem value="USD">USD ($)</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               )}

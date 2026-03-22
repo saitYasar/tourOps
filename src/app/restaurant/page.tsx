@@ -10,7 +10,7 @@ import dynamic from 'next/dynamic';
 import { toast } from 'sonner';
 
 import { organizationApi, locationApi, resourceApi, serviceCategoryApi, preReservationOrgApi } from '@/lib/api';
-import { formatPhoneNumber, cleanPhoneNumber } from '@/lib/utils';
+import { formatPhoneNumber, cleanPhoneNumber, getCurrencySymbol } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 
@@ -54,7 +54,7 @@ const RestaurantMap = dynamic(
 export default function RestaurantDashboard() {
   const { user } = useAuth();
   const { t, locale } = useLanguage();
-  const apiLang = (locale === 'de' ? 'en' : locale) as 'tr' | 'en';
+  const apiLang = locale as 'tr' | 'en' | 'de';
   const router = useRouter();
   const queryClient = useQueryClient();
   // Dialog states
@@ -72,6 +72,7 @@ export default function RestaurantDashboard() {
   const [editPhoneCountryCode, setEditPhoneCountryCode] = useState(90);
   const [editAddress, setEditAddress] = useState('');
   const [editAgencyCommissionRate, setEditAgencyCommissionRate] = useState<number | undefined>(undefined);
+  const [editCurrency, setEditCurrency] = useState<'TRY' | 'EUR' | 'USD'>('TRY');
 
   // Cover image edit state
   const [editCoverImage, setEditCoverImage] = useState<File | null>(null);
@@ -180,6 +181,7 @@ export default function RestaurantDashboard() {
       phoneCountryCode: editPhoneCountryCode,
       address: editAddress,
       agencyCommissionRate: editAgencyCommissionRate,
+      currency: editCurrency,
     }, editCoverImage || undefined),
     onSuccess: (result) => {
       if (result.success) {
@@ -204,6 +206,7 @@ export default function RestaurantDashboard() {
       setEditPhoneCountryCode(organization.phoneCountryCode || 90);
       setEditAddress(organization.address || '');
       setEditAgencyCommissionRate(organization.agencyCommissionRate ?? undefined);
+      setEditCurrency((organization.currency as 'TRY' | 'EUR' | 'USD') || 'TRY');
       setEditCoverImage(null);
       setEditCoverPreview(null);
     }
@@ -460,6 +463,14 @@ export default function RestaurantDashboard() {
                 <p className="text-sm text-slate-500 font-medium">{t.tours.agencyCommission}</p>
                 <p className="text-lg font-semibold text-orange-600">
                   {organization?.agencyCommissionRate != null ? `%${organization.agencyCommissionRate}` : '-'}
+                </p>
+              </div>
+
+              {/* Para Birimi */}
+              <div className="space-y-1">
+                <p className="text-sm text-slate-500 font-medium">{t.restaurant.currency}</p>
+                <p className="text-lg font-semibold text-slate-900">
+                  {organization?.currency ? `${organization.currency} (${getCurrencySymbol(organization.currency)})` : 'TRY (₺)'}
                 </p>
               </div>
 
@@ -941,6 +952,25 @@ export default function RestaurantDashboard() {
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">%</span>
               </div>
+            </div>
+
+            {/* Para Birimi */}
+            <div className="space-y-2">
+              <Label>{t.restaurant.currency}</Label>
+              <p className="text-xs text-slate-500">{t.restaurant.currencyDesc}</p>
+              <Select
+                value={editCurrency}
+                onValueChange={(val) => setEditCurrency(val as 'TRY' | 'EUR' | 'USD')}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="TRY">TRY (₺)</SelectItem>
+                  <SelectItem value="EUR">EUR (€)</SelectItem>
+                  <SelectItem value="USD">USD ($)</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

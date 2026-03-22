@@ -36,6 +36,7 @@ import { toast } from 'sonner';
 
 import { useLanguage } from '@/contexts/LanguageContext';
 import { adminApi, type CompanyDto, type CompanyStatus } from '@/lib/api';
+import { getCurrencySymbol } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -222,6 +223,13 @@ function CompanyDetailCard({
                       ({company.totalReviews} {t.admin.reviewCount})
                     </span>
                   </div>
+                )}
+
+                {/* Currency */}
+                {company.currency && (
+                  <Badge variant="outline" className="text-xs">
+                    {company.currency} ({getCurrencySymbol(company.currency)})
+                  </Badge>
                 )}
 
                 {/* Date */}

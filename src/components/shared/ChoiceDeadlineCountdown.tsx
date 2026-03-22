@@ -11,7 +11,7 @@ interface ChoiceDeadlineCountdownProps {
 }
 
 export function ChoiceDeadlineCountdown({ tourStopId, enabled = true, compact = false }: ChoiceDeadlineCountdownProps) {
-  const { days, hours, minutes, isExpired, isLoading, deadlineTime } = useChoiceDeadline(tourStopId, enabled);
+  const { days, hours, minutes, seconds, isExpired, isLoading, deadlineTime } = useChoiceDeadline(tourStopId, enabled);
   const { t } = useLanguage();
 
   if (isLoading || !deadlineTime) return null;
@@ -29,15 +29,18 @@ export function ChoiceDeadlineCountdown({ tourStopId, enabled = true, compact = 
   const colorClass = isUrgent ? 'text-red-600' : days === 0 ? 'text-amber-600' : 'text-emerald-600';
   const bgClass = isUrgent ? 'bg-red-50 border-red-200' : days === 0 ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200';
 
+  const pad = (n: number) => n.toString().padStart(2, '0');
+
   const parts: string[] = [];
   if (days > 0) parts.push(`${days}g`);
-  if (hours > 0) parts.push(`${hours}s`);
-  parts.push(`${minutes}dk`);
+  parts.push(`${pad(hours)}s`);
+  parts.push(`${pad(minutes)}dk`);
+  parts.push(`${pad(seconds)}sn`);
   const timeStr = parts.join(' ');
 
   if (compact) {
     return (
-      <span className={`inline-flex items-center gap-1 text-xs font-medium ${colorClass}`}>
+      <span className={`inline-flex items-center gap-1 text-xs font-medium tabular-nums ${colorClass}`}>
         <Timer className="h-3 w-3" />
         {timeStr}
       </span>
@@ -45,7 +48,7 @@ export function ChoiceDeadlineCountdown({ tourStopId, enabled = true, compact = 
   }
 
   return (
-    <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-sm font-medium ${bgClass} ${colorClass}`}>
+    <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-sm font-medium tabular-nums ${bgClass} ${colorClass}`}>
       <Timer className="h-4 w-4" />
       <span>{timeStr}</span>
     </div>

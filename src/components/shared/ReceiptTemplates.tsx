@@ -4,6 +4,7 @@ import React from 'react';
 import XLSX from 'xlsx-js-style';
 import { formatDate } from '@/lib/dateUtils';
 import type { AgencyStopChoicesDto, AgencyStopServiceSummaryDto, ClientResourceChoiceItemDto } from '@/lib/api';
+import { getCurrencySymbol } from '@/lib/utils';
 import type { useLanguage } from '@/contexts/LanguageContext';
 
 // ============================================
@@ -81,7 +82,7 @@ export function CompactReceipt({
               <div key={sc.id} className="flex justify-between">
                 <span>{sc.service?.title || `#${sc.serviceId}`}</span>
                 {sc.service?.basePrice != null && (
-                  <span>{sc.quantity} x {Number(sc.service.basePrice).toFixed(2)} ₺</span>
+                  <span>{sc.quantity} x {Number(sc.service.basePrice).toFixed(2)} {getCurrencySymbol(sc.service?.currency)}</span>
                 )}
               </div>
             ))}
@@ -353,6 +354,7 @@ export function ReceiptServiceSummary({
 }) {
   if (!serviceSummary?.services?.length) return null;
 
+  const currSymbol = getCurrencySymbol(serviceSummary.currency || serviceSummary.services[0]?.currency);
   const systemCommissionRate = (serviceSummary as Record<string, unknown>).systemCommissionRate;
   const systemCommissionAmount = (serviceSummary as Record<string, unknown>).systemCommissionAmount;
 
@@ -373,22 +375,22 @@ export function ReceiptServiceSummary({
             <tr key={idx}>
               <td style={{ border: '1px solid #ccc', padding: '5px 8px' }}>{item.serviceName || item.service?.title || ''}</td>
               <td style={{ border: '1px solid #ccc', padding: '5px 8px', textAlign: 'center' }}>{item.totalQuantity}</td>
-              <td style={{ border: '1px solid #ccc', padding: '5px 8px', textAlign: 'right' }}>{Number(item.unitPrice).toFixed(2)} ₺</td>
-              <td style={{ border: '1px solid #ccc', padding: '5px 8px', textAlign: 'right', fontWeight: 500 }}>{Number(item.totalPrice).toFixed(2)} ₺</td>
+              <td style={{ border: '1px solid #ccc', padding: '5px 8px', textAlign: 'right' }}>{Number(item.unitPrice).toFixed(2)} {currSymbol}</td>
+              <td style={{ border: '1px solid #ccc', padding: '5px 8px', textAlign: 'right', fontWeight: 500 }}>{Number(item.totalPrice).toFixed(2)} {currSymbol}</td>
             </tr>
           ))}
         </tbody>
         <tfoot>
           <tr style={{ borderTop: '2px solid #333' }}>
             <td colSpan={3} style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 'bold' }}>{t.tours.grandTotal}</td>
-            <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 'bold', fontSize: '1rem' }}>{Number(serviceSummary.grandTotal).toFixed(2)} ₺</td>
+            <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 'bold', fontSize: '1rem' }}>{Number(serviceSummary.grandTotal).toFixed(2)} {currSymbol}</td>
           </tr>
           {serviceSummary.commissionRate != null && serviceSummary.commissionAmount != null && (
             <tr>
               <td colSpan={3} style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 500, color: '#ea580c' }}>
                 {t.tours.agencyCommission} %{serviceSummary.commissionRate}
               </td>
-              <td style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 600, color: '#ea580c' }}>{Number(serviceSummary.commissionAmount).toFixed(2)} ₺</td>
+              <td style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 600, color: '#ea580c' }}>{Number(serviceSummary.commissionAmount).toFixed(2)} {currSymbol}</td>
             </tr>
           )}
           {systemCommissionRate != null && systemCommissionAmount != null && (
@@ -396,7 +398,7 @@ export function ReceiptServiceSummary({
               <td colSpan={3} style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 500, color: '#7c3aed' }}>
                 {t.tours.systemCommission} %{String(systemCommissionRate)}
               </td>
-              <td style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 600, color: '#7c3aed' }}>{Number(systemCommissionAmount as number).toFixed(2)} ₺</td>
+              <td style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 600, color: '#7c3aed' }}>{Number(systemCommissionAmount as number).toFixed(2)} {currSymbol}</td>
             </tr>
           )}
         </tfoot>

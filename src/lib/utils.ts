@@ -21,3 +21,19 @@ export function formatPhoneNumber(value: string): string {
 export function cleanPhoneNumber(value: string): string {
   return value.replace(/\D/g, '').slice(0, 10);
 }
+
+// ============================================
+// Currency
+// ============================================
+
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  TRY: '₺',
+  USD: '$',
+  EUR: '€',
+  GBP: '£',
+};
+
+export function getCurrencySymbol(currency?: string | null): string {
+  if (!currency) return '₺';
+  return CURRENCY_SYMBOLS[currency.toUpperCase()] || currency;
+}

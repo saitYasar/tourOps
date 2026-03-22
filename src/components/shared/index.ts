@@ -11,4 +11,5 @@ export { ImageCropper } from './ImageCropper';
 export { CompactReceipt, DetailedListReceipt, KitchenSummaryReceipt, ReceiptServiceSummary, handleReceiptPrint, exportReceiptExcel, COMBINATION_COLORS, getResourceLabel } from './ReceiptTemplates';
 export type { ReceiptTemplate, ReceiptTourInfo } from './ReceiptTemplates';
 export { ChoiceDeadlineCountdown } from './ChoiceDeadlineCountdown';
+export { ServiceDetailDialog } from './ServiceDetailDialog';
 // LocationPicker must be imported dynamically due to Leaflet SSR issues

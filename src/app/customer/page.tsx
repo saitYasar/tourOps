@@ -48,7 +48,7 @@ const customerKeys = getAuthStorageKeys('customer');
 
 export default function CustomerDashboard() {
   const { t, locale } = useLanguage();
-  const apiLang = (locale === 'de' ? 'en' : locale) as 'tr' | 'en';
+  const apiLang = locale as 'tr' | 'en' | 'de';
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'dashboard' | 'reservations' | 'serviceRequests' | 'profile'>('dashboard');
   const queryClient = useQueryClient();

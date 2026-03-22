@@ -38,7 +38,7 @@ import { LoadingState, SprinterLoading, ImageCropper } from '@/components/shared
 export default function AgencyDashboard() {
   const { user } = useAuth();
   const { t, locale } = useLanguage();
-  const apiLang = (locale === 'de' ? 'en' : locale) as 'tr' | 'en';
+  const apiLang = locale as 'tr' | 'en' | 'de';
   const router = useRouter();
   const queryClient = useQueryClient();
 

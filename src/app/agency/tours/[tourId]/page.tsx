@@ -48,6 +48,7 @@ import { toast } from 'sonner';
 import dynamic from 'next/dynamic';
 
 import { tourApi, tourStopApi, apiClient, agencyApi } from '@/lib/api';
+import { getCurrencySymbol } from '@/lib/utils';
 import type { ApiTourDto, ApiTourStopDto, CreateTourStopPayload, UpdateTourPayload, ServiceRequestDto, OrganizationPublicDto, TourClientDto, AgencyClientDto, AgencyStopChoicesDto, AgencyStopServiceSummaryDto, CategoryDto, LocationDto, CreateAgencyClientDto } from '@/lib/api';
 import { formatDate, formatShortDateTime } from '@/lib/dateUtils';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -106,7 +107,7 @@ export default function TourDetailPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { t, locale } = useLanguage();
-  const apiLang = (locale === 'de' ? 'en' : locale) as 'tr' | 'en';
+  const apiLang = locale as 'tr' | 'en' | 'de';
   const tourId = Number(params.tourId);
 
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -182,6 +183,7 @@ export default function TourDetailPage() {
     scheduledStartTime: '',
     scheduledEndTime: '',
     showPriceToCustomer: false,
+    maxSpendLimit: '',
   });
   // Fetch agency data for status badge
   const { data: agencyResult } = useQuery({
@@ -483,6 +485,7 @@ export default function TourDetailPage() {
         scheduledStartTime: stopForm.scheduledStartTime ? new Date(stopForm.scheduledStartTime).toISOString() : '',
         scheduledEndTime: stopForm.scheduledEndTime ? new Date(stopForm.scheduledEndTime).toISOString() : '',
         showPriceToCustomer: stopForm.showPriceToCustomer,
+        maxSpendLimit: stopForm.maxSpendLimit !== '' ? Number(stopForm.maxSpendLimit) : null,
       };
       const result = await tourStopApi.create(payload, apiLang);
       if (!result.success) throw new Error(result.error);
@@ -506,6 +509,7 @@ export default function TourDetailPage() {
         scheduledStartTime: stopForm.scheduledStartTime ? new Date(stopForm.scheduledStartTime).toISOString() : undefined,
         scheduledEndTime: stopForm.scheduledEndTime ? new Date(stopForm.scheduledEndTime).toISOString() : undefined,
         showPriceToCustomer: stopForm.showPriceToCustomer,
+        maxSpendLimit: stopForm.maxSpendLimit !== '' ? Number(stopForm.maxSpendLimit) : null,
       }, apiLang);
       if (!result.success) throw new Error(result.error);
       return result.data;
@@ -589,6 +593,7 @@ export default function TourDetailPage() {
       scheduledStartTime: defaults.start,
       scheduledEndTime: defaults.end,
       showPriceToCustomer: false,
+      maxSpendLimit: '',
     });
     setOrgSearch('');
     setSelectedOrgDetail(null);
@@ -603,6 +608,7 @@ export default function TourDetailPage() {
       scheduledStartTime: stop.scheduledStartTime ? stop.scheduledStartTime.substring(0, 16) : '',
       scheduledEndTime: stop.scheduledEndTime ? stop.scheduledEndTime.substring(0, 16) : '',
       showPriceToCustomer: stop.showPriceToCustomer || false,
+      maxSpendLimit: stop.maxSpendLimit != null ? String(stop.maxSpendLimit) : '',
     });
     // Find org from existing data for edit mode
     const existingOrg = organizations?.find((o) => o.id === stop.organizationId);
@@ -626,6 +632,7 @@ export default function TourDetailPage() {
       scheduledStartTime: defaults.start,
       scheduledEndTime: defaults.end,
       showPriceToCustomer: false,
+      maxSpendLimit: '',
     });
     setSelectedOrgDetail(org);
     setOrgSearch(org.name);
@@ -641,6 +648,7 @@ export default function TourDetailPage() {
       scheduledStartTime: '',
       scheduledEndTime: '',
       showPriceToCustomer: false,
+      maxSpendLimit: '',
     });
     setOrgSearch('');
     setSelectedOrgDetail(null);
@@ -1442,7 +1450,9 @@ export default function TourDetailPage() {
                           <LoadingState message={t.common.loading} />
                         ) : !serviceSummary?.services?.length ? (
                           <p className="text-sm text-slate-500 text-center py-4">{t.tours.noChoices}</p>
-                        ) : (
+                        ) : (() => {
+                          const currSymbol = getCurrencySymbol(serviceSummary.currency || serviceSummary.services[0]?.currency);
+                          return (
                           <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                               <thead>
@@ -1470,8 +1480,8 @@ export default function TourDetailPage() {
                                       <tr className={notes.length ? '' : 'border-b last:border-b-0'}>
                                         <td className="py-2">{item.serviceName || item.service?.title}</td>
                                         <td className="py-2 text-center">{item.totalQuantity}</td>
-                                        <td className="py-2 text-right">{Number(item.unitPrice).toFixed(2)} ₺</td>
-                                        <td className="py-2 text-right font-medium">{Number(item.totalPrice).toFixed(2)} ₺</td>
+                                        <td className="py-2 text-right">{Number(item.unitPrice).toFixed(2)} {currSymbol}</td>
+                                        <td className="py-2 text-right font-medium">{Number(item.totalPrice).toFixed(2)} {currSymbol}</td>
                                       </tr>
                                       {notes.length > 0 && (
                                         <tr className="border-b last:border-b-0">
@@ -1491,14 +1501,14 @@ export default function TourDetailPage() {
                               <tfoot>
                                 <tr className="border-t-2">
                                   <td colSpan={3} className="py-2 font-semibold text-right">{t.tours.grandTotal}</td>
-                                  <td className="py-2 text-right font-bold text-lg">{Number(serviceSummary.grandTotal).toFixed(2)} ₺</td>
+                                  <td className="py-2 text-right font-bold text-lg">{Number(serviceSummary.grandTotal).toFixed(2)} {currSymbol}</td>
                                 </tr>
                                 {serviceSummary.commissionRate != null && serviceSummary.commissionAmount != null && (
                                   <tr>
                                     <td colSpan={3} className="py-1 text-right text-sm font-medium text-orange-600">
                                       {t.tours.agencyCommission} %{serviceSummary.commissionRate}
                                     </td>
-                                    <td className="py-1 text-right font-semibold text-orange-600">{Number(serviceSummary.commissionAmount).toFixed(2)} ₺</td>
+                                    <td className="py-1 text-right font-semibold text-orange-600">{Number(serviceSummary.commissionAmount).toFixed(2)} {currSymbol}</td>
                                   </tr>
                                 )}
                                 {(serviceSummary as Record<string, unknown>).systemCommissionRate != null && (serviceSummary as Record<string, unknown>).systemCommissionAmount != null && (
@@ -1506,13 +1516,14 @@ export default function TourDetailPage() {
                                     <td colSpan={3} className="py-1 text-right text-sm font-medium text-violet-600">
                                       {t.tours.systemCommission} %{String((serviceSummary as Record<string, unknown>).systemCommissionRate)}
                                     </td>
-                                    <td className="py-1 text-right font-semibold text-violet-600">{Number((serviceSummary as Record<string, unknown>).systemCommissionAmount).toFixed(2)} ₺</td>
+                                    <td className="py-1 text-right font-semibold text-violet-600">{Number((serviceSummary as Record<string, unknown>).systemCommissionAmount).toFixed(2)} {currSymbol}</td>
                                   </tr>
                                 )}
                               </tfoot>
                             </table>
                           </div>
-                        )}
+                          );
+                        })()}
                       </CardContent>
                     </Card>
 
@@ -1597,7 +1608,7 @@ export default function TourDetailPage() {
                                                 <div className="flex items-center gap-3 text-slate-600">
                                                   <span>{sc.quantity}x</span>
                                                   {sc.service?.basePrice != null && (
-                                                    <span className="font-medium">{(Number(sc.service.basePrice) * sc.quantity).toFixed(2)} ₺</span>
+                                                    <span className="font-medium">{(Number(sc.service.basePrice) * sc.quantity).toFixed(2)} {getCurrencySymbol(sc.service?.currency)}</span>
                                                   )}
                                                 </div>
                                               </div>
@@ -2030,12 +2041,17 @@ export default function TourDetailPage() {
                             <p className="text-xs text-slate-500 truncate max-w-[320px]" title={org.address}>{org.address}</p>
                           )}
                         </div>
-                        {org.averageRating > 0 && (
-                          <div className="flex items-center gap-0.5 text-xs text-amber-600 shrink-0">
-                            <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                            {Number(org.averageRating).toFixed(1)}
-                          </div>
-                        )}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {org.currency && org.currency !== 'TRY' && (
+                            <span className="text-xs text-slate-500 font-medium">{org.currency}</span>
+                          )}
+                          {org.averageRating > 0 && (
+                            <div className="flex items-center gap-0.5 text-xs text-amber-600">
+                              <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                              {Number(org.averageRating).toFixed(1)}
+                            </div>
+                          )}
+                        </div>
                       </button>
                     ))}
                   </div>
@@ -2150,6 +2166,18 @@ export default function TourDetailPage() {
                   onCheckedChange={(checked) => setStopForm((prev) => ({ ...prev, showPriceToCustomer: checked }))}
                 />
                 <Label>{t.tours.showPriceToCustomer}</Label>
+              </div>
+
+              <div className="space-y-2">
+                <Label>{t.tours.maxSpendLimit}</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={stopForm.maxSpendLimit}
+                  onChange={(e) => setStopForm((prev) => ({ ...prev, maxSpendLimit: e.target.value }))}
+                  placeholder={t.tours.maxSpendLimitPlaceholder}
+                />
               </div>
             </div>
             <DialogFooter>

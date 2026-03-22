@@ -28,6 +28,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useDebounce } from '@/hooks/useDebounce';
 import { adminApi } from '@/lib/api';
 import type { ApiTourDto, AgencyStopChoicesDto, AgencyStopServiceSummaryDto } from '@/lib/api';
+import { getCurrencySymbol } from '@/lib/utils';
 import { formatDate, formatShortDateTime } from '@/lib/dateUtils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -94,7 +95,7 @@ export default function AdminToursPage() {
   const [receiptTemplate, setReceiptTemplate] = useState<ReceiptTemplate>('compact');
   const printRef = useRef<HTMLDivElement>(null);
 
-  const lang = (locale === 'de' ? 'en' : locale) as 'tr' | 'en';
+  const lang = locale as 'tr' | 'en' | 'de';
 
   // Reset page on filter change
   const prevFilters = useRef({ debouncedSearch, statusFilter, agencyFilter, sortBy, sortOrder });
@@ -598,7 +599,7 @@ export default function AdminToursPage() {
                                     {p.pricePaid != null && (
                                       <div className="flex items-center gap-2 text-slate-600">
                                         <DollarSign className="h-3 w-3 text-slate-400" />
-                                        <span className="font-medium text-slate-800">{Number(p.pricePaid).toFixed(2)} ₺</span>
+                                        <span className="font-medium text-slate-800">{Number(p.pricePaid).toFixed(2)} {getCurrencySymbol()}</span>
                                       </div>
                                     )}
                                   </div>
@@ -722,7 +723,9 @@ export default function AdminToursPage() {
                                   <LoadingState message={t.common.loading} />
                                 ) : !serviceSummary?.services?.length ? (
                                   <p className="text-sm text-slate-500 text-center py-4">{t.tours.noChoices}</p>
-                                ) : (
+                                ) : (() => {
+                                  const currSymbol = getCurrencySymbol(serviceSummary.currency || serviceSummary.services[0]?.currency);
+                                  return (
                                   <div className="overflow-x-auto">
                                     <table className="w-full text-sm">
                                       <thead>
@@ -750,8 +753,8 @@ export default function AdminToursPage() {
                                               <tr className={notes.length ? '' : 'border-b last:border-b-0'}>
                                                 <td className="py-2">{item.serviceName || item.service?.title}</td>
                                                 <td className="py-2 text-center">{item.totalQuantity}</td>
-                                                <td className="py-2 text-right">{Number(item.unitPrice).toFixed(2)} ₺</td>
-                                                <td className="py-2 text-right font-medium">{Number(item.totalPrice).toFixed(2)} ₺</td>
+                                                <td className="py-2 text-right">{Number(item.unitPrice).toFixed(2)} {currSymbol}</td>
+                                                <td className="py-2 text-right font-medium">{Number(item.totalPrice).toFixed(2)} {currSymbol}</td>
                                               </tr>
                                               {notes.length > 0 && (
                                                 <tr className="border-b last:border-b-0">
@@ -771,14 +774,14 @@ export default function AdminToursPage() {
                                       <tfoot>
                                         <tr className="border-t-2">
                                           <td colSpan={3} className="py-2 font-semibold text-right">{t.tours.grandTotal}</td>
-                                          <td className="py-2 text-right font-bold text-lg">{Number(serviceSummary.grandTotal).toFixed(2)} ₺</td>
+                                          <td className="py-2 text-right font-bold text-lg">{Number(serviceSummary.grandTotal).toFixed(2)} {currSymbol}</td>
                                         </tr>
                                         {serviceSummary.commissionRate != null && serviceSummary.commissionAmount != null && (
                                           <tr>
                                             <td colSpan={3} className="py-1 text-right text-sm font-medium text-orange-600">
                                               {t.tours.agencyCommission} %{serviceSummary.commissionRate}
                                             </td>
-                                            <td className="py-1 text-right font-semibold text-orange-600">{Number(serviceSummary.commissionAmount).toFixed(2)} ₺</td>
+                                            <td className="py-1 text-right font-semibold text-orange-600">{Number(serviceSummary.commissionAmount).toFixed(2)} {currSymbol}</td>
                                           </tr>
                                         )}
                                         {(serviceSummary as Record<string, unknown>).systemCommissionRate != null && (serviceSummary as Record<string, unknown>).systemCommissionAmount != null && (
@@ -786,13 +789,14 @@ export default function AdminToursPage() {
                                             <td colSpan={3} className="py-1 text-right text-sm font-medium text-violet-600">
                                               {t.tours.systemCommission} %{String((serviceSummary as Record<string, unknown>).systemCommissionRate)}
                                             </td>
-                                            <td className="py-1 text-right font-semibold text-violet-600">{Number((serviceSummary as Record<string, unknown>).systemCommissionAmount).toFixed(2)} ₺</td>
+                                            <td className="py-1 text-right font-semibold text-violet-600">{Number((serviceSummary as Record<string, unknown>).systemCommissionAmount).toFixed(2)} {currSymbol}</td>
                                           </tr>
                                         )}
                                       </tfoot>
                                     </table>
                                   </div>
-                                )}
+                                  );
+                                })()}
                               </CardContent>
                             </Card>
 
@@ -880,7 +884,7 @@ export default function AdminToursPage() {
                                                         <div className="flex items-center gap-3 text-slate-600 shrink-0">
                                                           <span>{sc.quantity}x</span>
                                                           {sc.service?.basePrice != null && (
-                                                            <span className="font-medium">{(Number(sc.service.basePrice) * sc.quantity).toFixed(2)} ₺</span>
+                                                            <span className="font-medium">{(Number(sc.service.basePrice) * sc.quantity).toFixed(2)} {getCurrencySymbol(sc.service?.currency)}</span>
                                                           )}
                                                         </div>
                                                       </div>

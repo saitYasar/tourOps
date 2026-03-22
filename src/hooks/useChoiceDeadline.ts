@@ -6,6 +6,7 @@ interface DeadlineState {
   days: number;
   hours: number;
   minutes: number;
+  seconds: number;
   isExpired: boolean;
   isLoading: boolean;
   deadlineTime?: string;
@@ -16,14 +17,14 @@ export function useChoiceDeadline(tourStopId: number | null | undefined, enabled
     queryKey: ['choice-deadline', tourStopId],
     queryFn: () => apiClient.getChoiceDeadlineRemaining(tourStopId!),
     enabled: enabled && !!tourStopId,
-    refetchInterval: 60_000, // refetch every minute
+    refetchInterval: 60_000,
     staleTime: 30_000,
   });
 
   const deadline = data as ChoiceDeadlineRemainingDto | undefined;
 
-  const [remaining, setRemaining] = useState<{ days: number; hours: number; minutes: number; isExpired: boolean }>({
-    days: 0, hours: 0, minutes: 0, isExpired: true,
+  const [remaining, setRemaining] = useState<{ days: number; hours: number; minutes: number; seconds: number; isExpired: boolean }>({
+    days: 0, hours: 0, minutes: 0, seconds: 0, isExpired: true,
   });
 
   useEffect(() => {
@@ -34,18 +35,19 @@ export function useChoiceDeadline(tourStopId: number | null | undefined, enabled
       const end = new Date(deadline.deadlineTime).getTime();
       const diff = end - now;
       if (diff <= 0) {
-        setRemaining({ days: 0, hours: 0, minutes: 0, isExpired: true });
+        setRemaining({ days: 0, hours: 0, minutes: 0, seconds: 0, isExpired: true });
         return;
       }
-      const totalMinutes = Math.floor(diff / 60_000);
-      const days = Math.floor(totalMinutes / (60 * 24));
-      const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
-      const minutes = totalMinutes % 60;
-      setRemaining({ days, hours, minutes, isExpired: false });
+      const totalSeconds = Math.floor(diff / 1000);
+      const days = Math.floor(totalSeconds / 86400);
+      const hours = Math.floor((totalSeconds % 86400) / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+      setRemaining({ days, hours, minutes, seconds, isExpired: false });
     };
 
     tick();
-    const interval = setInterval(tick, 30_000); // update every 30s
+    const interval = setInterval(tick, 1000); // update every second
     return () => clearInterval(interval);
   }, [deadline?.deadlineTime]);
 

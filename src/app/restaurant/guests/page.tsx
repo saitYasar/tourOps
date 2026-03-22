@@ -14,6 +14,9 @@ import {
   RotateCcw,
   User as UserIcon,
   FileSpreadsheet,
+  Info,
+  Users,
+  Clock,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -24,6 +27,7 @@ import {
   type AgencyStopChoicesDto,
   type AgencyStopServiceSummaryDto,
 } from '@/lib/api';
+import { getCurrencySymbol } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatDate } from '@/lib/dateUtils';
@@ -74,7 +78,7 @@ export default function RestaurantGuestsPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { t, locale } = useLanguage();
-  const apiLang = (locale === 'de' ? 'en' : locale) as 'tr' | 'en';
+  const apiLang = locale as 'tr' | 'en' | 'de';
   const printRef = useRef<HTMLDivElement>(null);
 
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -278,6 +282,73 @@ export default function RestaurantGuestsPage() {
               </Card>
             ) : (
               <div className="space-y-4">
+                {/* Reservation Info */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Info className="h-5 w-5" />
+                      {t.guests.reservationInfo}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      <div>
+                        <p className="text-xs text-slate-500 mb-0.5">{t.guests.tourName}</p>
+                        <p className="text-sm font-medium">{selectedReservation.tour?.tourName || '-'}</p>
+                      </div>
+                      {selectedReservation.tour?.tourCode && (
+                        <div>
+                          <p className="text-xs text-slate-500 mb-0.5">{t.guests.tourCode}</p>
+                          <p className="text-sm font-medium">{selectedReservation.tour.tourCode}</p>
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-xs text-slate-500 mb-0.5">{t.guests.date}</p>
+                        <p className="text-sm font-medium flex items-center gap-1">
+                          <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                          {formatDate(selectedReservation.tour?.startDate)}
+                          {selectedReservation.tour?.endDate && ` - ${formatDate(selectedReservation.tour.endDate)}`}
+                        </p>
+                      </div>
+                      {selectedReservation.tour?.agency?.name && (
+                        <div>
+                          <p className="text-xs text-slate-500 mb-0.5">{t.guests.agency}</p>
+                          <p className="text-sm font-medium">{selectedReservation.tour.agency.name}</p>
+                        </div>
+                      )}
+                      {selectedReservation.headcount != null && (
+                        <div>
+                          <p className="text-xs text-slate-500 mb-0.5">{t.guests.headcount}</p>
+                          <p className="text-sm font-medium flex items-center gap-1">
+                            <Users className="h-3.5 w-3.5 text-slate-400" />
+                            {selectedReservation.headcount}
+                          </p>
+                        </div>
+                      )}
+                      {(selectedReservation.scheduledStartTime || selectedReservation.scheduledEndTime) && (
+                        <div>
+                          <p className="text-xs text-slate-500 mb-0.5">{t.guests.scheduledTime}</p>
+                          <p className="text-sm font-medium flex items-center gap-1">
+                            <Clock className="h-3.5 w-3.5 text-slate-400" />
+                            {selectedReservation.scheduledStartTime?.slice(0, 5) || ''}
+                            {selectedReservation.scheduledEndTime ? ` - ${selectedReservation.scheduledEndTime.slice(0, 5)}` : ''}
+                          </p>
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-xs text-slate-500 mb-0.5">{t.guests.choicesStatus}</p>
+                        <ChoicesStatusBadge status={selectedReservation.choicesStatus} t={t} />
+                      </div>
+                    </div>
+                    {selectedReservation.note && (
+                      <div className="mt-3 pt-3 border-t">
+                        <p className="text-xs text-slate-500 mb-0.5">{t.guests.note}</p>
+                        <p className="text-sm text-slate-700">{selectedReservation.note}</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
                 {/* Service Summary */}
                 <Card>
                   <CardHeader className="pb-2">
@@ -291,7 +362,9 @@ export default function RestaurantGuestsPage() {
                       <LoadingState message={t.common.loading} />
                     ) : !serviceSummary?.services?.length ? (
                       <p className="text-sm text-slate-500 text-center py-4">{t.guests.noChoices}</p>
-                    ) : (
+                    ) : (() => {
+                      const currSymbol = getCurrencySymbol(serviceSummary.currency || serviceSummary.services[0]?.currency);
+                      return (
                       <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                           <thead>
@@ -319,8 +392,8 @@ export default function RestaurantGuestsPage() {
                                   <tr className={notes.length ? '' : 'border-b last:border-b-0'}>
                                     <td className="py-2">{item.serviceName || item.service?.title}</td>
                                     <td className="py-2 text-center">{item.totalQuantity}</td>
-                                    <td className="py-2 text-right">{Number(item.unitPrice).toFixed(2)} ₺</td>
-                                    <td className="py-2 text-right font-medium">{Number(item.totalPrice).toFixed(2)} ₺</td>
+                                    <td className="py-2 text-right">{Number(item.unitPrice).toFixed(2)} {currSymbol}</td>
+                                    <td className="py-2 text-right font-medium">{Number(item.totalPrice).toFixed(2)} {currSymbol}</td>
                                   </tr>
                                   {notes.length > 0 && (
                                     <tr key={`notes-${svcId}`} className="border-b last:border-b-0">
@@ -340,14 +413,14 @@ export default function RestaurantGuestsPage() {
                           <tfoot>
                             <tr className="border-t-2">
                               <td colSpan={3} className="py-2 font-semibold text-right">{t.tours.grandTotal}</td>
-                              <td className="py-2 text-right font-bold text-lg">{Number(serviceSummary.grandTotal).toFixed(2)} ₺</td>
+                              <td className="py-2 text-right font-bold text-lg">{Number(serviceSummary.grandTotal).toFixed(2)} {currSymbol}</td>
                             </tr>
                             {serviceSummary.commissionRate != null && serviceSummary.commissionAmount != null && (
                               <tr>
                                 <td colSpan={3} className="py-1 text-right text-sm font-medium text-orange-600">
                                   {t.tours.agencyCommission} %{serviceSummary.commissionRate}
                                 </td>
-                                <td className="py-1 text-right font-semibold text-orange-600">{Number(serviceSummary.commissionAmount).toFixed(2)} ₺</td>
+                                <td className="py-1 text-right font-semibold text-orange-600">{Number(serviceSummary.commissionAmount).toFixed(2)} {currSymbol}</td>
                               </tr>
                             )}
                             {(serviceSummary as Record<string, unknown>).systemCommissionRate != null && (serviceSummary as Record<string, unknown>).systemCommissionAmount != null && (
@@ -355,13 +428,14 @@ export default function RestaurantGuestsPage() {
                                 <td colSpan={3} className="py-1 text-right text-sm font-medium text-violet-600">
                                   {t.tours.systemCommission} %{String((serviceSummary as Record<string, unknown>).systemCommissionRate)}
                                 </td>
-                                <td className="py-1 text-right font-semibold text-violet-600">{Number((serviceSummary as Record<string, unknown>).systemCommissionAmount).toFixed(2)} ₺</td>
+                                <td className="py-1 text-right font-semibold text-violet-600">{Number((serviceSummary as Record<string, unknown>).systemCommissionAmount).toFixed(2)} {currSymbol}</td>
                               </tr>
                             )}
                           </tfoot>
                         </table>
                       </div>
-                    )}
+                      );
+                    })()}
                   </CardContent>
                 </Card>
 
@@ -446,7 +520,7 @@ export default function RestaurantGuestsPage() {
                                             <div className="flex items-center gap-3 text-slate-600">
                                               <span>{sc.quantity}x</span>
                                               {sc.service?.basePrice != null && (
-                                                <span className="font-medium">{(Number(sc.service.basePrice) * sc.quantity).toFixed(2)} ₺</span>
+                                                <span className="font-medium">{(Number(sc.service.basePrice) * sc.quantity).toFixed(2)} {getCurrencySymbol(sc.service?.currency)}</span>
                                               )}
                                             </div>
                                           </div>

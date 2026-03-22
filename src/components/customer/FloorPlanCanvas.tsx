@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect, useLayoutEffect, useCallback } from 'react';
 import { Stage, Layer, Rect, Group, Text, Circle, Line } from 'react-konva';
 import type Konva from 'konva';
 import type { ResourceDto } from '@/lib/api';
@@ -10,18 +10,24 @@ const ROOM_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC
 
 const CHAIR_W = 10;
 const CHAIR_H = 10;
-const CHAIR_GAP = 3;
+const CHAIR_GAP = 6;
 
-// Table size defaults by capacity (matching tableDefaults.ts)
+// Table size defaults by capacity — wide/slim proportions
 const TABLE_DEFAULTS: Record<number, { w: number; h: number; isRound: boolean }> = {
   2: { w: 50, h: 50, isRound: true },
-  4: { w: 80, h: 50, isRound: false },
-  6: { w: 100, h: 55, isRound: false },
-  8: { w: 130, h: 60, isRound: false },
+  4: { w: 90, h: 35, isRound: false },
+  6: { w: 120, h: 38, isRound: false },
+  8: { w: 160, h: 40, isRound: false },
 };
 
 function getTableDefault(capacity: number) {
-  return TABLE_DEFAULTS[capacity] || TABLE_DEFAULTS[4];
+  if (TABLE_DEFAULTS[capacity]) return TABLE_DEFAULTS[capacity];
+  if (capacity > 8) {
+    const perSide = Math.ceil(capacity / 2);
+    // Wide and slim: width grows with chairs, height stays thin
+    return { w: Math.min(600, perSide * (CHAIR_W + CHAIR_GAP) + 40), h: 40, isRound: false };
+  }
+  return TABLE_DEFAULTS[4];
 }
 
 // ── Coordinate parsing (handles string, object, array) ─────────
@@ -147,13 +153,14 @@ function resourceToTable(
   // Get number of chairs from children
   const chairCount = table.children?.length ?? capacity;
 
+  // Always use capacity-based slim dimensions (ignore stored width/height for customer view)
   return {
     id: table.id,
     name: table.name,
     x,
     y,
-    w: table.width ?? coords.w ?? defaults.w,
-    h: table.height ?? coords.h ?? defaults.h,
+    w: defaults.w,
+    h: defaults.h,
     r: table.rotation ?? coords.r ?? 0,
     capacity,
     isRound: defaults.isRound,
@@ -242,7 +249,6 @@ export function FloorPlanCanvas({ rooms, tablesMap, selectedTableId, onTableClic
   const [panX, setPanX] = useState(0);
   const [panY, setPanY] = useState(0);
   const [hoveredTableId, setHoveredTableId] = useState<number | null>(null);
-  const [ready, setReady] = useState(false);
 
   // Convert rooms and tables to editor types
   const editorRooms = rooms.map((r, i) => resourceToRoom(r, i));
@@ -254,52 +260,62 @@ export function FloorPlanCanvas({ rooms, tablesMap, selectedTableId, onTableClic
     });
   }
 
-  // Fit canvas to container
-  useEffect(() => {
+  // Measure container synchronously before paint
+  useLayoutEffect(() => {
     const container = containerRef.current;
     if (!container) return;
-
-    const updateSize = () => {
-      const w = container.offsetWidth;
-      const h = container.offsetHeight;
-      if (w > 0 && h > 0) {
-        setContainerSize({ width: w, height: h });
-        setReady(true);
-      }
-    };
-
-    requestAnimationFrame(updateSize);
-    const observer = new ResizeObserver(updateSize);
+    const w = container.offsetWidth;
+    const h = container.offsetHeight;
+    if (w > 0 && h > 0) {
+      setContainerSize({ width: w, height: h });
+    }
+    const observer = new ResizeObserver(() => {
+      const nw = container.offsetWidth;
+      const nh = container.offsetHeight;
+      if (nw > 0 && nh > 0) setContainerSize({ width: nw, height: nh });
+    });
     observer.observe(container);
     return () => observer.disconnect();
   }, []);
 
-  // Auto-fit: calculate bounds and center
-  useEffect(() => {
-    if (editorRooms.length === 0 || !ready || containerSize.width === 0) return;
+  // Auto-fit: zoom to tables if they exist, otherwise zoom to rooms
+  useLayoutEffect(() => {
+    if (editorRooms.length === 0 || containerSize.width === 0) return;
 
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (const room of editorRooms) {
-      minX = Math.min(minX, room.x);
-      minY = Math.min(minY, room.y);
-      maxX = Math.max(maxX, room.x + room.w);
-      maxY = Math.max(maxY, room.y + room.h);
+
+    // Prefer zooming to table bounds (tables may occupy a small area of a large room)
+    if (editorTables.length > 0) {
+      for (const table of editorTables) {
+        const chairOffset = CHAIR_W + CHAIR_GAP + 5;
+        minX = Math.min(minX, table.x - chairOffset);
+        minY = Math.min(minY, table.y - chairOffset);
+        maxX = Math.max(maxX, table.x + table.w + chairOffset);
+        maxY = Math.max(maxY, table.y + table.h + chairOffset);
+      }
+    } else {
+      for (const room of editorRooms) {
+        minX = Math.min(minX, room.x);
+        minY = Math.min(minY, room.y);
+        maxX = Math.max(maxX, room.x + room.w);
+        maxY = Math.max(maxY, room.y + room.h);
+      }
     }
 
     if (minX === Infinity) return;
 
-    const padding = 40;
+    const padding = 30;
     const contentW = maxX - minX + padding * 2;
     const contentH = maxY - minY + padding * 2;
     const scaleX = containerSize.width / contentW;
     const scaleY = containerSize.height / contentH;
-    const fitZoom = Math.min(scaleX, scaleY, 2);
+    const fitZoom = Math.min(scaleX, scaleY, 3);
 
     setZoom(fitZoom);
     setPanX(-minX * fitZoom + padding * fitZoom);
     setPanY(-minY * fitZoom + padding * fitZoom);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rooms, containerSize, ready]);
+  }, [rooms, containerSize]);
 
   const handleWheel = useCallback((e: Konva.KonvaEventObject<WheelEvent>) => {
     e.evt.preventDefault();
@@ -321,7 +337,7 @@ export function FloorPlanCanvas({ rooms, tablesMap, selectedTableId, onTableClic
       className="bg-slate-50 rounded-xl border overflow-hidden"
       style={{ height: 450 }}
     >
-      {ready && containerSize.width > 0 && containerSize.height > 0 && (
+      {containerSize.width > 0 && containerSize.height > 0 && (
         <Stage
           ref={stageRef}
           width={containerSize.width}

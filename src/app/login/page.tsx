@@ -293,7 +293,7 @@ function LoginPageContent() {
         </div>
 
         <p className="text-white/50 text-sm relative z-10">
-          &copy; 2026 TourOps. All rights reserved.
+          &copy; 2026 HerHafta. {t.auth.allRightsReserved}
         </p>
       </div>
 

@@ -13,8 +13,8 @@ const siteUrl = 'https://tourops.app';
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: 'TourOps - Tur Yönetim Sistemi',
-    template: '%s | TourOps',
+    default: 'HerHafta - Tur Yönetim Sistemi',
+    template: '%s | HerHafta',
   },
   description:
     'Acenteler, işletmeler ve gezginler için hepsi bir arada tur yönetim platformu. Turları planlayın, işletmelerle bağlantı kurun.',
@@ -25,8 +25,8 @@ export const metadata: Metadata = {
     'turizm platformu',
     'tur operatörü',
   ],
-  authors: [{ name: 'TourOps' }],
-  creator: 'TourOps',
+  authors: [{ name: 'HerHafta' }],
+  creator: 'HerHafta',
   icons: {
     icon: '/favicon.svg',
   },
@@ -34,8 +34,8 @@ export const metadata: Metadata = {
     type: 'website',
     locale: 'tr_TR',
     url: siteUrl,
-    siteName: 'TourOps',
-    title: 'TourOps - Tur Yönetiminin Dijital Merkezi',
+    siteName: 'HerHafta',
+    title: 'HerHafta - Tur Yönetiminin Dijital Merkezi',
     description:
       'Acenteler, işletmeler ve gezginler için hepsi bir arada tur yönetim platformu.',
     images: [
@@ -43,13 +43,13 @@ export const metadata: Metadata = {
         url: '/og-image.png',
         width: 1200,
         height: 630,
-        alt: 'TourOps - Tur Yönetim Platformu',
+        alt: 'HerHafta - Tur Yönetim Platformu',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'TourOps - Tur Yönetiminin Dijital Merkezi',
+    title: 'HerHafta - Tur Yönetiminin Dijital Merkezi',
     description:
       'Acenteler, işletmeler ve gezginler için hepsi bir arada tur yönetim platformu.',
     images: ['/og-image.png'],

@@ -98,18 +98,19 @@ export function LayoutInspector({
           <Label className="text-xs">Salon Kapasitesi</Label>
           <Input
             type="number"
-            value={selectedRoom.capacity || ''}
+            value={selectedRoom.capacity ?? ''}
             onFocus={(e) => e.target.select()}
-            onChange={(e) =>
+            onChange={(e) => {
+              const raw = e.target.value;
               dispatch({
                 type: 'UPDATE_ROOM_PROPERTY',
                 id: selectedRoom.id,
                 key: 'capacity',
-                value: Math.max(1, Number(e.target.value)),
-              })
-            }
+                value: raw === '' ? 0 : Number(raw),
+              });
+            }}
             className="h-8"
-            min={1}
+            min={0}
             step={1}
           />
         </div>
@@ -119,18 +120,24 @@ export function LayoutInspector({
             <Label className="text-xs">{le?.width ?? 'Genişlik'}</Label>
             <Input
               type="number"
-              value={selectedRoom.w || ''}
+              value={selectedRoom.w ?? ''}
               onFocus={(e) => e.target.select()}
-              onChange={(e) =>
+              onChange={(e) => {
+                const raw = e.target.value;
                 dispatch({
                   type: 'UPDATE_ROOM_PROPERTY',
                   id: selectedRoom.id,
                   key: 'w',
-                  value: Math.max(100, Number(e.target.value)),
-                })
-              }
+                  value: raw === '' ? 0 : Number(raw),
+                });
+              }}
+              onBlur={() => {
+                if (selectedRoom.w < 100) {
+                  dispatch({ type: 'UPDATE_ROOM_PROPERTY', id: selectedRoom.id, key: 'w', value: 100 });
+                }
+              }}
               className="h-8"
-              min={100}
+              min={0}
               step={20}
             />
           </div>
@@ -138,18 +145,24 @@ export function LayoutInspector({
             <Label className="text-xs">{le?.height ?? 'Yükseklik'}</Label>
             <Input
               type="number"
-              value={selectedRoom.h || ''}
+              value={selectedRoom.h ?? ''}
               onFocus={(e) => e.target.select()}
-              onChange={(e) =>
+              onChange={(e) => {
+                const raw = e.target.value;
                 dispatch({
                   type: 'UPDATE_ROOM_PROPERTY',
                   id: selectedRoom.id,
                   key: 'h',
-                  value: Math.max(100, Number(e.target.value)),
-                })
-              }
+                  value: raw === '' ? 0 : Number(raw),
+                });
+              }}
+              onBlur={() => {
+                if (selectedRoom.h < 100) {
+                  dispatch({ type: 'UPDATE_ROOM_PROPERTY', id: selectedRoom.id, key: 'h', value: 100 });
+                }
+              }}
               className="h-8"
-              min={100}
+              min={0}
               step={20}
             />
           </div>
@@ -381,18 +394,24 @@ export function LayoutInspector({
               <Label className="text-xs">{le?.length ?? 'Uzunluk'}</Label>
               <Input
                 type="number"
-                value={selectedObject.w || ''}
+                value={selectedObject.w ?? ''}
                 onFocus={(e) => e.target.select()}
-                onChange={(e) =>
+                onChange={(e) => {
+                  const raw = e.target.value;
                   dispatch({
                     type: 'UPDATE_OBJECT_PROPERTY',
                     id: selectedObject.id,
                     key: 'w',
-                    value: Math.max(10, Number(e.target.value)),
-                  })
-                }
+                    value: raw === '' ? 0 : Number(raw),
+                  });
+                }}
+                onBlur={() => {
+                  if (selectedObject.w < 10) {
+                    dispatch({ type: 'UPDATE_OBJECT_PROPERTY', id: selectedObject.id, key: 'w', value: 10 });
+                  }
+                }}
                 className="h-8"
-                min={10}
+                min={0}
                 step={10}
               />
             </div>
@@ -402,18 +421,24 @@ export function LayoutInspector({
             {config.thicknessEditable ? (
               <Input
                 type="number"
-                value={selectedObject.h || ''}
+                value={selectedObject.h ?? ''}
                 onFocus={(e) => e.target.select()}
-                onChange={(e) =>
+                onChange={(e) => {
+                  const raw = e.target.value;
                   dispatch({
                     type: 'UPDATE_OBJECT_PROPERTY',
                     id: selectedObject.id,
                     key: 'h',
-                    value: Math.max(10, Number(e.target.value)),
-                  })
-                }
+                    value: raw === '' ? 0 : Number(raw),
+                  });
+                }}
+                onBlur={() => {
+                  if (selectedObject.h < 10) {
+                    dispatch({ type: 'UPDATE_OBJECT_PROPERTY', id: selectedObject.id, key: 'h', value: 10 });
+                  }
+                }}
                 className="h-8"
-                min={10}
+                min={0}
                 step={10}
               />
             ) : (

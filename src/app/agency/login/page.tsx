@@ -79,7 +79,7 @@ function AgencyClientLoginContent() {
   const [lastName, setLastName] = useState('');
 
   // Fetch agency info by UUID (re-fetch on language change for translated description)
-  const apiLang = locale === 'de' ? 'en' : locale;
+  const apiLang = locale as 'tr' | 'en' | 'de';
   useEffect(() => {
     if (!uuid) return;
     setAgencyLoading(true);
@@ -335,7 +335,7 @@ function AgencyClientLoginContent() {
           </div>
 
           <p className="text-white/50 text-sm relative z-10">
-            &copy; 2026 TourOps. {t.auth.allRightsReserved}
+            &copy; 2026 HerHafta. {t.auth.allRightsReserved}
           </p>
         </div>
       </div>

@@ -13,5 +13,10 @@ export const TABLE_DEFAULTS: Record<number, TableDefault> = {
 };
 
 export function getTableDefault(capacity: number): TableDefault {
-  return TABLE_DEFAULTS[capacity] || TABLE_DEFAULTS[4];
+  if (TABLE_DEFAULTS[capacity]) return TABLE_DEFAULTS[capacity];
+  if (capacity > 8) {
+    const perSide = Math.ceil(capacity / 2);
+    return { w: Math.min(200, 80 + perSide * 12), h: Math.min(120, 40 + perSide * 10), isRound: false };
+  }
+  return TABLE_DEFAULTS[4];
 }
