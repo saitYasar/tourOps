@@ -366,14 +366,18 @@ export function FloorPlanCanvas({ rooms, tablesMap, objectsMap, selectedTableId,
     return () => observer.disconnect();
   }, []);
 
-  // Auto-fit: zoom to show entire room — runs only ONCE to prevent zoom animation
+  // Auto-fit: zoom & center content to fill the container.
+  // Re-fits every time rooms change (navigation) or container resizes.
+  const roomsKey = rooms.map(r => r.id).join(',');
+  const lastFitKey = useRef('');
+
   useLayoutEffect(() => {
-    if (hasFitted.current) return;
+    const fitKey = `${roomsKey}|${containerSize.width}|${containerSize.height}`;
+    if (fitKey === lastFitKey.current) return;
     if (editorRooms.length === 0 || containerSize.width === 0) return;
 
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 
-    // Always use room bounds to show the full salon
     for (const room of editorRooms) {
       minX = Math.min(minX, room.x);
       minY = Math.min(minY, room.y);
@@ -383,20 +387,26 @@ export function FloorPlanCanvas({ rooms, tablesMap, objectsMap, selectedTableId,
 
     if (minX === Infinity) return;
 
-    const padding = 20;
+    const padding = 30;
     const contentW = maxX - minX + padding * 2;
     const contentH = maxY - minY + padding * 2;
     const scaleX = containerSize.width / contentW;
     const scaleY = containerSize.height / contentH;
-    const fitZoom = Math.min(scaleX, scaleY, 1.5);
+    const fitZoom = Math.min(scaleX, scaleY);
 
     setZoom(fitZoom);
-    setPanX(-minX * fitZoom + padding * fitZoom);
-    setPanY(-minY * fitZoom + padding * fitZoom);
+    // Center content in the container
+    const scaledW = contentW * fitZoom;
+    const scaledH = contentH * fitZoom;
+    const offsetX = (containerSize.width - scaledW) / 2;
+    const offsetY = (containerSize.height - scaledH) / 2;
+    setPanX(-minX * fitZoom + padding * fitZoom + offsetX);
+    setPanY(-minY * fitZoom + padding * fitZoom + offsetY);
     setFitted(true);
     hasFitted.current = true;
+    lastFitKey.current = fitKey;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rooms, containerSize]);
+  }, [roomsKey, containerSize]);
 
   const handleWheel = useCallback((e: Konva.KonvaEventObject<WheelEvent>) => {
     e.evt.preventDefault();

@@ -42,6 +42,7 @@ import { LanguageSwitcher } from '@/components/shared';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { LoadingState, ErrorState } from '@/components/shared';
+import { formatDate } from '@/lib/dateUtils';
 import { toast } from 'sonner';
 
 const customerKeys = getAuthStorageKeys('customer');
@@ -609,7 +610,7 @@ function DashboardView({
                       {tour.startDate && (
                         <span className="flex items-center gap-1 bg-sky-50 text-sky-700 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full">
                           <Calendar className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-                          {new Date(tour.startDate).toLocaleDateString(locale)}
+                          {formatDate(tour.startDate)}
                         </span>
                       )}
                       <span className="flex items-center gap-1 bg-slate-50 text-slate-600 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full">

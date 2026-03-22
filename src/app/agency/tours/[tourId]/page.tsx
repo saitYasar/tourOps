@@ -51,6 +51,17 @@ import { tourApi, tourStopApi, apiClient, agencyApi } from '@/lib/api';
 import { getCurrencySymbol } from '@/lib/utils';
 import type { ApiTourDto, ApiTourStopDto, CreateTourStopPayload, UpdateTourPayload, ServiceRequestDto, OrganizationPublicDto, TourClientDto, AgencyClientDto, AgencyStopChoicesDto, AgencyStopServiceSummaryDto, CategoryDto, LocationDto, CreateAgencyClientDto } from '@/lib/api';
 import { formatDate, formatShortDateTime } from '@/lib/dateUtils';
+
+// UTC ISO string'i datetime-local input formatına (yerel saat) çevirir
+const toLocalDatetimeString = (isoString: string): string => {
+  const date = new Date(isoString);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+};
 import { useLanguage } from '@/contexts/LanguageContext';
 
 const TourStopsMap = dynamic(
@@ -563,8 +574,8 @@ export default function TourDetailPage() {
       tourCode: tour.tourCode,
       tourName: tour.tourName,
       description: tour.description || '',
-      startDate: tour.startDate ? tour.startDate.slice(0, 16) : '',
-      endDate: tour.endDate ? tour.endDate.slice(0, 16) : '',
+      startDate: tour.startDate ? toLocalDatetimeString(tour.startDate) : '',
+      endDate: tour.endDate ? toLocalDatetimeString(tour.endDate) : '',
       maxParticipants: tour.maxParticipants || 0,
       minParticipants: tour.minParticipants || 0,
     });
@@ -1413,7 +1424,12 @@ export default function TourDetailPage() {
                               );
                             })()}
                             {stop.preReservationStatus === 'approved' && stop.choicesStatus !== 'approved' && (
-                              <ChoiceDeadlineCountdown tourStopId={stop.id} compact />
+                              <ChoiceDeadlineCountdown
+                                tourStopId={stop.id}
+                                compact
+                                scheduledEndTime={stop.scheduledEndTime}
+                                choiceDeadlineHours={stop.choiceDeadline}
+                              />
                             )}
                           </div>
                         </button>
@@ -1531,10 +1547,22 @@ export default function TourDetailPage() {
                     {/* Customer Choices Detail */}
                     <Card>
                       <CardHeader className="pb-2">
-                        <CardTitle className="text-lg flex items-center gap-2">
-                          <ClipboardList className="h-5 w-5" />
-                          {t.tours.customerChoices}
-                        </CardTitle>
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <CardTitle className="text-lg flex items-center gap-2">
+                            <ClipboardList className="h-5 w-5" />
+                            {t.tours.customerChoices}
+                          </CardTitle>
+                          {(() => {
+                            const s = stops?.find(st => st.id === choicesStopId);
+                            return s?.preReservationStatus === 'approved' && s?.choicesStatus !== 'approved' ? (
+                              <ChoiceDeadlineCountdown
+                                tourStopId={choicesStopId}
+                                scheduledEndTime={s.scheduledEndTime}
+                                choiceDeadlineHours={s.choiceDeadline}
+                              />
+                            ) : null;
+                          })()}
+                        </div>
                       </CardHeader>
                       <CardContent>
                         {choicesLoading ? (
@@ -1657,7 +1685,11 @@ export default function TourDetailPage() {
                               </>
                             )}
                             {preResApproved && cs !== 'approved' && (
-                              <ChoiceDeadlineCountdown tourStopId={choicesStopId} />
+                              <ChoiceDeadlineCountdown
+                                tourStopId={choicesStopId}
+                                scheduledEndTime={currentStop?.scheduledEndTime}
+                                choiceDeadlineHours={currentStop?.choiceDeadline}
+                              />
                             )}
                           </div>
                           <div className="flex items-center gap-2">

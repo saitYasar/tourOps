@@ -57,6 +57,8 @@ interface CustomerVenueSelectorProps {
   existingResourceId?: number;
   pendingChairId?: number;
   currentClientId?: number;
+  /** When set, auto-navigate to this table's chair view */
+  navigateToTableId?: number | null;
 }
 
 export function CustomerVenueSelector({
@@ -69,6 +71,7 @@ export function CustomerVenueSelector({
   existingResourceId,
   pendingChairId,
   currentClientId,
+  navigateToTableId,
 }: CustomerVenueSelectorProps) {
   const { t } = useLanguage();
 
@@ -88,6 +91,26 @@ export function CustomerVenueSelector({
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [floorResources]);
+
+  // Navigate to a specific table when navigateToTableId changes (from 3D model click)
+  useEffect(() => {
+    if (!navigateToTableId) return;
+    // Find which floor/room contains this table by walking the cache
+    for (const floor of floorResources) {
+      const rooms = childrenCache[floor.id] ?? [];
+      for (const room of rooms) {
+        const tables = filterTables(childrenCache[room.id] ?? []);
+        if (tables.some(t => t.id === navigateToTableId)) {
+          setActiveFloorId(floor.id);
+          setActiveRoomId(room.id);
+          setSelectedTableId(navigateToTableId);
+          fetchChildren(navigateToTableId, true);
+          return;
+        }
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigateToTableId]);
 
   // Track which parent IDs we've already auto-skipped (prevents loops on back navigation)
   const autoSkippedFrom = useRef(new Set<number>());
