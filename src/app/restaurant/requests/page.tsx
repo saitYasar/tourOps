@@ -2,13 +2,13 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Calendar, Users, CheckCircle, XCircle, MessageSquare, Building2, Clock, ChevronDown, ChevronUp, FileText, Timer, Percent } from 'lucide-react';
+import { Users, CheckCircle, XCircle, MessageSquare, Building2, Clock, ChevronDown, ChevronUp, FileText, Timer, Percent } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { preReservationOrgApi, organizationApi, type PreReservationDto } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { formatDate, formatDateTime, formatShortDateTime } from '@/lib/dateUtils';
+import { formatShortDateTime } from '@/lib/dateUtils';
 
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
@@ -147,10 +147,6 @@ export default function RestaurantRequestsPage() {
   const getTourName = (r: PreReservationDto) =>
     r.tour?.tourName || `#${r.tourId}`;
 
-  const getTourDate = (r: PreReservationDto) => {
-    if (r.tour?.startDate) return formatDate(r.tour.startDate);
-    return null;
-  };
 
   return (
     <div className="flex flex-col h-full">
@@ -216,12 +212,6 @@ export default function RestaurantRequestsPage() {
 
                             {/* Summary row: description snippet + createdAt */}
                             <div className="flex flex-wrap items-center gap-4 text-sm text-slate-600">
-                              {getTourDate(request) && (
-                                <span className="flex items-center gap-1">
-                                  <Calendar className="h-4 w-4" />
-                                  {getTourDate(request)}
-                                </span>
-                              )}
                               {(request.scheduledStartTime || request.scheduledEndTime) && (
                                 <span className="flex items-center gap-1">
                                   <Clock className="h-4 w-4" />
@@ -252,12 +242,6 @@ export default function RestaurantRequestsPage() {
                                 <span className="flex items-center gap-1">
                                   <Percent className="h-4 w-4" />
                                   {t.tours.commissionRate}: %{request.organization.agencyCommissionRate}
-                                </span>
-                              )}
-                              {request.createdAt && (
-                                <span className="flex items-center gap-1">
-                                  <Clock className="h-4 w-4" />
-                                  {formatDate(request.createdAt)}
                                 </span>
                               )}
                             </div>
@@ -393,11 +377,6 @@ export default function RestaurantRequestsPage() {
             <div className="space-y-4 py-4">
               <div className="bg-slate-50 p-3 rounded-lg space-y-1">
                 <p className="font-medium">{getTourName(selectedRequest)}</p>
-                {getTourDate(selectedRequest) && (
-                  <p className="text-sm text-slate-600">
-                    {getTourDate(selectedRequest)}
-                  </p>
-                )}
                 {(selectedRequest.scheduledStartTime || selectedRequest.scheduledEndTime) && (
                   <p className="text-sm text-slate-600 flex items-center gap-1">
                     <Clock className="h-3.5 w-3.5" />

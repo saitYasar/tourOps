@@ -1,10 +1,18 @@
 import { format, parseISO, isValid } from 'date-fns';
 import { tr } from 'date-fns/locale';
 
+/**
+ * Strip timezone suffix (Z, +03:00, -05:30 etc.) so parseISO treats the value
+ * as local time — we always want to display exactly what the DB stores.
+ */
+function stripTimezone(dateString: string): string {
+  return dateString.replace(/[Zz]$/, '').replace(/[+-]\d{2}:\d{2}$/, '');
+}
+
 export function formatDate(dateString: string | undefined | null): string {
   if (!dateString) return '-';
   try {
-    const date = parseISO(dateString);
+    const date = parseISO(stripTimezone(dateString));
     if (!isValid(date)) return '-';
     return format(date, 'd MMMM yyyy', { locale: tr });
   } catch {
@@ -15,7 +23,7 @@ export function formatDate(dateString: string | undefined | null): string {
 export function formatDateTime(dateString: string | undefined | null): string {
   if (!dateString) return '-';
   try {
-    const date = parseISO(dateString);
+    const date = parseISO(stripTimezone(dateString));
     if (!isValid(date)) return '-';
     return format(date, 'd MMMM yyyy HH:mm', { locale: tr });
   } catch {
@@ -26,7 +34,7 @@ export function formatDateTime(dateString: string | undefined | null): string {
 export function formatShortDate(dateString: string | undefined | null): string {
   if (!dateString) return '-';
   try {
-    const date = parseISO(dateString);
+    const date = parseISO(stripTimezone(dateString));
     if (!isValid(date)) return '-';
     return format(date, 'dd.MM.yyyy', { locale: tr });
   } catch {
@@ -37,7 +45,7 @@ export function formatShortDate(dateString: string | undefined | null): string {
 export function formatShortDateTime(dateString: string | undefined | null): string {
   if (!dateString) return '-';
   try {
-    const date = parseISO(dateString);
+    const date = parseISO(stripTimezone(dateString));
     if (!isValid(date)) return '-';
     return format(date, 'dd.MM.yyyy HH:mm', { locale: tr });
   } catch {

@@ -113,7 +113,7 @@ export const tr = {
     dreamVacation: 'Hayalindeki Tatil',
     awaitsYou: 'Seni Bekliyor',
     customerLoginDesc: 'Eşsiz deneyimler, unutulmaz anılar ve keşfedilmeyi bekleyen muhteşem destinasyonlar için giriş yapın.',
-    destinations: '50+ Destinasyon',
+    destinations: '50+ Durak',
     uniqueExperiences: 'Benzersiz Deneyimler',
     premiumVenues: 'Seçkin Mekanlar',
     specialOffers: 'Özel Fırsatlar',
