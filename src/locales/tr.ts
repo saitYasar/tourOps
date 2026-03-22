@@ -277,7 +277,7 @@ export const tr = {
     deleteStopConfirm: 'Bu durağı silmek istediğinize emin misiniz?',
     stopCreated: 'Durak başarıyla eklendi',
     stopUpdated: 'Durak başarıyla güncellendi',
-    stopDeleted: 'Durak başarıyla silindi',
+    stopDeleted: 'Durak başarıyla silindi!',
     organization: 'İşletme',
     selectOrganization: 'İşletme seçin',
     scheduledTime: 'Planlanan Saat',
