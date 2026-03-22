@@ -57,7 +57,7 @@ export default function HomePage() {
               href="/login/customer"
               className="px-4 py-2 text-sm font-medium text-slate-700 hover:text-slate-900 border border-slate-200 hover:border-slate-300 rounded-lg transition-colors"
             >
-              Müşteri Girissi
+              Müşteri Giriş
             </Link>
             <Link
               href="/login"
@@ -96,7 +96,7 @@ export default function HomePage() {
               </h1>
               <p className="mt-6 text-lg sm:text-xl text-slate-200 leading-relaxed max-w-2xl mx-auto drop-shadow">
                 Acenteler, işletmeler ve gezginler için hepsi bir arada platform.
-                Turları planlayın, işletmelerle bağlantı kurun, müşterilerinize
+                Turlar planlayın, işletmelerle bağlantı kurun, müşterilerinize
                 unutulmaz deneyimler sunun.
               </p>
               <div className="mt-10">
