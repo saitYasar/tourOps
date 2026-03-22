@@ -2892,13 +2892,10 @@ class ApiClient {
     return this.request<any>(`/organization/pre-reservations/${id}`, { method: 'GET' }, lang);
   }
 
-  async approveOrgPreReservation(id: number, choiceDeadline?: number, responseNote?: string, lang: 'tr' | 'en' | 'de' = 'tr') {
+  async approveOrgPreReservation(id: number, choiceDeadline?: number, lang: 'tr' | 'en' | 'de' = 'tr') {
     const body: Record<string, unknown> = {};
     if (choiceDeadline !== undefined && choiceDeadline !== null) {
       body.choiceDeadline = choiceDeadline;
-    }
-    if (responseNote) {
-      body.responseNote = responseNote;
     }
     return this.request<any>(`/organization/pre-reservations/${id}/approve`, {
       method: 'PUT',
@@ -6164,7 +6161,6 @@ export interface PreReservationDto {
   choicesStatus?: 'in_progress' | 'submitted' | 'approved' | 'rejected' | 'revision_requested' | null;
   headcount?: number;
   note?: string;
-  responseNote?: string;
   rejectionReason?: string;
   scheduledStartTime?: string | null;
   scheduledEndTime?: string | null;
@@ -6206,9 +6202,9 @@ export const preReservationOrgApi = {
     }
   },
 
-  async approve(id: number, choiceDeadline?: number, responseNote?: string, lang: 'tr' | 'en' | 'de' = 'tr'): Promise<{ success: boolean; error?: string }> {
+  async approve(id: number, choiceDeadline?: number, lang: 'tr' | 'en' | 'de' = 'tr'): Promise<{ success: boolean; error?: string }> {
     try {
-      await apiClient.approveOrgPreReservation(id, choiceDeadline, responseNote, lang);
+      await apiClient.approveOrgPreReservation(id, choiceDeadline, lang);
       return { success: true };
     } catch (error) {
       return { success: false, error: (error as Error).message };

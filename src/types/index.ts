@@ -79,7 +79,6 @@ export interface PreReservationRequest extends BaseEntity {
   timeEnd: string;
   status: RequestStatus;
   note?: string;
-  responseNote?: string;
 }
 
 // ============================================

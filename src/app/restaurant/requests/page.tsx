@@ -70,8 +70,8 @@ export default function RestaurantRequestsPage() {
 
   // Mutation: Approve
   const approveMutation = useMutation({
-    mutationFn: ({ id, choiceDeadline: deadline, responseNote: note }: { id: number; choiceDeadline?: number; responseNote?: string }) =>
-      preReservationOrgApi.approve(id, deadline, note, apiLang),
+    mutationFn: ({ id, choiceDeadline: deadline }: { id: number; choiceDeadline?: number }) =>
+      preReservationOrgApi.approve(id, deadline, apiLang),
     onSuccess: (result) => {
       if (!result.success) {
         toast.error(result.error || t.common.error);
@@ -130,8 +130,7 @@ export default function RestaurantRequestsPage() {
 
     if (actionType === 'approve') {
       const deadline = choiceDeadline ? Number(choiceDeadline) : undefined;
-      const note = responseNote.trim() || undefined;
-      approveMutation.mutate({ id: selectedRequest.id, choiceDeadline: deadline, responseNote: note });
+      approveMutation.mutate({ id: selectedRequest.id, choiceDeadline: deadline });
     } else {
       if (!responseNote.trim()) {
         toast.error(t.requests.rejectionReasonRequired);
@@ -196,7 +195,7 @@ export default function RestaurantRequestsPage() {
               <div className="space-y-4">
                 {requests.map((request) => {
                   const isExpanded = expandedId === request.id;
-                  const hasDetails = request.tour?.description || request.note || request.responseNote || request.rejectionReason;
+                  const hasDetails = request.tour?.description || request.note || request.rejectionReason;
 
                   return (
                     <Card key={request.id} className="border transition-all duration-200">
@@ -270,13 +269,6 @@ export default function RestaurantRequestsPage() {
                                 {request.note && (
                                   <div className="text-sm text-slate-500 bg-slate-50 p-2 rounded">
                                     <span className="font-medium">{t.requests.note}:</span> {request.note}
-                                  </div>
-                                )}
-
-                                {request.responseNote && (
-                                  <div className="text-sm text-slate-500 bg-blue-50 p-2 rounded">
-                                    <span className="font-medium">{t.requests.responseNote}:</span>{' '}
-                                    {request.responseNote}
                                   </div>
                                 )}
 
@@ -431,23 +423,21 @@ export default function RestaurantRequestsPage() {
                 </div>
               )}
 
-              <div className="space-y-2">
-                <Label htmlFor="responseNote">
-                  {actionType === 'reject' ? `${t.requests.rejectionReason} *` : t.requests.responseNote}
-                </Label>
-                <Textarea
-                  id="responseNote"
-                  value={responseNote}
-                  onChange={(e) => setResponseNote(e.target.value)}
-                  placeholder={
-                    actionType === 'reject'
-                      ? t.requests.rejectionReasonPlaceholder
-                      : t.requests.responseNote
-                  }
-                  rows={3}
-                  required={actionType === 'reject'}
-                />
-              </div>
+              {actionType === 'reject' && (
+                <div className="space-y-2">
+                  <Label htmlFor="responseNote">
+                    {t.requests.rejectionReason} *
+                  </Label>
+                  <Textarea
+                    id="responseNote"
+                    value={responseNote}
+                    onChange={(e) => setResponseNote(e.target.value)}
+                    placeholder={t.requests.rejectionReasonPlaceholder}
+                    rows={3}
+                    required
+                  />
+                </div>
+              )}
             </div>
           )}
 

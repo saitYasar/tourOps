@@ -305,7 +305,7 @@ export const preReservationApi = {
     return simulateNetwork(request);
   },
 
-  async updateStatus(id: string, status: RequestStatus, responseNote?: string): Promise<PreReservationRequest | null> {
+  async updateStatus(id: string, status: RequestStatus): Promise<PreReservationRequest | null> {
     const db = getDatabase();
     const index = db.preReservationRequests.findIndex((r) => r.id === id);
     if (index === -1) return simulateNetwork(null);
@@ -313,7 +313,6 @@ export const preReservationApi = {
     db.preReservationRequests[index] = {
       ...db.preReservationRequests[index],
       status,
-      responseNote,
       updatedAt: getCurrentTimestamp(),
     };
     addAuditLog(db, 'UPDATE_STATUS', 'preReservationRequest', id, `Durum güncellendi: ${status}`);
