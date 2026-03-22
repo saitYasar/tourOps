@@ -55,10 +55,11 @@ export function ChoiceDeadlineCountdown({
   const tours = t.tours as Record<string, string>;
   const label = tours.lastSelectionTime || 'Son seçim saati';
 
-  // Compute deadline from props if provided
+  // Compute deadline from props if provided (default: scheduledEndTime itself)
   const localDeadlineTime = useMemo(() => {
-    if (!scheduledEndTime || !choiceDeadlineHours) return null;
-    return new Date(new Date(scheduledEndTime).getTime() - choiceDeadlineHours * 3600000).toISOString();
+    if (!scheduledEndTime) return null;
+    const hours = choiceDeadlineHours ?? 0;
+    return new Date(new Date(scheduledEndTime).getTime() - hours * 3600000).toISOString();
   }, [scheduledEndTime, choiceDeadlineHours]);
 
   // Use API hook only when no local data available

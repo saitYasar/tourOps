@@ -1275,6 +1275,7 @@ export interface ApiTourStopDto {
   scheduledEndTime: string;
   showPriceToCustomer?: boolean;
   maxSpendLimit?: number | null;
+  choiceDeadline?: number | null;
   preReservationStatus?: 'pending' | 'approved' | 'rejected' | null;
   choicesStatus?: 'in_progress' | 'submitted' | 'approved' | 'rejected' | 'revision_requested' | null;
   createdAt?: string;
@@ -3655,6 +3656,10 @@ class ApiClient {
     return this.request<ApiTourDto>(`/admin/tours/${id}`, {}, lang);
   }
 
+  async getAdminTourClients(tourId: number, lang: 'tr' | 'en' | 'de' = 'tr') {
+    return this.request<{ data: TourClientDto[]; meta: unknown }>(`/admin/tours/${tourId}/participants`, {}, lang, true);
+  }
+
   async getAdminStopChoices(stopId: number, lang: 'tr' | 'en' | 'de' = 'tr') {
     return this.request<AgencyStopChoicesDto[]>(`/admin/tour-stops/${stopId}/choices`, {
       method: 'GET',
@@ -5627,6 +5632,72 @@ export const adminApi = {
           imageUrl: p.imageUrl || p.url || p.photoUrl,
         }));
       }
+      // Normalize participants: backend may nest client data under 'user' instead of 'client'
+      if (response.participants?.length) {
+        response.participants = response.participants.map((p: any) => {
+          if (!p.client && p.user) {
+            return { ...p, client: p.user };
+          }
+          return p;
+        });
+      }
+      // Enrich participants: fetch missing client details
+      if (response.participants?.length) {
+        const missing = response.participants.filter((p: any) => !p.client && p.clientId);
+        if (missing.length > 0) {
+          // Try fetching full tour clients list (has nested client objects)
+          let clientMap: Record<number, any> = {};
+          const extractClients = (tourClients: any[]) => {
+            tourClients.forEach((tc: any) => {
+              if (tc.client) {
+                clientMap[tc.clientId] = {
+                  id: tc.client.id,
+                  firstName: tc.client.firstName,
+                  lastName: tc.client.lastName,
+                  email: tc.client.email,
+                  phone: tc.client.phone,
+                  username: tc.client.username,
+                };
+              }
+            });
+          };
+          // Try admin endpoint, then agency endpoint, then individual user fallback
+          try {
+            const res = await apiClient.getAdminTourClients(id, lang);
+            const data = Array.isArray(res) ? res : (res as any).data ?? [];
+            extractClients(data);
+          } catch {
+            try {
+              const tourClients = await apiClient.getTourClients(id);
+              if (Array.isArray(tourClients)) extractClients(tourClients);
+            } catch {
+              // Last fallback: fetch individual users via admin endpoint
+              const results = await Promise.allSettled(
+                missing.map((p: any) => apiClient.getUserById(p.clientId, lang))
+              );
+              results.forEach((r, i) => {
+                if (r.status === 'fulfilled' && r.value) {
+                  const u = r.value;
+                  clientMap[missing[i].clientId] = {
+                    id: u.id,
+                    firstName: u.firstName,
+                    lastName: u.lastName,
+                    email: u.email,
+                    phone: u.phone,
+                    username: u.username,
+                  };
+                }
+              });
+            }
+          }
+          response.participants = response.participants.map((p: any) => {
+            if (!p.client && clientMap[p.clientId]) {
+              return { ...p, client: clientMap[p.clientId] };
+            }
+            return p;
+          });
+        }
+      }
       return { success: true, data: response as ApiTourDto };
     } catch (error) {
       return { success: false, error: (error as Error).message };
@@ -6088,6 +6159,7 @@ export interface PreReservationDto {
   id: number;
   tourId: number;
   organizationId: number;
+  tourStopId?: number | null;
   status: 'pending' | 'approved' | 'rejected';
   choicesStatus?: 'in_progress' | 'submitted' | 'approved' | 'rejected' | 'revision_requested' | null;
   headcount?: number;
@@ -6096,6 +6168,7 @@ export interface PreReservationDto {
   rejectionReason?: string;
   scheduledStartTime?: string | null;
   scheduledEndTime?: string | null;
+  choiceDeadline?: number | null;
   createdAt: string;
   updatedAt: string;
   tour?: {

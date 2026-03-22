@@ -172,6 +172,12 @@ interface VenueObject {
   rotation?: number;
 }
 
+/** Per-table occupancy: array of clients seated (index = chair index) */
+export interface TableOccupant {
+  clientId: number;
+  clientName: string;
+}
+
 interface VenueModel3DProps {
   floors: Floor[];
   rooms: Room[];
@@ -183,6 +189,10 @@ interface VenueModel3DProps {
   onRoomSelect?: (roomId: string) => void;
   onTableSelect?: (tableId: string) => void;
   selectedTableId?: string | null;
+  /** Read-only occupancy overlay: tableId → list of occupants */
+  occupancy?: Record<string, TableOccupant[]>;
+  /** When true, disables interaction (click/hover) — pure view mode */
+  readOnly?: boolean;
 }
 
 type ViewMode = 'building' | 'floor' | 'room';
@@ -249,15 +259,26 @@ function computeLayout(floors: Floor[], rooms: Room[], tables: Table[], objects:
         if (hasTC) {
           const rcx = (room.x ?? 0) + (room.width ?? 150) / 2;
           const rcz = (room.y ?? 0) + (room.height ?? 100) / 2;
-          tLayouts = rTables.map(t => ({
-            table: t,
-            cx: ((t.x ?? 0) - rcx) * scale,
-            cz: ((t.y ?? 0) - rcz) * scale,
-            w: Math.max(0.3, (t.w ?? (t.capacity <= 2 ? 40 : 60)) * scale),
-            d: Math.max(0.3, (t.h ?? 40) * scale),
-            rot: t.rotation ?? 0,
-            isRound: t.capacity <= 2,
-          }));
+          tLayouts = rTables.map(t => {
+            const tw = t.w ?? (t.capacity <= 2 ? 40 : 60);
+            const th = t.h ?? 40;
+            const trot = t.rotation ?? 0;
+            const trad = (trot * Math.PI) / 180;
+            const tcos = Math.cos(trad);
+            const tsin = Math.sin(trad);
+            // Rotated center offset (Konva rotates around top-left)
+            const tcx = (tw / 2) * tcos - (th / 2) * tsin;
+            const tcz = (tw / 2) * tsin + (th / 2) * tcos;
+            return {
+              table: t,
+              cx: ((t.x ?? 0) + tcx - rcx) * scale,
+              cz: ((t.y ?? 0) + tcz - rcz) * scale,
+              w: Math.max(0.3, tw * scale),
+              d: Math.max(0.3, th * scale),
+              rot: trot,
+              isRound: t.capacity <= 2,
+            };
+          });
         } else {
           tLayouts = autoTables(rTables, rw, rd);
         }
@@ -265,14 +286,25 @@ function computeLayout(floors: Floor[], rooms: Room[], tables: Table[], objects:
         const rObjs = objects.filter(o => o.roomId === room.id);
         const rcx2 = (room.x ?? 0) + (room.width ?? 150) / 2;
         const rcz2 = (room.y ?? 0) + (room.height ?? 100) / 2;
-        const oLayouts: ObjLayout3D[] = rObjs.map(o => ({
-          obj: o,
-          cx: ((o.x ?? 0) - rcx2) * scale,
-          cz: ((o.y ?? 0) - rcz2) * scale,
-          w: Math.max(0.1, (o.w ?? 60) * scale),
-          d: Math.max(0.1, (o.h ?? 14) * scale),
-          rot: o.rotation ?? 0,
-        }));
+        const oLayouts: ObjLayout3D[] = rObjs.map(o => {
+          const ow = o.w ?? 60;
+          const oh = o.h ?? 14;
+          const orot = o.rotation ?? 0;
+          const orad = (orot * Math.PI) / 180;
+          const ocos = Math.cos(orad);
+          const osin = Math.sin(orad);
+          // Rotated center offset (Konva rotates around top-left)
+          const ocx = (ow / 2) * ocos - (oh / 2) * osin;
+          const ocz = (ow / 2) * osin + (oh / 2) * ocos;
+          return {
+            obj: o,
+            cx: ((o.x ?? 0) + ocx - rcx2) * scale,
+            cz: ((o.y ?? 0) + ocz - rcz2) * scale,
+            w: Math.max(0.1, ow * scale),
+            d: Math.max(0.1, oh * scale),
+            rot: orot,
+          };
+        });
         return { room, color: COLORS[ri % COLORS.length], cx, cz, w: rw, d: rd, tables: tLayouts, objects: oLayouts };
       });
     } else {
@@ -359,31 +391,90 @@ function autoTables(tbls: Table[], rw: number, rd: number): TableLayout3D[] {
 // 3D Components
 // ═══════════════════════════════════════════════════════════
 
-function Chair3D({ position, rotation }: { position: [number, number, number]; rotation: number }) {
+const OCCUPIED_CLR = '#16a34a';   // green for occupied chair
+const OCCUPIED_SEAT = '#bbf7d0'; // light green seat
+const SKIN_CLR = '#f0c8a0';     // person skin tone
+const SHIRT_CLR = '#3b82f6';    // person shirt blue
+
+function Chair3D({ position, rotation, occupant }: { position: [number, number, number]; rotation: number; occupant?: TableOccupant | null }) {
+  const isOccupied = !!occupant;
+  const seatColor = isOccupied ? OCCUPIED_SEAT : CHAIR_CLR;
+  const backColor = isOccupied ? OCCUPIED_CLR : WOOD_DARK;
+
+  // Person measurements (seated)
+  const seatY = TABLE_H * 0.5;          // chair seat height
+  const torsoH = 0.28;
+  const headR = 0.06;
+  const torsoY = seatY + torsoH / 2 + 0.02;
+  const headY = seatY + torsoH + headR + 0.04;
+
   return (
     <group position={position} rotation={[0, rotation, 0]}>
-      <mesh position={[0, TABLE_H * 0.5, 0]} castShadow>
+      {/* Chair seat */}
+      <mesh position={[0, seatY, 0]} castShadow>
         <boxGeometry args={[CHAIR_SZ, 0.04, CHAIR_SZ]} />
-        <meshStandardMaterial color={CHAIR_CLR} roughness={0.8} />
+        <meshStandardMaterial color={seatColor} roughness={0.8} />
       </mesh>
-      <mesh position={[0, TABLE_H * 0.5 + CHAIR_BACK / 2, -CHAIR_SZ / 2 + 0.02]} castShadow>
+      {/* Chair back */}
+      <mesh position={[0, seatY + CHAIR_BACK / 2, -CHAIR_SZ / 2 + 0.02]} castShadow>
         <boxGeometry args={[CHAIR_SZ, CHAIR_BACK, 0.04]} />
-        <meshStandardMaterial color={WOOD_DARK} roughness={0.8} />
+        <meshStandardMaterial color={backColor} roughness={0.8} />
       </mesh>
+      {/* Chair legs */}
       {([[-1, -1], [1, -1], [-1, 1], [1, 1]] as [number, number][]).map(([dx, dz], i) => (
         <mesh key={i} position={[dx * (CHAIR_SZ / 2 - 0.02), TABLE_H * 0.25, dz * (CHAIR_SZ / 2 - 0.02)]}>
           <cylinderGeometry args={[0.015, 0.015, TABLE_H * 0.5, 6]} />
           <meshStandardMaterial color={WOOD_DARK} roughness={0.9} />
         </mesh>
       ))}
+
+      {/* ─── Seated person figure ─── */}
+      {isOccupied && (
+        <group>
+          {/* Torso */}
+          <mesh position={[0, torsoY, 0]} castShadow>
+            <cylinderGeometry args={[0.07, 0.06, torsoH, 8]} />
+            <meshStandardMaterial color={SHIRT_CLR} roughness={0.7} />
+          </mesh>
+          {/* Head */}
+          <mesh position={[0, headY, 0]} castShadow>
+            <sphereGeometry args={[headR, 12, 10]} />
+            <meshStandardMaterial color={SKIN_CLR} roughness={0.6} />
+          </mesh>
+          {/* Left arm */}
+          <mesh position={[-0.09, torsoY - 0.02, 0]} castShadow rotation={[0, 0, 0.2]}>
+            <cylinderGeometry args={[0.02, 0.018, 0.18, 6]} />
+            <meshStandardMaterial color={SHIRT_CLR} roughness={0.7} />
+          </mesh>
+          {/* Right arm */}
+          <mesh position={[0.09, torsoY - 0.02, 0]} castShadow rotation={[0, 0, -0.2]}>
+            <cylinderGeometry args={[0.02, 0.018, 0.18, 6]} />
+            <meshStandardMaterial color={SHIRT_CLR} roughness={0.7} />
+          </mesh>
+
+          {/* Name label above head */}
+          <Html position={[0, headY + headR + 0.08, 0]} center distanceFactor={4} style={{ pointerEvents: 'none' }}>
+            <div style={{
+              background: OCCUPIED_CLR, color: '#fff',
+              padding: '1px 6px', borderRadius: 4,
+              fontSize: 8, fontWeight: 700, whiteSpace: 'nowrap',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+              maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis',
+            }}>
+              {occupant!.clientName}
+            </div>
+          </Html>
+        </group>
+      )}
     </group>
   );
 }
 
 function Table3DObj({
-  layout, isSelected, onClick, visible,
+  layout, isSelected, onClick, visible, occupants, readOnly,
 }: {
   layout: TableLayout3D; isSelected: boolean; onClick: () => void; visible: boolean;
+  occupants?: TableOccupant[]; readOnly?: boolean;
 }) {
   const ref = useRef<THREE.Group>(null);
   const [hov, setHov] = useState(false);
@@ -428,9 +519,9 @@ function Table3DObj({
       ref={ref}
       position={[cx, 0, cz]}
       rotation={[0, (rot * Math.PI) / 180, 0]}
-      onClick={e => { e.stopPropagation(); onClick(); }}
-      onPointerOver={e => { e.stopPropagation(); setHov(true); document.body.style.cursor = 'pointer'; }}
-      onPointerOut={() => { setHov(false); document.body.style.cursor = 'auto'; }}
+      onClick={e => { if (!readOnly) { e.stopPropagation(); onClick(); } }}
+      onPointerOver={e => { if (!readOnly) { e.stopPropagation(); setHov(true); document.body.style.cursor = 'pointer'; } }}
+      onPointerOut={() => { if (!readOnly) { setHov(false); document.body.style.cursor = 'auto'; } }}
     >
       {isRound ? (
         <mesh position={[0, TABLE_H, 0]} castShadow receiveShadow>
@@ -492,7 +583,7 @@ function Table3DObj({
         </group>
       )}
       {chairs.map((ch, i) => (
-        <Chair3D key={i} position={[ch.x, 0, ch.z]} rotation={ch.a} />
+        <Chair3D key={i} position={[ch.x, 0, ch.z]} rotation={ch.a} occupant={occupants?.[i] ?? null} />
       ))}
       {isSelected && <pointLight position={[0, TABLE_H + 0.4, 0]} color={SEL_CLR} intensity={3} distance={2} />}
       {visible && (
@@ -503,7 +594,7 @@ function Table3DObj({
             fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap',
             boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
           }}>
-            {table.name} · {table.capacity}{isWindow ? ' 🪟' : ''}
+            {table.name} · {occupants?.length ? `${occupants.length}/` : ''}{table.capacity}{isWindow ? ' 🪟' : ''}
           </div>
         </Html>
       )}
@@ -590,6 +681,7 @@ function StructuralObject3D({
 // ─── Room with always-visible walls ───────────────────────
 function Room3D({
   layout, wallScale, showTables, selectedTableId, onRoomClick, onTableSelect,
+  occupancy, readOnly,
 }: {
   layout: RoomLayout3D;
   wallScale: number; // 0.15 building, 0.35 floor, 1.0 room
@@ -597,6 +689,8 @@ function Room3D({
   selectedTableId?: string | null;
   onRoomClick: () => void;
   onTableSelect?: (tableId: string) => void;
+  occupancy?: Record<string, TableOccupant[]>;
+  readOnly?: boolean;
 }) {
   const wallRef = useRef<THREE.Group>(null);
   const [hov, setHov] = useState(false);
@@ -697,6 +791,8 @@ function Room3D({
             isSelected={selectedTableId === tl.table.id}
             onClick={() => onTableSelect?.(tl.table.id)}
             visible={showTables}
+            occupants={occupancy?.[tl.table.id]}
+            readOnly={readOnly}
           />
         ))}
       </group>
@@ -762,12 +858,13 @@ function Roof3D({ slabW, slabD, baseY }: { slabW: number; slabD: number; baseY: 
 // ─── Floor Slab ───────────────────────────────────────────
 function FloorSlab3D({
   layout, viewMode, isSelected, isTopFloor, selectedRoomId, internalSelectedTableId,
-  onFloorClick, onRoomClick, onTableSelect,
+  onFloorClick, onRoomClick, onTableSelect, occupancy, readOnly,
 }: {
   layout: FloorLayout3D; viewMode: ViewMode; isSelected: boolean; isTopFloor: boolean;
   selectedRoomId: string | null; internalSelectedTableId: string | null;
   onFloorClick: () => void; onRoomClick: (room: Room) => void;
   onTableSelect: (tableId: string) => void;
+  occupancy?: Record<string, TableOccupant[]>; readOnly?: boolean;
 }) {
   const ref = useRef<THREE.Group>(null);
   const [hov, setHov] = useState(false);
@@ -834,6 +931,8 @@ function FloorSlab3D({
           selectedTableId={internalSelectedTableId}
           onRoomClick={() => onRoomClick(rl.room)}
           onTableSelect={onTableSelect}
+          occupancy={occupancy}
+          readOnly={readOnly}
         />
       ))}
 
@@ -890,7 +989,7 @@ function CameraManager({
 // ─── Scene ────────────────────────────────────────────────
 function Scene3D({
   layout, viewMode, selectedFloorId, selectedRoomId, internalSelectedTableId,
-  onFloorClick, onRoomClick, onTableSelect,
+  onFloorClick, onRoomClick, onTableSelect, occupancy, readOnly,
 }: {
   layout: FloorLayout3D[]; viewMode: ViewMode;
   selectedFloorId: string | null; selectedRoomId: string | null;
@@ -898,6 +997,7 @@ function Scene3D({
   onFloorClick: (id: string) => void;
   onRoomClick: (room: Room) => void;
   onTableSelect: (tableId: string) => void;
+  occupancy?: Record<string, TableOccupant[]>; readOnly?: boolean;
 }) {
   const selectedFloor = layout.find(f => f.floor.id === selectedFloorId) ?? null;
   const selectedRoom = selectedFloor?.rooms.find(r => r.room.id === selectedRoomId) ?? null;
@@ -942,6 +1042,8 @@ function Scene3D({
           onFloorClick={() => onFloorClick(fl.floor.id)}
           onRoomClick={onRoomClick}
           onTableSelect={onTableSelect}
+          occupancy={occupancy}
+          readOnly={readOnly}
         />
       ))}
     </>
@@ -954,6 +1056,7 @@ function Scene3D({
 export function VenueModel3D({
   floors: propsFloors, rooms: propsRooms, tables: propsTables, objects: propsObjects, selectedTableId,
   onFloorSelect, onRoomSelect, onTableSelect: onTableSelectProp,
+  occupancy, readOnly,
 }: VenueModel3DProps) {
   const { t } = useLanguage();
   const [mounted, setMounted] = useState(false);
@@ -1035,6 +1138,8 @@ export function VenueModel3D({
           onFloorClick={handleFloorClick}
           onRoomClick={handleRoomClick}
           onTableSelect={handleTableSelect}
+          occupancy={occupancy}
+          readOnly={readOnly}
         />
       </Canvas>
 

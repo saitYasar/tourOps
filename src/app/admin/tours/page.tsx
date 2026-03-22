@@ -62,7 +62,7 @@ import {
 import {
   LoadingState, EmptyState, ErrorState, TourStatusBadge, AdminPagination,
   CompactReceipt, DetailedListReceipt, KitchenSummaryReceipt, ReceiptServiceSummary,
-  handleReceiptPrint, exportReceiptExcel, ChoiceDeadlineCountdown,
+  handleReceiptPrint, exportReceiptExcel, ChoiceDeadlineCountdown, VenueOccupancyViewer,
 } from '@/components/shared';
 import type { ReceiptTemplate } from '@/components/shared';
 
@@ -553,8 +553,9 @@ export default function AdminToursPage() {
                         </p>
                         <div className="space-y-1">
                           {tourDetail.participants.map((p) => {
-                            const name = p.client
-                              ? `${p.client.firstName || ''} ${p.client.lastName || ''}`.trim()
+                            const client = p.client;
+                            const name = client
+                              ? `${client.firstName || ''} ${client.lastName || ''}`.trim()
                               : p.clientName || `#${p.clientId}`;
                             const isExpanded = expandedParticipantId === p.id;
                             return (
@@ -576,24 +577,24 @@ export default function AdminToursPage() {
                                     <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                                   </div>
                                 </button>
-                                {isExpanded && p.client && (
+                                {isExpanded && client && (
                                   <div className="ml-6 p-3 bg-white border border-slate-200 rounded-lg text-xs space-y-1.5">
-                                    {p.client.username && (
+                                    {client.username && (
                                       <div className="flex items-center gap-2 text-slate-600">
                                         <User className="h-3 w-3 text-slate-400" />
-                                        <span className="font-medium text-slate-800">{p.client.username}</span>
+                                        <span className="font-medium text-slate-800">{client.username}</span>
                                       </div>
                                     )}
-                                    {p.client.email && (
+                                    {client.email && (
                                       <div className="flex items-center gap-2 text-slate-600">
                                         <Mail className="h-3 w-3 text-slate-400" />
-                                        <span className="font-medium text-slate-800">{p.client.email}</span>
+                                        <span className="font-medium text-slate-800">{client.email}</span>
                                       </div>
                                     )}
-                                    {p.client.phone && (
+                                    {client.phone && (
                                       <div className="flex items-center gap-2 text-slate-600">
                                         <Phone className="h-3 w-3 text-slate-400" />
-                                        <span className="font-medium text-slate-800">{p.client.phone}</span>
+                                        <span className="font-medium text-slate-800">{client.phone}</span>
                                       </div>
                                     )}
                                     {p.pricePaid != null && (
@@ -800,13 +801,40 @@ export default function AdminToursPage() {
                               </CardContent>
                             </Card>
 
+                            {/* 3D Venue Occupancy */}
+                            {selectedStop && choicesArr.length > 0 && (
+                              <Card>
+                                <CardHeader className="pb-2">
+                                  <CardTitle className="text-sm flex items-center gap-2">
+                                    <Building2 className="h-4 w-4" />
+                                    {t.venue?.modelView || '3D Model'}
+                                  </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                  <VenueOccupancyViewer
+                                    organizationId={selectedStop.organizationId}
+                                    choices={choicesArr}
+                                  />
+                                </CardContent>
+                              </Card>
+                            )}
+
                             {/* Customer Choices Detail */}
                             <Card>
                               <CardHeader className="pb-2">
-                                <CardTitle className="text-sm flex items-center gap-2">
-                                  <ClipboardList className="h-4 w-4" />
-                                  {t.tours.customerChoices}
-                                </CardTitle>
+                                <div className="flex items-center justify-between">
+                                  <CardTitle className="text-sm flex items-center gap-2">
+                                    <ClipboardList className="h-4 w-4" />
+                                    {t.tours.customerChoices}
+                                  </CardTitle>
+                                  {selectedStop?.preReservationStatus === 'approved' && selectedStop?.choicesStatus !== 'approved' && (
+                                    <ChoiceDeadlineCountdown
+                                      tourStopId={choicesStopId}
+                                      scheduledEndTime={selectedStop.scheduledEndTime}
+                                      choiceDeadlineHours={selectedStop.choiceDeadline}
+                                    />
+                                  )}
+                                </div>
                               </CardHeader>
                               <CardContent>
                                 {choicesLoading ? (

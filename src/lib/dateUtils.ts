@@ -14,7 +14,9 @@ export function formatDate(dateString: string | undefined | null): string {
   try {
     const date = parseISO(stripTimezone(dateString));
     if (!isValid(date)) return '-';
-    return format(date, 'd MMMM yyyy', { locale: tr });
+    // Show time when the value contains a non-midnight time component
+    const hasTime = dateString.includes('T') && (date.getHours() !== 0 || date.getMinutes() !== 0);
+    return format(date, hasTime ? 'd MMMM yyyy HH:mm' : 'd MMMM yyyy', { locale: tr });
   } catch {
     return '-';
   }
