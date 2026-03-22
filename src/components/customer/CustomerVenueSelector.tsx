@@ -59,6 +59,7 @@ interface CustomerVenueSelectorProps {
   currentClientId?: number;
   /** When set, auto-navigate to this table's chair view */
   navigateToTableId?: number | null;
+  readOnly?: boolean;
 }
 
 export function CustomerVenueSelector({
@@ -72,6 +73,7 @@ export function CustomerVenueSelector({
   pendingChairId,
   currentClientId,
   navigateToTableId,
+  readOnly = false,
 }: CustomerVenueSelectorProps) {
   const { t } = useLanguage();
 
@@ -218,7 +220,7 @@ export function CustomerVenueSelector({
                         : 'border-slate-200 bg-white hover:border-orange-400 hover:bg-orange-50 hover:shadow-sm'
                 }`}
                 onClick={() => {
-                  if (!isOccupiedByOther) onSelectChair(chair);
+                  if (!readOnly && !isOccupiedByOther) onSelectChair(chair);
                 }}
               >
                 {/* Badge for selected/pending seat */}

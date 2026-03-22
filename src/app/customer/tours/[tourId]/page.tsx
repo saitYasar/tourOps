@@ -19,6 +19,7 @@ import {
   Armchair,
   UtensilsCrossed,
   MessageSquare,
+  ChevronDown,
 } from 'lucide-react';
 
 import { getCurrencySymbol } from '@/lib/utils';
@@ -351,6 +352,34 @@ export default function CustomerTourDetailPage() {
     selectedMenuItems[stopId]?.[serviceId] ?? 0;
 
   const setItemQty = async (stopId: number, serviceId: number, qty: number) => {
+    // Check maxSpendLimit before increasing quantity
+    const currentQty = selectedMenuItems[stopId]?.[serviceId] ?? 0;
+    if (qty > currentQty) {
+      const stop = tour?.stops?.find(s => s.id === stopId);
+      const limit = stop?.maxSpendLimit != null ? Number(stop.maxSpendLimit) : 0;
+      if (limit > 0) {
+        const currentTotal = getMenuTotal(stopId, menuCategories);
+        // Find the service price
+        let svcPrice = 0;
+        const findPrice = (cats: ClientStopMenuCategoryDto[]) => {
+          for (const cat of cats) {
+            for (const svc of cat.services || []) {
+              if (svc.id === serviceId) { svcPrice = Number(svc.basePrice); return; }
+            }
+            if (cat.child_service_categories) findPrice(cat.child_service_categories);
+          }
+        };
+        findPrice(menuCategories);
+        const addedAmount = (qty - currentQty) * svcPrice;
+        if (currentTotal + addedAmount > limit) {
+          const firstCurrency = menuCategories.flatMap(c => c.services).find(s => s?.currency)?.currency;
+          const currSymbol = getCurrencySymbol(firstCurrency);
+          toast.error(`${t.customer.spendLimitExceeded}: ${currSymbol}${limit.toFixed(2)}`);
+          return;
+        }
+      }
+    }
+
     const existingChoiceId = serviceChoiceIds[stopId]?.[serviceId];
 
     if (existingChoiceId) {
@@ -581,6 +610,7 @@ export default function CustomerTourDetailPage() {
                   ? preResStatusConfig[stop.preReservationStatus] || preResStatusConfig.pending
                   : null;
                 const isApproved = stop.preReservationStatus === 'approved';
+                const choicesApproved = stop.choicesStatus === 'approved';
                 const tableInfo = selectedTables[stop.id];
                 const menuItemCount = menuTotalItemCount(stop.id);
 
@@ -682,7 +712,7 @@ export default function CustomerTourDetailPage() {
                                     disabled={!isApproved || participantStatus !== 'confirmed'}
                                   >
                                     <Armchair className="h-3 w-3 mr-1 shrink-0" />
-                                    <span className="truncate">{tableInfo ? t.customer.changeTable : t.customer.selectSeat}</span>
+                                    <span className="truncate">{tableInfo ? (choicesApproved ? t.customer.viewSeat : t.customer.changeTable) : t.customer.selectSeat}</span>
                                   </Button>
                                 </span>
                               </TooltipTrigger>
@@ -786,6 +816,7 @@ export default function CustomerTourDetailPage() {
                 pendingChairId={pendingChair?.id}
                 currentClientId={clientProfile?.id}
                 navigateToTableId={navigateToTableId}
+                readOnly={tableStopId ? tour?.stops?.find(s => s.id === tableStopId)?.choicesStatus === 'approved' : false}
               />
               </>
             )}
@@ -819,7 +850,7 @@ export default function CustomerTourDetailPage() {
       {/* Menu Selection Dialog */}
       {/* ============================================ */}
       <Dialog open={!!menuStopId} onOpenChange={(open) => { if (!open && !detailService) setMenuStopId(null); }}>
-        <DialogContent className="sm:max-w-lg max-h-[95vh] sm:max-h-[85vh] w-[95vw] sm:w-auto flex flex-col">
+        <DialogContent className="sm:max-w-lg max-h-[95vh] sm:max-h-[85vh] min-h-[60vh] sm:min-h-[50vh] w-[95vw] sm:w-auto flex flex-col">
           <DialogHeader className="flex-shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <UtensilsCrossed className="h-5 w-5 text-orange-500" />
@@ -852,6 +883,7 @@ export default function CustomerTourDetailPage() {
                     getItemNote={getItemNote}
                     setItemNote={setItemNote}
                     onServiceClick={setDetailService}
+                    readOnly={tour.stops?.find(s => s.id === menuStopId)?.choicesStatus === 'approved'}
                   />
                 ))}
               </div>
@@ -864,6 +896,8 @@ export default function CustomerTourDetailPage() {
               stopId={menuStopId}
               categories={menuCategories}
               showPrice={tour.stops?.find(s => s.id === menuStopId)?.showPriceToCustomer ?? true}
+              maxSpendLimit={tour.stops?.find(s => s.id === menuStopId)?.maxSpendLimit}
+              readOnly={tour.stops?.find(s => s.id === menuStopId)?.choicesStatus === 'approved'}
               getMenuTotal={getMenuTotal}
               menuTotalItemCount={menuTotalItemCount}
               t={t}
@@ -913,6 +947,7 @@ function InteractiveMenuCategory({
   getItemNote,
   setItemNote,
   onServiceClick,
+  readOnly = false,
 }: {
   category: ClientStopMenuCategoryDto;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -925,6 +960,7 @@ function InteractiveMenuCategory({
   getItemNote: (stopId: number, serviceId: number) => string;
   setItemNote: (stopId: number, serviceId: number, note: string) => void;
   onServiceClick?: (svc: ClientStopMenuServiceDto) => void;
+  readOnly?: boolean;
 }) {
   const priceLabel = (type: string) => {
     if (type === 'fixed') return '';
@@ -934,23 +970,33 @@ function InteractiveMenuCategory({
     return '';
   };
 
+  const [collapsed, setCollapsed] = useState(false);
+
   return (
     <div>
       {/* Category header — matches restaurant preview */}
       {(category.services?.length > 0 || category.child_service_categories?.length > 0) && (
         depth === 0 ? (
-          <div className="bg-gradient-to-r from-stone-800 to-stone-700 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl mb-3">
+          <div
+            className="bg-gradient-to-r from-stone-800 to-stone-700 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl mb-3 cursor-pointer flex items-center justify-between"
+            onClick={() => setCollapsed(prev => !prev)}
+          >
             <h3 className="text-base sm:text-lg font-bold text-white">{category.name}</h3>
+            <ChevronDown className={`h-4 w-4 text-white transition-transform ${collapsed ? '-rotate-90' : ''}`} />
           </div>
         ) : (
-          <div className="px-4 py-2 mb-2">
-            <h4 className="text-sm font-semibold text-stone-600 border-b border-stone-200 pb-1">{category.name}</h4>
+          <div
+            className="px-4 py-2 mb-2 cursor-pointer flex items-center justify-between"
+            onClick={() => setCollapsed(prev => !prev)}
+          >
+            <h4 className="text-sm font-semibold text-stone-600 border-b border-stone-200 pb-1 flex-1">{category.name}</h4>
+            <ChevronDown className={`h-3.5 w-3.5 text-stone-400 transition-transform ${collapsed ? '-rotate-90' : ''}`} />
           </div>
         )
       )}
 
       {/* Services — restaurant preview style with +/- controls */}
-      {category.services && category.services.length > 0 && (
+      {!collapsed && category.services && category.services.length > 0 && (
         <div className="space-y-1 mb-3">
           {category.services.map((svc) => {
             const qty = getItemQty(stopId, svc.id);
@@ -1002,35 +1048,43 @@ function InteractiveMenuCategory({
                     )}
                   </div>
                   {/* Quantity controls */}
-                  <div className="shrink-0 flex items-center gap-0.5 sm:gap-1 self-center" onClick={(e) => e.stopPropagation()}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span tabIndex={0}>
-                          <button
-                            className="w-6 h-6 sm:w-7 sm:h-7 rounded-full border border-stone-300 flex items-center justify-center hover:bg-stone-100 disabled:opacity-30 transition-colors"
-                            onClick={() => setItemQty(stopId, svc.id, qty - 1)}
-                            disabled={qty === 0}
-                          >
-                            <Minus className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-                          </button>
-                        </span>
-                      </TooltipTrigger>
-                      {qty === 0 && (
-                        <TooltipContent>
-                          {t.tooltips.quantityZero}
-                        </TooltipContent>
-                      )}
-                    </Tooltip>
-                    <span className={`w-5 sm:w-6 text-center text-xs sm:text-sm font-bold ${qty > 0 ? 'text-orange-600' : 'text-stone-400'}`}>
-                      {qty}
-                    </span>
-                    <button
-                      className="w-6 h-6 sm:w-7 sm:h-7 rounded-full border border-orange-300 bg-orange-50 flex items-center justify-center hover:bg-orange-100 transition-colors"
-                      onClick={() => setItemQty(stopId, svc.id, qty + 1)}
-                    >
-                      <Plus className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-orange-600" />
-                    </button>
-                  </div>
+                  {readOnly ? (
+                    qty > 0 && (
+                      <div className="shrink-0 self-center">
+                        <span className="text-xs sm:text-sm font-bold text-orange-600">{qty}x</span>
+                      </div>
+                    )
+                  ) : (
+                    <div className="shrink-0 flex items-center gap-0.5 sm:gap-1 self-center" onClick={(e) => e.stopPropagation()}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span tabIndex={0}>
+                            <button
+                              className="w-6 h-6 sm:w-7 sm:h-7 rounded-full border border-stone-300 flex items-center justify-center hover:bg-stone-100 disabled:opacity-30 transition-colors"
+                              onClick={() => setItemQty(stopId, svc.id, qty - 1)}
+                              disabled={qty === 0}
+                            >
+                              <Minus className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                            </button>
+                          </span>
+                        </TooltipTrigger>
+                        {qty === 0 && (
+                          <TooltipContent>
+                            {t.tooltips.quantityZero}
+                          </TooltipContent>
+                        )}
+                      </Tooltip>
+                      <span className={`w-5 sm:w-6 text-center text-xs sm:text-sm font-bold ${qty > 0 ? 'text-orange-600' : 'text-stone-400'}`}>
+                        {qty}
+                      </span>
+                      <button
+                        className="w-6 h-6 sm:w-7 sm:h-7 rounded-full border border-orange-300 bg-orange-50 flex items-center justify-center hover:bg-orange-100 transition-colors"
+                        onClick={() => setItemQty(stopId, svc.id, qty + 1)}
+                      >
+                        <Plus className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-orange-600" />
+                      </button>
+                    </div>
+                  )}
                 </div>
                 {/* Note input — visible when item is selected */}
                 {qty > 0 && (
@@ -1040,9 +1094,10 @@ function InteractiveMenuCategory({
                       <input
                         type="text"
                         value={note}
-                        onChange={(e) => setItemNote(stopId, svc.id, e.target.value)}
+                        onChange={(e) => !readOnly && setItemNote(stopId, svc.id, e.target.value)}
+                        readOnly={readOnly}
                         placeholder={t.customer?.notePlaceholder ?? 'Bu ürün için özel istekler...'}
-                        className="flex-1 text-xs bg-white/80 border border-stone-200 rounded-lg px-2.5 py-1.5 text-stone-700 placeholder:text-stone-300 focus:outline-none focus:ring-1 focus:ring-orange-300 focus:border-orange-300"
+                        className={`flex-1 text-xs bg-white/80 border border-stone-200 rounded-lg px-2.5 py-1.5 text-stone-700 placeholder:text-stone-300 focus:outline-none focus:ring-1 focus:ring-orange-300 focus:border-orange-300 ${readOnly ? 'cursor-default opacity-60' : ''}`}
                       />
                     </div>
                   </div>
@@ -1054,7 +1109,7 @@ function InteractiveMenuCategory({
       )}
 
       {/* Child categories */}
-      {category.child_service_categories && category.child_service_categories.length > 0 && (
+      {!collapsed && category.child_service_categories && category.child_service_categories.length > 0 && (
         <div className="space-y-3">
           {category.child_service_categories.map((child) => (
             <InteractiveMenuCategory
@@ -1069,6 +1124,7 @@ function InteractiveMenuCategory({
               getItemNote={getItemNote}
               setItemNote={setItemNote}
               onServiceClick={onServiceClick}
+              readOnly={readOnly}
             />
           ))}
         </div>
@@ -1081,6 +1137,8 @@ function MenuBottomBar({
   stopId,
   categories,
   showPrice,
+  maxSpendLimit,
+  readOnly = false,
   getMenuTotal,
   menuTotalItemCount,
   t,
@@ -1089,6 +1147,8 @@ function MenuBottomBar({
   stopId: number;
   categories: ClientStopMenuCategoryDto[];
   showPrice: boolean;
+  maxSpendLimit?: number | null;
+  readOnly?: boolean;
   getMenuTotal: (stopId: number, categories: ClientStopMenuCategoryDto[]) => number;
   menuTotalItemCount: (stopId: number) => number;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1102,28 +1162,43 @@ function MenuBottomBar({
   const firstCurrency = categories.flatMap(c => c.services).find(s => s?.currency)?.currency;
   const currSymbol = getCurrencySymbol(firstCurrency);
 
-  if (totalItems === 0) return null;
+  const limitNum = maxSpendLimit != null ? Number(maxSpendLimit) : 0;
+  const hasLimit = limitNum > 0;
+  const overLimit = hasLimit && totalPrice > limitNum;
+
+  if (totalItems === 0 && !hasLimit) return null;
 
   return (
     <div className="flex-shrink-0 border-t border-slate-200 pt-3 mt-2">
+      {hasLimit && (
+        <div className={`text-xs font-medium mb-2 px-2 py-1 rounded ${overLimit ? 'bg-red-50 text-red-600' : 'bg-slate-50 text-slate-500'}`}>
+          {t.customer.spendLimit}: {currSymbol}{Number(maxSpendLimit).toFixed(2)}
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm text-slate-600">
             {totalItems} {t.customer.quantity}
           </p>
           {showPrice && (
-            <p className="text-lg font-bold text-orange-600">
+            <p className={`text-lg font-bold ${overLimit ? 'text-red-600' : 'text-orange-600'}`}>
               {t.customer.total}: {currSymbol}{totalPrice.toFixed(2)}
             </p>
           )}
         </div>
-        <Button
-          className="bg-orange-500 hover:bg-orange-600 text-white"
-          onClick={onSave}
-        >
-          <Check className="h-4 w-4 mr-1" />
-          {t.customer.saveSelection}
-        </Button>
+        {readOnly ? (
+          <Button variant="outline" onClick={onSave}>
+            {t.common.close}
+          </Button>
+        ) : (
+          <Button
+            className="bg-orange-500 hover:bg-orange-600 text-white"
+            onClick={onSave}
+          >
+            <Check className="h-4 w-4 mr-1" />
+            {t.customer.saveSelection}
+          </Button>
+        )}
       </div>
     </div>
   );

@@ -17,6 +17,7 @@ import {
   Info,
   Users,
   Clock,
+  Percent,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -312,18 +313,19 @@ export default function RestaurantGuestsPage() {
                           <p className="text-sm font-medium">{selectedReservation.tour.tourCode}</p>
                         </div>
                       )}
-                      <div>
-                        <p className="text-xs text-slate-500 mb-0.5">{t.guests.date}</p>
-                        <p className="text-sm font-medium flex items-center gap-1">
-                          <Calendar className="h-3.5 w-3.5 text-slate-400" />
-                          {formatDate(selectedReservation.tour?.startDate)}
-                          {selectedReservation.tour?.endDate && ` - ${formatDate(selectedReservation.tour.endDate)}`}
-                        </p>
-                      </div>
                       {selectedReservation.tour?.agency?.name && (
                         <div>
                           <p className="text-xs text-slate-500 mb-0.5">{t.guests.agency}</p>
                           <p className="text-sm font-medium">{selectedReservation.tour.agency.name}</p>
+                        </div>
+                      )}
+                      {selectedReservation.agencyCommissionRate != null && (
+                        <div>
+                          <p className="text-xs text-slate-500 mb-0.5">{t.guests.givenCommissionRate}</p>
+                          <p className="text-sm font-medium flex items-center gap-1">
+                            <Percent className="h-3.5 w-3.5 text-slate-400" />
+                            %{selectedReservation.agencyCommissionRate}
+                          </p>
                         </div>
                       )}
                       {selectedReservation.headcount != null && (

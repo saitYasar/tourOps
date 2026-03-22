@@ -79,11 +79,11 @@ export default function AgencySetupPage() {
   const agencySchema = useMemo(() => z.object({
     name: z.string().min(3, t.agency.agencyNameMinError),
     email: z.string().email('Geçerli bir e-posta giriniz'),
-    phoneCountryCode: z.number({ required_error: t.common.required, invalid_type_error: t.common.required }).min(1, 'Ülke kodu seçiniz'),
-    phone: z.number({ required_error: t.common.required, invalid_type_error: t.common.required }).min(1000000, 'Geçerli bir telefon numarası giriniz'),
+    phoneCountryCode: z.number({ error: t.common.required }).min(1, 'Ülke kodu seçiniz'),
+    phone: z.number({ error: t.common.required }).min(1000000, 'Geçerli bir telefon numarası giriniz'),
     description: z.string().optional(),
     legalName: z.string().min(5, 'Ticari ünvan en az 5 karakter olmalı'),
-    taxNumber: z.number({ required_error: t.common.required, invalid_type_error: t.common.required }).min(1000000000, 'Vergi numarası en az 10 haneli olmalı').max(99999999999, 'Vergi numarası en fazla 11 haneli olmalı'),
+    taxNumber: z.number({ error: t.common.required }).min(1000000000, 'Vergi numarası en az 10 haneli olmalı').max(99999999999, 'Vergi numarası en fazla 11 haneli olmalı'),
     taxOffice: z.string().min(3, 'Vergi dairesi en az 3 karakter olmalı'),
   }), [t]);
 

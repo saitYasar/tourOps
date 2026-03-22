@@ -944,6 +944,7 @@ export interface ClientTourStopDto {
   showPriceToCustomer: boolean;
   choiceDeadline?: number | null;
   choicesStatus?: string | null;
+  maxSpendLimit?: number | null;
   organization: {
     name: string;
     categoryId: number;
@@ -6165,6 +6166,7 @@ export interface PreReservationDto {
   scheduledStartTime?: string | null;
   scheduledEndTime?: string | null;
   choiceDeadline?: number | null;
+  agencyCommissionRate?: number | null;
   createdAt: string;
   updatedAt: string;
   tour?: {
