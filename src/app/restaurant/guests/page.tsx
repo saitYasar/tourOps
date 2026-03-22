@@ -325,6 +325,15 @@ export default function RestaurantGuestsPage() {
                           </p>
                         </div>
                       )}
+                      {(selectedReservation.tour?.minParticipants != null || selectedReservation.tour?.maxParticipants != null) && (
+                        <div>
+                          <p className="text-xs text-slate-500 mb-0.5">{(t.tours as Record<string, string>).estimatedParticipation}</p>
+                          <p className="text-sm font-medium flex items-center gap-1 text-indigo-600">
+                            <Users className="h-3.5 w-3.5" />
+                            {selectedReservation.tour?.minParticipants ?? '?'} - {selectedReservation.tour?.maxParticipants ?? '?'}
+                          </p>
+                        </div>
+                      )}
                       {(selectedReservation.scheduledStartTime || selectedReservation.scheduledEndTime) && (
                         <div>
                           <p className="text-xs text-slate-500 mb-0.5">{t.guests.scheduledTime}</p>

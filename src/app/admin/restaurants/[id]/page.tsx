@@ -50,6 +50,7 @@ import { getCurrencySymbol } from '@/lib/utils';
 import {
   adminApi,
   locationApi,
+  resourceApi,
   type OrganizationDto,
   type CompanyStatus,
   type AdminUpdateOrganizationDto,
@@ -2473,20 +2474,14 @@ function ResourcesTab({ orgId }: { orgId: number }) {
     return cache;
   }, [normalizedResources]);
 
-  // Admin API adapter for LayoutEditor
+  // Admin API adapter for LayoutEditor — use /resources/layout API for reading (includes width/height/coordinates)
   const adminApiAdapter = useMemo<LayoutApiAdapter>(() => ({
-    getLayout: async (parentId: number) => {
-      const children = normalizedResources.filter((r) => r.parentId === parentId);
-      return { success: true, data: children };
-    },
-    getChildren: async (parentId: number) => {
-      const children = normalizedResources.filter((r) => r.parentId === parentId);
-      return { success: true, data: children };
-    },
+    getLayout: async (parentId: number) => resourceApi.getLayout(parentId, orgId),
+    getChildren: async (parentId: number) => resourceApi.getChildren(parentId),
     create: (data) => adminApi.createOrgResource(orgId, data),
     update: (id, data) => adminApi.updateOrgResource(orgId, id, data),
     delete: (id) => adminApi.deleteOrgResource(orgId, id),
-  }), [normalizedResources, orgId]);
+  }), [orgId]);
 
   const refetchResources = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['admin-org-resources', orgId] });

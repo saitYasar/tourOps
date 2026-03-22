@@ -236,6 +236,12 @@ export default function RestaurantRequestsPage() {
                                   {request.headcount} {t.venue.persons}
                                 </span>
                               )}
+                              {(request.tour?.minParticipants != null || request.tour?.maxParticipants != null) && (
+                                <span className="flex items-center gap-1">
+                                  <Users className="h-4 w-4 text-indigo-500" />
+                                  {(t.tours as Record<string, string>).estimatedParticipation}: {request.tour?.minParticipants ?? '?'} - {request.tour?.maxParticipants ?? '?'} {t.venue.persons}
+                                </span>
+                              )}
                               {request.tour?.agency && (
                                 <span className="flex items-center gap-1">
                                   <Building2 className="h-4 w-4" />
@@ -402,6 +408,12 @@ export default function RestaurantRequestsPage() {
                 )}
                 {selectedRequest.headcount != null && (
                   <p className="text-sm text-slate-600">{selectedRequest.headcount} {t.venue.persons}</p>
+                )}
+                {(selectedRequest.tour?.minParticipants != null || selectedRequest.tour?.maxParticipants != null) && (
+                  <p className="text-sm text-indigo-600 flex items-center gap-1">
+                    <Users className="h-3.5 w-3.5" />
+                    {(t.tours as Record<string, string>).estimatedParticipation}: {selectedRequest.tour?.minParticipants ?? '?'} - {selectedRequest.tour?.maxParticipants ?? '?'} {t.venue.persons}
+                  </p>
                 )}
                 {selectedRequest.tour?.agency && (
                   <p className="text-sm text-slate-600">

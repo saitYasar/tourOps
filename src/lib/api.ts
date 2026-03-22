@@ -2538,11 +2538,12 @@ class ApiClient {
     }, 'tr', true);
   }
 
-  async getResourceLayout(parentId?: number | null, lang: 'tr' | 'en' | 'de' = 'tr') {
+  async getResourceLayout(parentId?: number | null, lang: 'tr' | 'en' | 'de' = 'tr', organizationId?: number) {
     let url = '/resources/layout';
-    if (parentId !== undefined && parentId !== null) {
-      url += `?parentId=${parentId}`;
-    }
+    const params: string[] = [];
+    if (parentId !== undefined && parentId !== null) params.push(`parentId=${parentId}`);
+    if (organizationId !== undefined) params.push(`organizationId=${organizationId}`);
+    if (params.length > 0) url += `?${params.join('&')}`;
     return this.request<ResourceDto[]>(url, {
       method: 'GET',
     }, lang);
@@ -4873,9 +4874,9 @@ export const resourceApi = {
   },
 
   // Yerleşim düzenini getir (tree yapısı)
-  async getLayout(parentId?: number | null): Promise<{ success: boolean; data?: ResourceDto[]; error?: string }> {
+  async getLayout(parentId?: number | null, organizationId?: number): Promise<{ success: boolean; data?: ResourceDto[]; error?: string }> {
     try {
-      const response = await apiClient.getResourceLayout(parentId);
+      const response = await apiClient.getResourceLayout(parentId, 'tr', organizationId);
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
@@ -6104,6 +6105,9 @@ export interface PreReservationDto {
     startDate?: string;
     endDate?: string;
     description?: string;
+    maxParticipants?: number;
+    minParticipants?: number;
+    currentParticipants?: number;
     agency?: { id: number; name: string };
   };
   organization?: {

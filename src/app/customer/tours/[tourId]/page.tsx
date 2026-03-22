@@ -321,11 +321,6 @@ export default function CustomerTourDetailPage() {
       } else {
         await apiClient.createResourceChoice(currentStopId, { resourceId: chair.id });
       }
-      // Refresh children cache for the table to update occupancy
-      const tableId = chair.parentId;
-      if (tableId) {
-        fetchChildren(tableId, true);
-      }
       setSelectedTables(prev => ({
         ...prev,
         [currentStopId]: {
@@ -336,8 +331,10 @@ export default function CustomerTourDetailPage() {
         },
       }));
       closeTableDialog();
-      // Auto-open menu dialog after selection
-      setMenuStopId(currentStopId);
+      // Open menu dialog after table dialog fully unmounts to avoid portal conflicts
+      requestAnimationFrame(() => {
+        setMenuStopId(currentStopId);
+      });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t.customer.tableSaveError);
     } finally {

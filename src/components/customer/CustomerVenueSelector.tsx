@@ -26,6 +26,21 @@ function filterTables(resources: ResourceDto[]): ResourceDto[] {
   });
 }
 
+/** Filter structural/decorative objects — everything that is NOT a table or chair/seat. */
+function filterObjects(resources: ResourceDto[]): ResourceDto[] {
+  return resources.filter(r => {
+    const code = r.resourceType?.code;
+    if (code === 'object') return true;
+    if (code === 'table' || code === 'chair' || code === 'seat') return false;
+    // No resourceType code — use name-based fallback: exclude anything that looks like a table
+    if (!code) {
+      if (r.capacity && r.capacity > 0) return false; // has capacity → probably a table
+      return true; // no capacity, no known type → treat as object
+    }
+    return false;
+  });
+}
+
 // Lazy load Konva canvas (heavy dependency) — no loading placeholder to avoid flash
 const FloorPlanCanvas = dynamic(
   () => import('./FloorPlanCanvas').then(m => ({ default: m.FloorPlanCanvas })),
@@ -80,6 +95,7 @@ export function CustomerVenueSelector({
   // Derived data
   const activeRooms = activeFloorId ? (childrenCache[activeFloorId] ?? []) : [];
   const roomTables = activeRoomId ? filterTables(childrenCache[activeRoomId] ?? []) : [];
+  const roomObjects = activeRoomId ? filterObjects(childrenCache[activeRoomId] ?? []) : [];
   const chairResources = selectedTableId ? (childrenCache[selectedTableId] ?? []) : [];
 
   // Auto-skip room selection when floor has only one room
@@ -147,9 +163,10 @@ export function CustomerVenueSelector({
 
   // ─── Level 3: Chair selection (bus-seat style layout) ────────
   if (selectedTableId) {
-    // Split chairs into two sides for table layout
-    const topRow = chairResources.slice(0, Math.ceil(chairResources.length / 2));
-    const bottomRow = chairResources.slice(Math.ceil(chairResources.length / 2));
+    // Chairs come from DB in opposite-pair order: 1↔2, 3↔4, 5↔6, ...
+    // Split into top (odd indices: 0,2,4,...) and bottom (even indices: 1,3,5,...)
+    const topRow = chairResources.filter((_, i) => i % 2 === 0);
+    const bottomRow = chairResources.filter((_, i) => i % 2 === 1);
 
     const renderSeatTile = (chair: ResourceDto) => {
       const occupant = chair.client;
@@ -307,6 +324,7 @@ export function CustomerVenueSelector({
   // ─── Level 2: Table selection (room selected) ───────────────
   if (activeRoomId) {
     const tablesMap: Record<number, ResourceDto[]> = { [activeRoomId]: roomTables };
+    const objectsMap: Record<number, ResourceDto[]> = { [activeRoomId]: roomObjects };
     const roomForCanvas = activeRooms.filter(r => r.id === activeRoomId);
     const isTablesLoading = loadingChildren && roomTables.length === 0;
 
@@ -348,6 +366,7 @@ export function CustomerVenueSelector({
           <FloorPlanCanvas
             rooms={roomForCanvas}
             tablesMap={tablesMap}
+            objectsMap={objectsMap}
             selectedTableId={null}
             onTableClick={handleTableClick}
           />
