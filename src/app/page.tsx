@@ -47,7 +47,7 @@ export default function HomePage() {
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-red-600 to-rose-700 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center">
               <span className="text-white font-bold text-sm">H</span>
             </div>
             <span className="text-xl font-bold text-slate-900">HerHafta</span>
@@ -57,11 +57,11 @@ export default function HomePage() {
               href="/login/customer"
               className="px-4 py-2 text-sm font-medium text-slate-700 hover:text-slate-900 border border-slate-200 hover:border-slate-300 rounded-lg transition-colors"
             >
-              Müşteri Giriş
+              Müşteri Girişi
             </Link>
             <Link
               href="/login"
-              className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+              className="px-4 py-2 text-sm font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition-colors"
             >
               Firma Girişi
             </Link>
@@ -102,7 +102,7 @@ export default function HomePage() {
               <div className="mt-10">
                 <Link
                   href="/register"
-                  className="inline-block px-10 py-4 text-base font-semibold text-white bg-red-600 hover:bg-red-500 rounded-xl transition-all shadow-lg shadow-red-600/30 hover:shadow-red-500/40 hover:-translate-y-0.5"
+                  className="inline-block px-10 py-4 text-base font-semibold text-white bg-orange-500 hover:bg-orange-600 rounded-xl transition-all shadow-lg shadow-orange-500/30 hover:shadow-orange-600/40 hover:-translate-y-0.5"
                 >
                   Ücretsiz Başlayın
                 </Link>
