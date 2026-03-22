@@ -508,8 +508,8 @@ export default function TourDetailPage() {
         tourCode: editForm.tourCode,
         tourName: editForm.tourName,
         description: editForm.description || undefined,
-        startDate: editForm.startDate ? new Date(editForm.startDate).toISOString() : undefined,
-        endDate: editForm.endDate ? new Date(editForm.endDate).toISOString() : undefined,
+        startDate: editForm.startDate || undefined,
+        endDate: editForm.endDate || undefined,
         maxParticipants: editForm.maxParticipants || undefined,
         minParticipants: editForm.minParticipants || undefined,
       };
@@ -573,8 +573,8 @@ export default function TourDetailPage() {
         tourId,
         organizationId: stopForm.organizationId,
         description: stopForm.description || undefined,
-        scheduledStartTime: stopForm.scheduledStartTime ? new Date(stopForm.scheduledStartTime).toISOString() : '',
-        scheduledEndTime: stopForm.scheduledEndTime ? new Date(stopForm.scheduledEndTime).toISOString() : '',
+        scheduledStartTime: stopForm.scheduledStartTime || '',
+        scheduledEndTime: stopForm.scheduledEndTime || '',
         showPriceToCustomer: stopForm.showPriceToCustomer,
         maxSpendLimit: stopForm.maxSpendLimit !== '' ? Number(stopForm.maxSpendLimit) : null,
       };
@@ -597,8 +597,8 @@ export default function TourDetailPage() {
       if (!editingStop) return;
       const result = await tourStopApi.update(editingStop.id, {
         description: stopForm.description || undefined,
-        scheduledStartTime: stopForm.scheduledStartTime ? new Date(stopForm.scheduledStartTime).toISOString() : undefined,
-        scheduledEndTime: stopForm.scheduledEndTime ? new Date(stopForm.scheduledEndTime).toISOString() : undefined,
+        scheduledStartTime: stopForm.scheduledStartTime || undefined,
+        scheduledEndTime: stopForm.scheduledEndTime || undefined,
         showPriceToCustomer: stopForm.showPriceToCustomer,
         maxSpendLimit: stopForm.maxSpendLimit !== '' ? Number(stopForm.maxSpendLimit) : null,
       }, apiLang);

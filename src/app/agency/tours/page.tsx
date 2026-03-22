@@ -124,8 +124,8 @@ export default function ToursPage() {
         tourCode: formData.tourCode,
         tourName: formData.tourName,
         description: formData.description || undefined,
-        startDate: formData.startDate ? new Date(formData.startDate).toISOString() : '',
-        endDate: formData.endDate ? new Date(formData.endDate).toISOString() : '',
+        startDate: formData.startDate || '',
+        endDate: formData.endDate || '',
         maxParticipants: formData.maxParticipants || undefined,
         minParticipants: formData.minParticipants || undefined,
       };
@@ -150,8 +150,8 @@ export default function ToursPage() {
         tourCode: formData.tourCode,
         tourName: formData.tourName,
         description: formData.description || undefined,
-        startDate: formData.startDate ? new Date(formData.startDate).toISOString() : undefined,
-        endDate: formData.endDate ? new Date(formData.endDate).toISOString() : undefined,
+        startDate: formData.startDate || undefined,
+        endDate: formData.endDate || undefined,
         maxParticipants: formData.maxParticipants || undefined,
         minParticipants: formData.minParticipants || undefined,
       };
