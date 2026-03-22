@@ -23,10 +23,10 @@ export function EmptyState({
       </div>
       <h3 className="text-lg font-medium text-slate-900 mb-1">{title}</h3>
       {description && (
-        <p className="text-sm text-slate-500 max-w-sm mb-4">{description}</p>
+        <p className="text-sm text-slate-500 max-w-sm">{description}</p>
       )}
       {actionLabel && onAction && (
-        <Button onClick={onAction}>{actionLabel}</Button>
+        <Button className="mt-4" onClick={onAction}>{actionLabel}</Button>
       )}
     </div>
   );
