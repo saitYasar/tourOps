@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, User, Search, Users, Eye, EyeOff, Navigation, Calendar, Hash, UserPlus, FileSpreadsheet, Upload, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -21,7 +21,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { LoadingState, EmptyState, ErrorState, ConfirmDialog } from '@/components/shared';
+import { LoadingState, EmptyState, ErrorState, ConfirmDialog, AdminPagination } from '@/components/shared';
 
 interface ClientFormData {
   firstName: string;
@@ -41,6 +41,9 @@ export default function AgencyClientsPage() {
   const { t, locale } = useLanguage();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
+  const [searchDebounced, setSearchDebounced] = useState('');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(50);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<AgencyClientDto | null>(null);
   const [addToTourTarget, setAddToTourTarget] = useState<AgencyClientDto | null>(null);
@@ -64,17 +67,27 @@ export default function AgencyClientsPage() {
   });
   const agencyStatus = agencyResult?.success ? agencyResult.data?.status : undefined;
 
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchDebounced(search);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   const {
     data: clientsData,
     isLoading,
     error,
     refetch,
   } = useQuery({
-    queryKey: ['agency-clients'],
-    queryFn: () => agencyApi.getClients(1, 100),
+    queryKey: ['agency-clients', page, limit, searchDebounced],
+    queryFn: () => agencyApi.getClients(page, limit, searchDebounced || undefined),
   });
 
   const clients = clientsData?.success ? clientsData.data?.data || [] : [];
+  const meta = clientsData?.success ? clientsData.data?.meta : undefined;
 
   // Fetch tours and use embedded participants to map clientId -> tour names
   const { data: toursData } = useQuery({
@@ -245,17 +258,14 @@ export default function AgencyClientsPage() {
     });
   };
 
-  const filteredClients = clients.filter((client: AgencyClientDto) => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    const c = client.client;
-    return (
-      (c?.firstName || '').toLowerCase().includes(q) ||
-      (c?.lastName || '').toLowerCase().includes(q) ||
-      (c?.username || '').toLowerCase().includes(q) ||
-      (c?.email && c.email.toLowerCase().includes(q))
-    );
-  });
+  const handlePageChange = useCallback((newPage: number) => {
+    setPage(newPage);
+  }, []);
+
+  const handleLimitChange = useCallback((newLimit: number) => {
+    setLimit(newLimit);
+    setPage(1);
+  }, []);
 
   const getInitials = (firstName?: string | null, lastName?: string | null) => {
     const f = firstName?.charAt(0) || '';
@@ -300,7 +310,7 @@ export default function AgencyClientsPage() {
                   </div>
                   <div>
                     <CardTitle>Müşteri Listesi</CardTitle>
-                    <CardDescription>{clients.length} müşteri kayıtlı</CardDescription>
+                    <CardDescription>{meta?.totalCount ?? meta?.total ?? clients.length} müşteri kayıtlı</CardDescription>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -317,19 +327,17 @@ export default function AgencyClientsPage() {
             </CardHeader>
             <CardContent>
               {/* Search */}
-              {clients.length > 0 && (
-                <div className="relative mb-4">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                  <Input
-                    placeholder="Müşteri ara..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="pl-9"
-                  />
-                </div>
-              )}
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Input
+                  placeholder="Müşteri ara..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
 
-              {clients.length === 0 ? (
+              {clients.length === 0 && !searchDebounced ? (
                 <EmptyState
                   icon={Users}
                   title="Henüz müşteri yok"
@@ -337,12 +345,13 @@ export default function AgencyClientsPage() {
                   actionLabel="Yeni Müşteri"
                   onAction={() => setIsFormOpen(true)}
                 />
-              ) : filteredClients.length === 0 ? (
+              ) : clients.length === 0 ? (
                 <div className="text-center py-8 text-slate-500">
                   <Search className="h-12 w-12 mx-auto mb-3 text-slate-300" />
                   <p>Aramanızla eşleşen müşteri bulunamadı</p>
                 </div>
               ) : (
+                <>
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
@@ -356,7 +365,7 @@ export default function AgencyClientsPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {filteredClients.map((client: AgencyClientDto) => (
+                      {clients.map((client: AgencyClientDto) => (
                         <tr key={client.id}>
                           <td className="py-3">
                             <div className="flex items-center gap-3">
@@ -449,6 +458,17 @@ export default function AgencyClientsPage() {
                     </tbody>
                   </table>
                 </div>
+                {meta && (
+                  <AdminPagination
+                    page={page}
+                    limit={limit}
+                    total={meta.totalCount ?? meta.total}
+                    totalPages={meta.totalPages}
+                    onPageChange={handlePageChange}
+                    onLimitChange={handleLimitChange}
+                  />
+                )}
+                </>
               )}
             </CardContent>
           </Card>

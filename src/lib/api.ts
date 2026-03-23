@@ -2222,8 +2222,9 @@ class ApiClient {
   // Agencies - Clients
   // ============================================
 
-  async getAgencyClients(page = 1, limit = 10) {
-    const url = `/agencies/clients?page=${page}&limit=${limit}`;
+  async getAgencyClients(page = 1, limit = 10, search?: string) {
+    let url = `/agencies/clients?page=${page}&limit=${limit}`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
     return this.request<PaginatedResponse<AgencyClientDto>>(url, {
       method: 'GET',
     }, 'tr', true);
@@ -4854,9 +4855,9 @@ export const agencyApi = {
   },
 
   // Get clients
-  async getClients(page = 1, limit = 10) {
+  async getClients(page = 1, limit = 10, search?: string) {
     try {
-      const response = await apiClient.getAgencyClients(page, limit);
+      const response = await apiClient.getAgencyClients(page, limit, search);
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
