@@ -770,6 +770,12 @@ export const en = {
     noToursYet: 'No tours available yet',
     adding: 'Adding...',
     selectTour: 'Select a tour',
+    excelTemplate: 'Excel Template',
+    excelTemplateDesc: 'Your Excel file must follow the format below. Column names and order must not be changed, otherwise the system will not be able to process the file.',
+    downloadTemplate: 'Download Template',
+    excelRowNo: 'Sıra No',
+    excelLastName: 'SOYADI',
+    excelFirstName: 'ADI',
     // Form labels
     labelFirstName: 'First Name *',
     labelLastName: 'Last Name *',

@@ -770,6 +770,12 @@ export const de = {
     noToursYet: 'Noch keine Touren verfügbar',
     adding: 'Hinzufügen...',
     selectTour: 'Tour auswählen',
+    excelTemplate: 'Excel-Vorlage',
+    excelTemplateDesc: 'Ihre Excel-Datei muss dem folgenden Format entsprechen. Spaltennamen und Reihenfolge dürfen nicht geändert werden, da das System die Datei sonst nicht verarbeiten kann.',
+    downloadTemplate: 'Vorlage herunterladen',
+    excelRowNo: 'Sıra No',
+    excelLastName: 'SOYADI',
+    excelFirstName: 'ADI',
     // Form labels
     labelFirstName: 'Vorname *',
     labelLastName: 'Nachname *',

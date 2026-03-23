@@ -771,6 +771,12 @@ export const tr = {
     noToursYet: 'Henüz tur bulunmuyor',
     adding: 'Ekleniyor...',
     selectTour: 'Tur seçiniz',
+    excelTemplate: 'Excel Şablonu',
+    excelTemplateDesc: 'Excel dosyanız aşağıdaki formatta olmalıdır. Sütun adları ve sırası değiştirilmemelidir, aksi halde sistem dosyayı işleyemez.',
+    downloadTemplate: 'Şablonu İndir',
+    excelRowNo: 'Sıra No',
+    excelLastName: 'SOYADI',
+    excelFirstName: 'ADI',
     // Form labels
     labelFirstName: 'Ad *',
     labelLastName: 'Soyad *',

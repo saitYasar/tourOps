@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2, User, Search, Users, Eye, EyeOff, Navigation, Calendar, Hash, UserPlus, FileSpreadsheet, Upload, X, MessageCircle } from 'lucide-react';
+import { Plus, Trash2, User, Search, Users, Eye, EyeOff, Navigation, Calendar, Hash, UserPlus, FileSpreadsheet, Upload, X, MessageCircle, Download } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { agencyApi, tourApi, type AgencyClientDto, type CreateAgencyClientDto } from '@/lib/api';
@@ -824,6 +824,59 @@ export default function AgencyClientsPage() {
                   e.target.value = '';
                 }}
               />
+            </div>
+
+            {/* Excel Template */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>{t.invitations.excelTemplate}</Label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const XLSX = require('xlsx-js-style');
+                    const tourTitle = batchSelectedTourName || 'TUR ADI';
+                    const data = [
+                      [tourTitle, '', ''],
+                      [t.invitations.excelRowNo, t.invitations.excelLastName, t.invitations.excelFirstName],
+                      [1, 'HILLEBRAND', 'INGE'],
+                      [2, 'SUPPAN-DANIA', 'BETTINA'],
+                      [3, 'SCHNEIDER', 'KARIN'],
+                    ];
+                    const ws = XLSX.utils.aoa_to_sheet(data);
+                    ws['!cols'] = [{ wch: 8 }, { wch: 20 }, { wch: 20 }];
+                    ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 2 } }];
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, 'Müşteriler');
+                    XLSX.writeFile(wb, 'musteri_sablonu.xlsx');
+                  }}
+                  className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  {t.invitations.downloadTemplate}
+                </button>
+              </div>
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-blue-50 border-b">
+                      <th colSpan={3} className="px-3 py-1.5 text-left font-semibold text-blue-700 italic">23-27 MART 2026 İSTANBUL TURU</th>
+                    </tr>
+                    <tr className="bg-slate-100 border-b">
+                      <th className="px-3 py-1.5 text-left font-semibold text-slate-700">{t.invitations.excelRowNo}</th>
+                      <th className="px-3 py-1.5 text-left font-semibold text-slate-700">{t.invitations.excelLastName}</th>
+                      <th className="px-3 py-1.5 text-left font-semibold text-slate-700">{t.invitations.excelFirstName}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    <tr><td className="px-3 py-1 text-slate-500">1</td><td className="px-3 py-1">HILLEBRAND</td><td className="px-3 py-1">INGE</td></tr>
+                    <tr><td className="px-3 py-1 text-slate-500">2</td><td className="px-3 py-1">SUPPAN-DANIA</td><td className="px-3 py-1">BETTINA</td></tr>
+                    <tr><td className="px-3 py-1 text-slate-500">3</td><td className="px-3 py-1">SCHNEIDER</td><td className="px-3 py-1">KARIN</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-[11px] text-amber-600 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-1.5">
+                ⚠ {t.invitations.excelTemplateDesc}
+              </p>
             </div>
 
             {/* Optional Tour Select */}
