@@ -43,6 +43,23 @@ export function getResourceLabel(choice: AgencyStopChoicesDto): string {
   return choice.resourceChoice.resource?.name || '';
 }
 
+/** Extract numeric seat value from resource label for sorting (e.g. "Masa 1-3" → 3, "5" → 5) */
+function getSeatSortKey(choice: AgencyStopChoicesDto): number {
+  const label = getResourceLabel(choice);
+  if (!label) return Number.MAX_SAFE_INTEGER;
+  // Try to extract the last number in the label (e.g. "Masa 1-3" → 3, "12" → 12)
+  const matches = label.match(/(\d+)/g);
+  if (matches && matches.length > 0) {
+    return parseInt(matches[matches.length - 1], 10);
+  }
+  return Number.MAX_SAFE_INTEGER;
+}
+
+/** Sort choices by seat number (lowest first) */
+function sortChoicesBySeat(choices: AgencyStopChoicesDto[]): AgencyStopChoicesDto[] {
+  return [...choices].sort((a, b) => getSeatSortKey(a) - getSeatSortKey(b));
+}
+
 // ============================================
 // Compact Receipt (80mm thermal)
 // ============================================
@@ -65,7 +82,7 @@ export function CompactReceipt({
         <p>{formatDate(tourInfo.startDate)}</p>
         <p className="text-[10px] mt-1">{t.guests.printedAt}: {new Date().toLocaleString()}</p>
       </div>
-      {choices.map((choice, idx) => {
+      {sortChoicesBySeat(choices).map((choice, idx) => {
         const clientName = choice.client
           ? `${choice.client.firstName || ''} ${choice.client.lastName || ''}`.trim()
           : choice.clientName || `#${choice.clientId}`;
@@ -110,8 +127,10 @@ export function DetailedListReceipt({
   orgName: string;
   t: T;
 }) {
+  const sortedChoices = sortChoicesBySeat(choices);
+
   const categoryOrderMap = new Map<string, number>();
-  for (const choice of choices) {
+  for (const choice of sortedChoices) {
     for (const sc of choice.serviceChoices || []) {
       const catName = sc.service?.serviceCategoryName || t.guests.uncategorized;
       if (!categoryOrderMap.has(catName)) categoryOrderMap.set(catName, categoryOrderMap.size);
@@ -119,7 +138,7 @@ export function DetailedListReceipt({
   }
   const categoryNames = Array.from(categoryOrderMap.keys());
 
-  const rows = choices.map((choice, idx) => {
+  const rows = sortedChoices.map((choice, idx) => {
     const firstName = (choice.client?.firstName || '').toUpperCase();
     const lastName = (choice.client?.lastName || '').toUpperCase();
     const categoryMap = new Map<string, string>();
@@ -141,7 +160,7 @@ export function DetailedListReceipt({
 
   const globalFoodColorMap = new Map<string, string>();
   let globalColorIdx = 0;
-  for (const choice of choices) {
+  for (const choice of sortedChoices) {
     for (const sc of choice.serviceChoices || []) {
       const title = (sc.service?.title || `#${sc.serviceId}`).toUpperCase();
       if (!globalFoodColorMap.has(title)) {
@@ -152,7 +171,7 @@ export function DetailedListReceipt({
   }
 
   const serviceSeatMap = new Map<string, { seats: string[]; color: string }>();
-  for (const choice of choices) {
+  for (const choice of sortedChoices) {
     const seatLabel = getResourceLabel(choice);
     for (const sc of choice.serviceChoices || []) {
       const title = (sc.service?.title || `#${sc.serviceId}`).toUpperCase();
@@ -487,6 +506,7 @@ export function exportReceiptExcel(
   t: T,
 ) {
   if (!choices.length) return;
+  const sortedChoices = sortChoicesBySeat(choices);
   const tourName = tourInfo.tourName || '';
   const tourDate = formatDate(tourInfo.startDate);
   const wb = XLSX.utils.book_new();
@@ -515,7 +535,7 @@ export function exportReceiptExcel(
   // Global food color map
   const globalFoodColorMap = new Map<string, string>();
   let colorIdx = 0;
-  for (const choice of choices) {
+  for (const choice of sortedChoices) {
     for (const sc of choice.serviceChoices || []) {
       const title = (sc.service?.title || `#${sc.serviceId}`).toUpperCase();
       if (!globalFoodColorMap.has(title)) {
@@ -527,7 +547,7 @@ export function exportReceiptExcel(
 
   // --- Sheet 1: Detaylı Liste ---
   const categoryOrderMap = new Map<string, number>();
-  for (const choice of choices) {
+  for (const choice of sortedChoices) {
     for (const sc of choice.serviceChoices || []) {
       const catName = sc.service?.serviceCategoryName || t.guests.uncategorized;
       if (!categoryOrderMap.has(catName)) categoryOrderMap.set(catName, categoryOrderMap.size);
@@ -538,7 +558,7 @@ export function exportReceiptExcel(
 
   type CellInfo = { v: string | number; colors?: string[] };
   const detailData: CellInfo[][] = [];
-  choices.forEach((choice, idx) => {
+  sortedChoices.forEach((choice, idx) => {
     const row: CellInfo[] = [
       { v: idx + 1 },
       { v: (choice.client?.lastName || '').toUpperCase() },
@@ -599,7 +619,7 @@ export function exportReceiptExcel(
 
   const svcMap = new Map<string, { totalQty: number; color: string; entries: { seat: string; name: string; qty: number; note?: string }[] }>();
   const svcOrder: string[] = [];
-  for (const choice of choices) {
+  for (const choice of sortedChoices) {
     const clientName = [choice.client?.firstName, choice.client?.lastName].filter(Boolean).join(' ').toUpperCase();
     const seatLabel = getResourceLabel(choice);
     for (const sc of choice.serviceChoices || []) {
