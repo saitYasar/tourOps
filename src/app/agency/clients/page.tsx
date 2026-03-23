@@ -422,27 +422,19 @@ export default function AgencyClientsPage() {
                           </td>
                           <td className="py-3 text-right">
                             <div className="flex items-center justify-end gap-1">
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span tabIndex={0}>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-8 px-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50"
-                                      disabled={!!(clientTourMap.get(client.clientId)?.length)}
-                                      onClick={() => {
-                                        setAddToTourTarget(client);
-                                        setSelectedTourId(null);
-                                      }}
-                                      title="Tura Ekle"
-                                    >
-                                      <UserPlus className="h-4 w-4 mr-1" />
-                                      <span className="text-xs">Tura Ekle</span>
-                                    </Button>
-                                  </span>
-                                </TooltipTrigger>
-                                {!!(clientTourMap.get(client.clientId)?.length) && <TooltipContent>{t.tooltips.clientHasTours}</TooltipContent>}
-                              </Tooltip>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 px-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                                onClick={() => {
+                                  setAddToTourTarget(client);
+                                  setSelectedTourId(null);
+                                }}
+                                title="Tura Ekle"
+                              >
+                                <UserPlus className="h-4 w-4 mr-1" />
+                                <span className="text-xs">Tura Ekle</span>
+                              </Button>
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -769,6 +761,8 @@ export default function AgencyClientsPage() {
                   .filter((tour) => !tourSearch || tour.tourName.toLowerCase().includes(tourSearch.toLowerCase()) || tour.tourCode.toLowerCase().includes(tourSearch.toLowerCase()))
                   .map((tour) => {
                     const isSelected = selectedTourId === tour.id;
+                    const clientTours = addToTourTarget ? (clientTourMap.get(addToTourTarget.clientId) || []) : [];
+                    const isAlreadyInTour = clientTours.includes(tour.tourName);
                     const statusColors: Record<string, string> = {
                       draft: 'bg-yellow-100 text-yellow-700',
                       published: 'bg-green-100 text-green-700',
@@ -785,9 +779,12 @@ export default function AgencyClientsPage() {
                       <button
                         key={tour.id}
                         type="button"
-                        onClick={() => setSelectedTourId(tour.id)}
+                        disabled={isAlreadyInTour}
+                        onClick={() => !isAlreadyInTour && setSelectedTourId(tour.id)}
                         className={`w-full text-left p-3 rounded-lg border-2 transition-all ${
-                          isSelected
+                          isAlreadyInTour
+                            ? 'border-transparent bg-slate-100 opacity-60 cursor-not-allowed ring-1 ring-slate-200'
+                            : isSelected
                             ? 'border-blue-500 bg-blue-50 shadow-sm'
                             : 'border-transparent bg-white hover:bg-slate-50 shadow-sm ring-1 ring-slate-200'
                         }`}
@@ -806,9 +803,16 @@ export default function AgencyClientsPage() {
                               </span>
                             </div>
                           </div>
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium flex-shrink-0 ${statusColors[tour.status] || 'bg-slate-100 text-slate-600'}`}>
-                            {statusLabels[tour.status] || tour.status}
-                          </span>
+                          <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${statusColors[tour.status] || 'bg-slate-100 text-slate-600'}`}>
+                              {statusLabels[tour.status] || tour.status}
+                            </span>
+                            {isAlreadyInTour && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-200 text-slate-500">
+                                Zaten ekli
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </button>
                     );
