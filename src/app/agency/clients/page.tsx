@@ -44,6 +44,12 @@ export default function AgencyClientsPage() {
   const [searchDebounced, setSearchDebounced] = useState('');
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(50);
+  const [filterTourId, setFilterTourId] = useState<number | undefined>(undefined);
+  const [filterTourSearch, setFilterTourSearch] = useState('');
+  const [filterTourSearchDebounced, setFilterTourSearchDebounced] = useState('');
+  const [filterTourDropdownOpen, setFilterTourDropdownOpen] = useState(false);
+  const [filterTourName, setFilterTourName] = useState('');
+  const filterTourRef = useRef<HTMLDivElement>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<AgencyClientDto | null>(null);
   const [addToTourTarget, setAddToTourTarget] = useState<AgencyClientDto | null>(null);
@@ -76,14 +82,41 @@ export default function AgencyClientsPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
+  // Debounce tour filter search
+  useEffect(() => {
+    const timer = setTimeout(() => setFilterTourSearchDebounced(filterTourSearch), 300);
+    return () => clearTimeout(timer);
+  }, [filterTourSearch]);
+
+  // Close tour filter dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (filterTourRef.current && !filterTourRef.current.contains(e.target as Node)) {
+        setFilterTourDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  // Search tours for filter dropdown
+  const { data: filterTourResults } = useQuery({
+    queryKey: ['filter-tour-search', filterTourSearchDebounced],
+    queryFn: async () => {
+      const result = await tourApi.list(1, 20, locale as 'tr' | 'en' | 'de', filterTourSearchDebounced || undefined);
+      return result.success ? result.data || [] : [];
+    },
+    enabled: filterTourDropdownOpen,
+  });
+
   const {
     data: clientsData,
     isLoading,
     error,
     refetch,
   } = useQuery({
-    queryKey: ['agency-clients', page, limit, searchDebounced],
-    queryFn: () => agencyApi.getClients(page, limit, searchDebounced || undefined),
+    queryKey: ['agency-clients', page, limit, searchDebounced, filterTourId],
+    queryFn: () => agencyApi.getClients(page, limit, searchDebounced || undefined, filterTourId),
   });
 
   const clients = clientsData?.success ? clientsData.data?.data || [] : [];
@@ -326,18 +359,76 @@ export default function AgencyClientsPage() {
               </div>
             </CardHeader>
             <CardContent>
-              {/* Search */}
-              <div className="relative mb-4">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <Input
-                  placeholder="Müşteri ara..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-9"
-                />
+              {/* Search & Tour Filter */}
+              <div className="flex flex-col sm:flex-row gap-3 mb-4">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input
+                    placeholder="Müşteri ara..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+                <div className="relative w-full sm:w-72" ref={filterTourRef}>
+                  <Navigation className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input
+                    placeholder="Tura göre filtrele..."
+                    value={filterTourDropdownOpen ? filterTourSearch : filterTourName}
+                    onChange={(e) => {
+                      setFilterTourSearch(e.target.value);
+                      if (!filterTourDropdownOpen) setFilterTourDropdownOpen(true);
+                    }}
+                    onFocus={() => setFilterTourDropdownOpen(true)}
+                    className="pl-9 pr-8"
+                  />
+                  {filterTourId && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFilterTourId(undefined);
+                        setFilterTourName('');
+                        setFilterTourSearch('');
+                        setPage(1);
+                      }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                  {filterTourDropdownOpen && (
+                    <div className="absolute z-20 top-full mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+                      {!filterTourResults || filterTourResults.length === 0 ? (
+                        <div className="p-3 text-sm text-slate-400 text-center">Tur bulunamadı</div>
+                      ) : (
+                        filterTourResults.map((tour) => (
+                          <button
+                            key={tour.id}
+                            type="button"
+                            onClick={() => {
+                              setFilterTourId(tour.id);
+                              setFilterTourName(tour.tourName);
+                              setFilterTourSearch('');
+                              setFilterTourDropdownOpen(false);
+                              setPage(1);
+                            }}
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-slate-50 flex items-center justify-between gap-2 ${
+                              filterTourId === tour.id ? 'bg-blue-50 text-blue-700' : ''
+                            }`}
+                          >
+                            <div className="min-w-0">
+                              <p className="truncate font-medium">{tour.tourName}</p>
+                              <p className="text-xs text-slate-400">{tour.tourCode}</p>
+                            </div>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {clients.length === 0 && !searchDebounced ? (
+              {clients.length === 0 && !searchDebounced && !filterTourId ? (
                 <EmptyState
                   icon={Users}
                   title="Henüz müşteri yok"
