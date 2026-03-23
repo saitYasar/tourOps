@@ -2,11 +2,12 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2, User, Search, Users, Eye, EyeOff, Navigation, Calendar, Hash, UserPlus, FileSpreadsheet, Upload, X } from 'lucide-react';
+import { Plus, Trash2, User, Search, Users, Eye, EyeOff, Navigation, Calendar, Hash, UserPlus, FileSpreadsheet, Upload, X, MessageCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { agencyApi, tourApi, type AgencyClientDto, type CreateAgencyClientDto } from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { locales, type Locale } from '@/locales';
 
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
@@ -50,6 +51,8 @@ export default function AgencyClientsPage() {
   const [filterTourDropdownOpen, setFilterTourDropdownOpen] = useState(false);
   const [filterTourName, setFilterTourName] = useState('');
   const filterTourRef = useRef<HTMLDivElement>(null);
+  const [whatsappTarget, setWhatsappTarget] = useState<AgencyClientDto | null>(null);
+  const [whatsappLang, setWhatsappLang] = useState<Locale>('tr');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<AgencyClientDto | null>(null);
   const [addToTourTarget, setAddToTourTarget] = useState<AgencyClientDto | null>(null);
@@ -208,16 +211,16 @@ export default function AgencyClientsPage() {
       tourApi.addParticipant(tourId, clientId),
     onSuccess: (result) => {
       if (result.success) {
-        toast.success('Müşteri tura başarıyla eklendi');
+        toast.success(t.invitations.clientAddedToTour);
         queryClient.invalidateQueries({ queryKey: ['agency-tours-for-clients'] });
         setAddToTourTarget(null);
         setSelectedTourId(null);
       } else {
-        toast.error(result.error || 'Tura ekleme başarısız');
+        toast.error(result.error || t.invitations.addToTourFailed);
       }
     },
     onError: () => {
-      toast.error('Tura ekleme başarısız');
+      toast.error(t.invitations.addToTourFailed);
     },
   });
 
@@ -342,8 +345,8 @@ export default function AgencyClientsPage() {
                     <Users className="h-6 w-6 text-blue-600" />
                   </div>
                   <div>
-                    <CardTitle>Müşteri Listesi</CardTitle>
-                    <CardDescription>{meta?.totalCount ?? meta?.total ?? clients.length} müşteri kayıtlı</CardDescription>
+                    <CardTitle>{t.invitations.clientList}</CardTitle>
+                    <CardDescription>{t.invitations.clientsRegistered.replace('{count}', String(meta?.totalCount ?? meta?.total ?? clients.length))}</CardDescription>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -353,7 +356,7 @@ export default function AgencyClientsPage() {
                   </Button>
                   <Button onClick={() => setIsFormOpen(true)}>
                     <Plus className="h-4 w-4 mr-2" />
-                    Yeni Müşteri
+                    {t.invitations.newClient}
                   </Button>
                 </div>
               </div>
@@ -364,7 +367,7 @@ export default function AgencyClientsPage() {
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <Input
-                    placeholder="Müşteri ara..."
+                    placeholder={t.invitations.searchClients}
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     className="pl-9"
@@ -373,7 +376,7 @@ export default function AgencyClientsPage() {
                 <div className="relative w-full sm:w-72" ref={filterTourRef}>
                   <Navigation className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <Input
-                    placeholder="Tura göre filtrele..."
+                    placeholder={t.invitations.filterByTour}
                     value={filterTourDropdownOpen ? filterTourSearch : filterTourName}
                     onChange={(e) => {
                       setFilterTourSearch(e.target.value);
@@ -399,7 +402,7 @@ export default function AgencyClientsPage() {
                   {filterTourDropdownOpen && (
                     <div className="absolute z-20 top-full mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
                       {!filterTourResults || filterTourResults.length === 0 ? (
-                        <div className="p-3 text-sm text-slate-400 text-center">Tur bulunamadı</div>
+                        <div className="p-3 text-sm text-slate-400 text-center">{t.invitations.noTourFound}</div>
                       ) : (
                         filterTourResults.map((tour) => (
                           <button
@@ -431,15 +434,15 @@ export default function AgencyClientsPage() {
               {clients.length === 0 && !searchDebounced && !filterTourId ? (
                 <EmptyState
                   icon={Users}
-                  title="Henüz müşteri yok"
-                  description="Yeni müşteri ekleyerek başlayın"
-                  actionLabel="Yeni Müşteri"
+                  title={t.invitations.noClientsYet}
+                  description={t.invitations.noClientsYetDesc}
+                  actionLabel={t.invitations.newClient}
                   onAction={() => setIsFormOpen(true)}
                 />
               ) : clients.length === 0 ? (
                 <div className="text-center py-8 text-slate-500">
                   <Search className="h-12 w-12 mx-auto mb-3 text-slate-300" />
-                  <p>Aramanızla eşleşen müşteri bulunamadı</p>
+                  <p>{t.invitations.noSearchResult}</p>
                 </div>
               ) : (
                 <>
@@ -447,34 +450,58 @@ export default function AgencyClientsPage() {
                   <table className="w-full">
                     <thead>
                       <tr className="border-b text-left text-xs text-slate-500 uppercase">
-                        <th className="pb-3 font-medium">Müşteri</th>
-                        <th className="pb-3 font-medium">Kullanıcı Adı</th>
-                        <th className="pb-3 font-medium">Durum</th>
-                        <th className="pb-3 font-medium">Tur</th>
-                        <th className="pb-3 font-medium">Kayıt Tarihi</th>
-                        <th className="pb-3 font-medium text-right">İşlem</th>
+                        <th className="pb-3 font-medium">{t.invitations.columnClient}</th>
+                        <th className="pb-3 font-medium">{t.invitations.columnEmail}</th>
+                        <th className="pb-3 font-medium">{t.invitations.columnUsername}</th>
+                        <th className="pb-3 font-medium">{t.invitations.columnStatus}</th>
+                        <th className="pb-3 font-medium">{t.invitations.columnTour}</th>
+                        <th className="pb-3 font-medium">{t.invitations.columnDate}</th>
+                        <th className="pb-3 font-medium text-right">{t.invitations.columnActions}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y">
                       {clients.map((client: AgencyClientDto) => (
                         <tr key={client.id}>
-                          <td className="py-3">
+                          <td className="py-3 max-w-[160px]">
                             <div className="flex items-center gap-3">
                               <div className="w-9 h-9 rounded-full bg-gradient-to-br from-sky-500 to-blue-500 flex items-center justify-center text-white font-medium text-xs flex-shrink-0">
                                 {getInitials(client.client?.firstName, client.client?.lastName)}
                               </div>
-                              <div className="min-w-0">
-                                <p className="font-medium text-sm truncate">
-                                  {client.client?.firstName || ''} {client.client?.lastName || ''}
-                                </p>
-                                {client.client?.email && (
-                                  <p className="text-xs text-slate-500 truncate">{client.client.email}</p>
-                                )}
-                              </div>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <p className="font-medium text-sm truncate min-w-0 cursor-default">
+                                    {client.client?.firstName || ''} {client.client?.lastName || ''}
+                                  </p>
+                                </TooltipTrigger>
+                                <TooltipContent side="top">
+                                  <p className="text-xs">{client.client?.firstName || ''} {client.client?.lastName || ''}</p>
+                                </TooltipContent>
+                              </Tooltip>
                             </div>
                           </td>
-                          <td className="py-3">
-                            <code className="text-sm bg-slate-100 px-2 py-0.5 rounded">{client.client?.username}</code>
+                          <td className="py-3 max-w-[160px]">
+                            {client.client?.email ? (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="text-sm text-slate-600 block truncate cursor-default">{client.client.email}</span>
+                                </TooltipTrigger>
+                                <TooltipContent side="top">
+                                  <p className="text-xs">{client.client.email}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            ) : (
+                              <span className="text-xs text-slate-400">-</span>
+                            )}
+                          </td>
+                          <td className="py-3 max-w-[130px]">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <code className="text-sm bg-slate-100 px-2 py-0.5 rounded block truncate cursor-default">{client.client?.username}</code>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">
+                                <p className="text-xs">{client.client?.username}</p>
+                              </TooltipContent>
+                            </Tooltip>
                           </td>
                           <td className="py-3">
                             {client.active ? (
@@ -498,9 +525,16 @@ export default function AgencyClientsPage() {
                               return (
                                 <div className="flex flex-wrap gap-1">
                                   {tours.map((name, i) => (
-                                    <span key={i} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
-                                      {name}
-                                    </span>
+                                    <Tooltip key={i}>
+                                      <TooltipTrigger asChild>
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 max-w-[140px] truncate cursor-default">
+                                          {name}
+                                        </span>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top">
+                                        <p className="text-xs">{name}</p>
+                                      </TooltipContent>
+                                    </Tooltip>
                                   ))}
                                 </div>
                               );
@@ -508,11 +542,20 @@ export default function AgencyClientsPage() {
                           </td>
                           <td className="py-3">
                             <span className="text-xs text-slate-500 whitespace-nowrap">
-                              {new Date(client.createdAt).toLocaleDateString('tr-TR')}
+                              {new Date(client.createdAt).toLocaleDateString(locale === 'tr' ? 'tr-TR' : locale === 'de' ? 'de-DE' : 'en-US')}
                             </span>
                           </td>
                           <td className="py-3 text-right">
                             <div className="flex items-center justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 text-green-600 hover:text-green-800 hover:bg-green-50"
+                                onClick={() => setWhatsappTarget(client)}
+                                title={t.invitations.whatsappShare}
+                              >
+                                <MessageCircle className="h-4 w-4" />
+                              </Button>
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -521,10 +564,10 @@ export default function AgencyClientsPage() {
                                   setAddToTourTarget(client);
                                   setSelectedTourId(null);
                                 }}
-                                title="Tura Ekle"
+                                title={t.invitations.addToTour}
                               >
                                 <UserPlus className="h-4 w-4 mr-1" />
-                                <span className="text-xs">Tura Ekle</span>
+                                <span className="text-xs">{t.invitations.addToTour}</span>
                               </Button>
                               <Button
                                 variant="ghost"
@@ -558,20 +601,83 @@ export default function AgencyClientsPage() {
         </div>
       </div>
 
+      {/* WhatsApp Share Dialog */}
+      <Dialog open={!!whatsappTarget} onOpenChange={(open) => { if (!open) { setWhatsappTarget(null); setWhatsappLang('tr'); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageCircle className="h-5 w-5 text-green-600" />
+              {t.invitations.whatsappShare}
+            </DialogTitle>
+          </DialogHeader>
+          {whatsappTarget && (() => {
+            const fullName = `${whatsappTarget.client?.firstName || ''} ${whatsappTarget.client?.lastName || ''}`.trim();
+            const username = whatsappTarget.client?.username || '';
+            const wpT = locales[whatsappLang];
+            const message = wpT.invitations.whatsappMessage
+              .replace('{fullName}', fullName)
+              .replace('{username}', username);
+            return (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  {(['tr', 'en', 'de'] as Locale[]).map((lang) => (
+                    <button
+                      key={lang}
+                      type="button"
+                      onClick={() => setWhatsappLang(lang)}
+                      className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                        whatsappLang === lang
+                          ? 'bg-green-600 text-white shadow-sm'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      {lang === 'tr' ? 'Türkçe' : lang === 'en' ? 'English' : 'Deutsch'}
+                    </button>
+                  ))}
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-slate-500 mb-2">{t.invitations.whatsappPreview}</p>
+                  <div className="bg-slate-50 rounded-lg p-3 text-sm whitespace-pre-line text-slate-700 border max-h-60 overflow-y-auto">
+                    {message}
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => { setWhatsappTarget(null); setWhatsappLang('tr'); }}>
+                    {t.common.cancel}
+                  </Button>
+                  <Button
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                    onClick={() => {
+                      const encoded = encodeURIComponent(message);
+                      window.open(`https://web.whatsapp.com/send?text=${encoded}`, '_blank');
+                      setWhatsappTarget(null);
+                      setWhatsappLang('tr');
+                    }}
+                  >
+                    <MessageCircle className="h-4 w-4 mr-2" />
+                    {t.invitations.whatsappSend}
+                  </Button>
+                </DialogFooter>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
       {/* Create Client Dialog */}
       <Dialog open={isFormOpen} onOpenChange={(open) => !open && closeForm()}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <User className="h-5 w-5 text-blue-600" />
-              Yeni Müşteri
+              {t.invitations.newClient}
             </DialogTitle>
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="firstName">Ad *</Label>
+                <Label htmlFor="firstName">{t.invitations.labelFirstName}</Label>
                 <Input
                   id="firstName"
                   value={formData.firstName}
@@ -582,7 +688,7 @@ export default function AgencyClientsPage() {
                 {errors.firstName && <p className="text-xs text-red-500">{errors.firstName}</p>}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="lastName">Soyad *</Label>
+                <Label htmlFor="lastName">{t.invitations.labelLastName}</Label>
                 <Input
                   id="lastName"
                   value={formData.lastName}
@@ -595,7 +701,7 @@ export default function AgencyClientsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="username">Kullanıcı Adı *</Label>
+              <Label htmlFor="username">{t.invitations.labelUsername}</Label>
               <Input
                 id="username"
                 value={formData.username}
@@ -607,14 +713,14 @@ export default function AgencyClientsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Şifre *</Label>
+              <Label htmlFor="password">{t.invitations.labelPassword}</Label>
               <div className="relative">
                 <Input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
                   value={formData.password}
                   onChange={(e) => setFormData((prev) => ({ ...prev, password: e.target.value }))}
-                  placeholder="En az 6 karakter"
+                  placeholder={t.invitations.passwordMinLength}
                   className={`pr-10 ${errors.password ? 'border-red-500' : ''}`}
                 />
                 <button
@@ -630,7 +736,7 @@ export default function AgencyClientsPage() {
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={closeForm}>
-                İptal
+                {t.common.cancel}
               </Button>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -639,12 +745,12 @@ export default function AgencyClientsPage() {
                       {createMutation.isPending ? (
                         <>
                           <span className="animate-spin mr-2">&#9696;</span>
-                          Oluşturuluyor...
+                          {t.common.loading}
                         </>
                       ) : (
                         <>
                           <Plus className="h-4 w-4 mr-2" />
-                          Oluştur
+                          {t.common.create}
                         </>
                       )}
                     </Button>
@@ -664,7 +770,7 @@ export default function AgencyClientsPage() {
         title={t.agency.deleteClient}
         description={
           deleteTarget
-            ? `"${deleteTarget.client?.firstName || ''} ${deleteTarget.client?.lastName || ''}" müşterisini silmek istediğinize emin misiniz?`
+            ? t.invitations.deleteClientConfirm.replace('{name}', `${deleteTarget.client?.firstName || ''} ${deleteTarget.client?.lastName || ''}`.trim())
             : ''
         }
         onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
@@ -814,7 +920,7 @@ export default function AgencyClientsPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Navigation className="h-5 w-5 text-blue-600" />
-              Tura Ekle
+              {t.invitations.addToTour}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
@@ -824,7 +930,7 @@ export default function AgencyClientsPage() {
               </div>
               <div>
                 <p className="font-medium text-sm">{addToTourTarget?.client?.firstName} {addToTourTarget?.client?.lastName}</p>
-                <p className="text-xs text-slate-500">Hangi tura eklemek istiyorsunuz?</p>
+                <p className="text-xs text-slate-500">{t.invitations.whichTour}</p>
               </div>
             </div>
 
@@ -833,7 +939,7 @@ export default function AgencyClientsPage() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input
-                  placeholder="Tur ara..."
+                  placeholder={t.invitations.searchTour}
                   value={tourSearch}
                   onChange={(e) => setTourSearch(e.target.value)}
                   className="pl-9 h-9 text-sm"
@@ -844,7 +950,7 @@ export default function AgencyClientsPage() {
             {!toursList || toursList.length === 0 ? (
               <div className="text-center py-6">
                 <Navigation className="h-10 w-10 mx-auto mb-2 text-slate-300" />
-                <p className="text-sm text-slate-400">Henüz tur bulunmuyor</p>
+                <p className="text-sm text-slate-400">{t.invitations.noToursYet}</p>
               </div>
             ) : (
               <div className="space-y-1.5 max-h-[280px] overflow-y-auto pr-1 -mr-1">
@@ -861,10 +967,10 @@ export default function AgencyClientsPage() {
                       completed: 'bg-slate-100 text-slate-700',
                     };
                     const statusLabels: Record<string, string> = {
-                      draft: 'Taslak',
-                      published: 'Yayında',
-                      cancelled: 'İptal',
-                      completed: 'Tamamlandı',
+                      draft: t.invitations.statusDraft,
+                      published: t.invitations.statusPublished,
+                      cancelled: t.invitations.statusCancelled,
+                      completed: t.invitations.statusCompleted,
                     };
                     return (
                       <button
@@ -890,7 +996,7 @@ export default function AgencyClientsPage() {
                               </span>
                               <span className="inline-flex items-center gap-1">
                                 <Calendar className="h-3 w-3" />
-                                {new Date(tour.startDate).toLocaleDateString('tr-TR')} - {new Date(tour.endDate).toLocaleDateString('tr-TR')}
+                                {new Date(tour.startDate).toLocaleDateString(locale === 'tr' ? 'tr-TR' : locale === 'de' ? 'de-DE' : 'en-US')} - {new Date(tour.endDate).toLocaleDateString(locale === 'tr' ? 'tr-TR' : locale === 'de' ? 'de-DE' : 'en-US')}
                               </span>
                             </div>
                           </div>
@@ -900,7 +1006,7 @@ export default function AgencyClientsPage() {
                             </span>
                             {isAlreadyInTour && (
                               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-200 text-slate-500">
-                                Zaten ekli
+                                {t.invitations.alreadyAdded}
                               </span>
                             )}
                           </div>
@@ -913,7 +1019,7 @@ export default function AgencyClientsPage() {
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => { setAddToTourTarget(null); setSelectedTourId(null); setTourSearch(''); }}>
-              İptal
+              {t.common.cancel}
             </Button>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -929,12 +1035,12 @@ export default function AgencyClientsPage() {
                     {addToTourMutation.isPending ? (
                       <>
                         <span className="animate-spin mr-2">&#9696;</span>
-                        Ekleniyor...
+                        {t.invitations.adding}
                       </>
                     ) : (
                       <>
                         <UserPlus className="h-4 w-4 mr-2" />
-                        Onayla
+                        {t.common.confirm}
                       </>
                     )}
                   </Button>
