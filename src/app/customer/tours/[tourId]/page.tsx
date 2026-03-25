@@ -716,7 +716,7 @@ export default function CustomerTourDetailPage() {
                                     disabled={!isApproved || !tableInfo || participantStatus !== 'confirmed'}
                                   >
                                     <UtensilsCrossed className="h-3 w-3 mr-1 shrink-0" />
-                                    <span className="truncate">{t.customer.selectMenuAction}</span>
+                                    <span className="truncate">{choicesApproved ? t.customer.viewMenuAction : t.customer.selectMenuAction}</span>
                                     {menuItemCount > 0 && (
                                       <span className="ml-1 bg-orange-100 text-orange-700 rounded-full px-1.5 text-[10px] font-bold shrink-0">
                                         {menuItemCount}
@@ -854,7 +854,7 @@ export default function CustomerTourDetailPage() {
           <DialogHeader className="flex-shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <UtensilsCrossed className="h-5 w-5 text-orange-500" />
-              {t.customer.selectMenuAction}
+              {tour.stops?.find(s => s.id === menuStopId)?.choicesStatus === 'approved' ? t.customer.viewMenuAction : t.customer.selectMenuAction}
             </DialogTitle>
           </DialogHeader>
 
