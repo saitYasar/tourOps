@@ -374,7 +374,7 @@ export default function CustomerTourDetailPage() {
         if (currentTotal + addedAmount > limit) {
           const firstCurrency = menuCategories.flatMap(c => c.services).find(s => s?.currency)?.currency;
           const currSymbol = getCurrencySymbol(firstCurrency);
-          toast.error(`${t.customer.spendLimitExceeded}: ${currSymbol}${limit.toFixed(2)}`);
+          toast.error(t.customer.spendLimitExceeded);
           return;
         }
       }

@@ -675,7 +675,7 @@ export const en = {
     tableSaveError: 'Failed to save table selection',
     menuUpdateError: 'Failed to update menu selection',
     menuSaveError: 'Failed to save menu selection',
-    spendLimitExceeded: 'Spend limit exceeded! Maximum spend limit',
+    spendLimitExceeded: 'You can only select 1 item',
     spendLimit: 'Spend Limit',
     noteSaveError: 'Failed to save note',
     changeTable:'Change Seat',

@@ -675,7 +675,7 @@ export const tr = {
     tableSaveError: 'Masa seçimi kaydedilemedi',
     menuUpdateError: 'Menü seçimi güncellenemedi',
     menuSaveError: 'Menü seçimi kaydedilemedi',
-    spendLimitExceeded: 'Üst limit aşıldı! Maksimum harcama limiti',
+    spendLimitExceeded: 'Sadece 1 adet seçim yapabilirsiniz',
     spendLimit: 'Üst Limit',
     noteSaveError: 'Not kaydedilemedi',
     changeTable: 'Yer Değiştir',

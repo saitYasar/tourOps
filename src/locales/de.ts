@@ -675,7 +675,7 @@ export const de = {
     tableSaveError: 'Tischauswahl konnte nicht gespeichert werden',
     menuUpdateError: 'Menüauswahl konnte nicht aktualisiert werden',
     menuSaveError: 'Menüauswahl konnte nicht gespeichert werden',
-    spendLimitExceeded: 'Ausgabenlimit überschritten! Maximales Ausgabenlimit',
+    spendLimitExceeded: 'Sie können nur 1 Auswahl treffen',
     spendLimit: 'Ausgabenlimit',
     noteSaveError: 'Notiz konnte nicht gespeichert werden',
     changeTable: 'Platz ändern',
