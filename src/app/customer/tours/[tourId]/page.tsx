@@ -79,6 +79,8 @@ export default function CustomerTourDetailPage() {
   const [menuStopId, setMenuStopId] = useState<number | null>(null);
   // Service detail popup
   const [detailService, setDetailService] = useState<ClientStopMenuServiceDto | null>(null);
+  // Gallery lightbox
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
   // Persisted selections across stops (synced from backend)
   const [selectedTables, setSelectedTables] = useState<Record<number, SelectedTableInfo>>({});
@@ -754,7 +756,11 @@ export default function CustomerTourDetailPage() {
             </div>
             <div className="flex gap-2 sm:gap-3 overflow-x-auto pb-3 snap-x snap-mandatory -mx-3 px-3 scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch' }}>
               {tour.photos.map((photo, i) => (
-                <div key={photo.id || i} className="flex-shrink-0 w-[45vw] sm:w-[30vw] max-w-sm snap-start rounded-xl overflow-hidden bg-slate-100 aspect-[4/3]">
+                <div
+                  key={photo.id || i}
+                  className="flex-shrink-0 w-[45vw] sm:w-[30vw] max-w-sm snap-start rounded-xl overflow-hidden bg-slate-100 aspect-[4/3] cursor-pointer"
+                  onClick={() => setLightboxImage(photo.imageUrl || '')}
+                >
                   <img
                     src={photo.imageUrl || ''}
                     alt=""
@@ -766,6 +772,21 @@ export default function CustomerTourDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Gallery Lightbox */}
+      {lightboxImage && (
+        <div
+          className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-4"
+          onClick={() => setLightboxImage(null)}
+        >
+          <img
+            src={lightboxImage}
+            alt=""
+            className="max-w-full max-h-[90vh] object-contain rounded-lg"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
 
       {/* ============================================ */}
       {/* Table Selection Dialog */}
