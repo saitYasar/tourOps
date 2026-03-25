@@ -1170,11 +1170,6 @@ function MenuBottomBar({
 
   return (
     <div className="flex-shrink-0 border-t border-slate-200 pt-3 mt-2">
-      {hasLimit && (
-        <div className={`text-xs font-medium mb-2 px-2 py-1 rounded ${overLimit ? 'bg-red-50 text-red-600' : 'bg-slate-50 text-slate-500'}`}>
-          {t.customer.spendLimit}: {currSymbol}{Number(maxSpendLimit).toFixed(2)}
-        </div>
-      )}
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm text-slate-600">

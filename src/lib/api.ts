@@ -3860,7 +3860,7 @@ class ApiClient {
     const formData = new FormData();
     formData.append('galleryImages', image);
 
-    const url = `${this.baseUrl}/agency/tours/${tourId}/photos?lang=${lang}`;
+    const url = `${this.baseUrl}/agency/tours/${tourId}?lang=${lang}`;
 
     const headers: HeadersInit = {};
     const token = this.resolveToken();
@@ -3869,7 +3869,7 @@ class ApiClient {
     }
 
     const res = await fetch(url, {
-      method: 'POST',
+      method: 'PUT',
       headers,
       body: formData,
     });
