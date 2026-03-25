@@ -386,7 +386,7 @@ export default function TourDetailPage() {
   // Receipt helpers
   const selectedStop = stops?.find(s => s.id === choicesStopId);
   const choicesOrgName = selectedStop?.organization?.name || '';
-  const receiptTourInfo = tour ? { tourName: tour.tourName, startDate: tour.startDate } : { tourName: '', startDate: '' };
+  const receiptTourInfo = tour ? { tourName: tour.tourName, startDate: tour.startDate, stopStartDate: selectedStop?.scheduledStartTime, stopEndDate: selectedStop?.scheduledEndTime } : { tourName: '', startDate: '' };
   const choicesArr = stopChoices || [];
 
   const handlePrint = useCallback(() => {
