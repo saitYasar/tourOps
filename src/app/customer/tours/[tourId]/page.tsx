@@ -752,9 +752,9 @@ export default function CustomerTourDetailPage() {
               <ImageIcon className="h-5 w-5 text-orange-500" />
               <h3 className="text-lg font-bold text-slate-800">{t.customer.gallery}</h3>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="flex gap-2 sm:gap-3 overflow-x-auto pb-3 snap-x snap-mandatory -mx-3 px-3 scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch' }}>
               {tour.photos.map((photo, i) => (
-                <div key={photo.id || i} className="aspect-square rounded-xl overflow-hidden bg-slate-100">
+                <div key={photo.id || i} className="flex-shrink-0 w-[45vw] sm:w-[30vw] max-w-sm snap-start rounded-xl overflow-hidden bg-slate-100 aspect-[4/3]">
                   <img
                     src={photo.imageUrl || ''}
                     alt=""

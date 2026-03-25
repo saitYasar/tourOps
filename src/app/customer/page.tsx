@@ -562,7 +562,7 @@ function DashboardView({
               const isConfirmed = item.status === 'confirmed';
 
               const cardContent = (
-                <Card className={`overflow-hidden border-0 shadow-md transition-all bg-white ${isConfirmed ? 'hover:shadow-lg cursor-pointer' : 'opacity-75 cursor-not-allowed'}`}>
+                <Card className={`overflow-hidden border-0 shadow-md transition-all bg-white h-full flex flex-col ${isConfirmed ? 'hover:shadow-lg cursor-pointer' : 'opacity-75 cursor-not-allowed'}`}>
                   {tour.coverImageUrl ? (
                     <div className="h-28 sm:h-32 bg-slate-100 overflow-hidden">
                       <img src={tour.coverImageUrl} alt={tour.tourName} className="w-full h-full object-cover" />
@@ -572,7 +572,7 @@ function DashboardView({
                       ['from-sky-400 to-blue-500', 'from-orange-400 to-amber-500', 'from-emerald-400 to-teal-500', 'from-rose-400 to-pink-500'][index % 4]
                     }`} />
                   )}
-                  <CardContent className="p-3 sm:p-4">
+                  <CardContent className="p-3 sm:p-4 flex-1 flex flex-col">
                     <div className="flex items-start justify-between gap-2 mb-1.5 sm:mb-2">
                       <h4 className="font-bold text-slate-800 text-sm sm:text-base min-w-0 truncate">{tour.tourName}</h4>
                       <span
@@ -582,10 +582,8 @@ function DashboardView({
                         {statusCfg.label}
                       </span>
                     </div>
-                    {tour.description && (
-                      <p className="text-xs sm:text-sm text-slate-500 line-clamp-2 mb-2 sm:mb-3">{tour.description}</p>
-                    )}
-                    <div className="flex flex-wrap gap-1.5 sm:gap-2 text-[10px] sm:text-xs">
+                    <p className="text-xs sm:text-sm text-slate-500 line-clamp-2 mb-2 sm:mb-3 min-h-[2.5em]">{tour.description || '\u00A0'}</p>
+                    <div className="flex flex-wrap gap-1.5 sm:gap-2 text-[10px] sm:text-xs mt-auto">
                       {tour.tourCode && (
                         <span className="flex items-center gap-1 bg-violet-50 text-violet-700 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full">
                           <Ticket className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
