@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2, User, Search, Users, Eye, EyeOff, Navigation, Calendar, Hash, UserPlus, FileSpreadsheet, Upload, X, MessageCircle, Download } from 'lucide-react';
+import { Plus, Trash2, User, Search, Users, Eye, EyeOff, Navigation, Calendar, Hash, UserPlus, FileSpreadsheet, Upload, X, MessageCircle, Download, FileText, Send, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { agencyApi, tourApi, type AgencyClientDto, type CreateAgencyClientDto } from '@/lib/api';
@@ -23,6 +23,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { LoadingState, EmptyState, ErrorState, ConfirmDialog, AdminPagination } from '@/components/shared';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 
 interface ClientFormData {
   firstName: string;
@@ -309,6 +310,68 @@ export default function AgencyClientsPage() {
     return (f + l || '?').toUpperCase();
   };
 
+  const handleDownloadPdf = () => {
+    if (!clients.length) return;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const rows = clients.map((client: AgencyClientDto, i: number) => {
+      const tours = clientTourMap.get(client.clientId);
+      const tourStr = tours?.join(', ') || '-';
+      const status = client.active ? t.agency.clientActive : t.agency.clientInactive;
+      const date = new Date(client.createdAt).toLocaleDateString(locale === 'tr' ? 'tr-TR' : locale === 'de' ? 'de-DE' : 'en-US');
+      return `<tr>
+        <td style="padding:6px 10px;border:1px solid #e2e8f0;text-align:center">${i + 1}</td>
+        <td style="padding:6px 10px;border:1px solid #e2e8f0">${client.client?.firstName || ''} ${client.client?.lastName || ''}</td>
+        <td style="padding:6px 10px;border:1px solid #e2e8f0">${client.client?.email || '-'}</td>
+        <td style="padding:6px 10px;border:1px solid #e2e8f0">${client.client?.username || '-'}</td>
+        <td style="padding:6px 10px;border:1px solid #e2e8f0;text-align:center">${status}</td>
+        <td style="padding:6px 10px;border:1px solid #e2e8f0">${tourStr}</td>
+        <td style="padding:6px 10px;border:1px solid #e2e8f0;text-align:center">${date}</td>
+      </tr>`;
+    }).join('');
+
+    const totalLabel = t.invitations.clientsRegistered.replace('{count}', String(meta?.totalCount ?? meta?.total ?? clients.length));
+
+    printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${t.invitations.clientList}</title>
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 20px; color: #1e293b; }
+        h1 { font-size: 18px; margin-bottom: 4px; }
+        p { font-size: 13px; color: #64748b; margin-bottom: 16px; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        th { padding: 8px 10px; border: 1px solid #cbd5e1; background: #f1f5f9; font-weight: 600; text-align: left; }
+        @media print { body { padding: 0; } }
+      </style></head><body>
+      <h1>${t.invitations.clientList}</h1>
+      <p>${totalLabel}${filterTourName ? ' — ' + filterTourName : ''}</p>
+      <table>
+        <thead><tr>
+          <th style="text-align:center">#</th>
+          <th>${t.invitations.columnClient}</th>
+          <th>${t.invitations.columnEmail}</th>
+          <th>${t.invitations.columnUsername}</th>
+          <th style="text-align:center">${t.invitations.columnStatus}</th>
+          <th>${t.invitations.columnTour}</th>
+          <th style="text-align:center">${t.invitations.columnDate}</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table></body></html>`);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => printWindow.print(), 300);
+  };
+
+  const handleSendPdfWhatsapp = () => {
+    if (!clients.length) return;
+    const lines = clients.map((client: AgencyClientDto, i: number) => {
+      const name = `${client.client?.firstName || ''} ${client.client?.lastName || ''}`.trim();
+      return `${i + 1}. ${name}`;
+    });
+    const header = `*${t.invitations.clientList}*${filterTourName ? ` — ${filterTourName}` : ''}`;
+    const text = encodeURIComponent(`${header}\n\n${lines.join('\n')}`);
+    window.open(`https://web.whatsapp.com/send?text=${text}`, '_blank');
+  };
+
   if (isLoading) {
     return (
       <div className="flex flex-col h-full">
@@ -350,6 +413,25 @@ export default function AgencyClientsPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" disabled={clients.length === 0}>
+                        <Send className="h-4 w-4 mr-2" />
+                        {t.invitations.sendPdf}
+                        <ChevronDown className="h-3.5 w-3.5 ml-1.5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={handleDownloadPdf}>
+                        <Download className="h-4 w-4 mr-2" />
+                        {t.invitations.downloadPdf}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleSendPdfWhatsapp}>
+                        <MessageCircle className="h-4 w-4 mr-2" />
+                        {t.invitations.sendViaWhatsapp}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                   <Button variant="outline" onClick={() => setIsBatchOpen(true)}>
                     <FileSpreadsheet className="h-4 w-4 mr-2" />
                     {t.invitations.batchImport}
@@ -554,7 +636,7 @@ export default function AgencyClientsPage() {
                                 onClick={() => setWhatsappTarget(client)}
                                 title={t.invitations.whatsappShare}
                               >
-                                <MessageCircle className="h-4 w-4" />
+                                <Send className="h-4 w-4" />
                               </Button>
                               <Button
                                 variant="ghost"
