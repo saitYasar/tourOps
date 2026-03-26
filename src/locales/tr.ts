@@ -663,6 +663,7 @@ export const tr = {
     price: 'Fiyat',
     selectSeat: 'Yer Seç',
     selectMenuAction: 'Menü Seç',
+    editMenuAction: 'Menüyü Düzenle',
     viewMenuAction: 'Menüyü Gör',
     floor: 'Kat',
     room: 'Oda',

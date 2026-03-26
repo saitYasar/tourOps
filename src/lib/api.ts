@@ -1719,10 +1719,10 @@ class ApiClient {
   // Client - Reservations
   // ============================================
 
-  async getClientReservations(clientId: string, page = 1, limit = 10, lang: 'tr' | 'en' | 'de' = 'tr') {
+  async getClientReservations(clientId: string, page = 1, limit = 10) {
     return this.request<PaginatedResponse<ClientReservationDto>>(`/reservations/client/${clientId}?page=${page}&limit=${limit}`, {
       method: 'GET',
-    }, lang);
+    }, 'tr', true);
   }
 
   async createReservation(data: CreateReservationDto, lang: 'tr' | 'en' | 'de' = 'tr') {

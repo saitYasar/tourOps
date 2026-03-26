@@ -89,6 +89,8 @@ export default function CustomerTourDetailPage() {
   const [serviceChoiceIds, setServiceChoiceIds] = useState<Record<number, Record<number, number>>>({});
   // Notes per menu item: stopId -> { serviceId -> note }
   const [menuNotes, setMenuNotes] = useState<Record<number, Record<number, string>>>({});
+  // Service titles for selected items: stopId -> { serviceId -> title }
+  const [menuItemTitles, setMenuItemTitles] = useState<Record<number, Record<number, string>>>({});
   // Debounce timers for note API calls
   const noteTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
@@ -188,15 +190,18 @@ export default function CustomerTourDetailPage() {
         const menuItems: MenuSelections = {};
         const choiceIdMap: Record<number, number> = {};
         const noteMap: Record<number, string> = {};
+        const titleMap: Record<number, string> = {};
         for (const sc of choices.serviceChoices) {
           const svcId = sc.serviceId || sc.service?.id;
           if (!svcId) continue;
           menuItems[svcId] = sc.quantity;
           choiceIdMap[svcId] = sc.id;
           if (sc.note) noteMap[svcId] = sc.note;
+          if (sc.service?.title) titleMap[svcId] = sc.service.title;
         }
         setSelectedMenuItems(prev => ({ ...prev, [stopId]: menuItems }));
         setServiceChoiceIds(prev => ({ ...prev, [stopId]: choiceIdMap }));
+        setMenuItemTitles(prev => ({ ...prev, [stopId]: titleMap }));
         if (Object.keys(noteMap).length > 0) {
           setMenuNotes(prev => ({ ...prev, [stopId]: noteMap }));
         }
@@ -382,12 +387,27 @@ export default function CustomerTourDetailPage() {
       }
     }
 
+    // Find service title from menu categories for title tracking
+    const findServiceTitle = (cats: ClientStopMenuCategoryDto[]): string => {
+      for (const cat of cats) {
+        for (const svc of cat.services || []) {
+          if (svc.id === serviceId) return svc.title;
+        }
+        if (cat.child_service_categories) {
+          const found = findServiceTitle(cat.child_service_categories);
+          if (found) return found;
+        }
+      }
+      return '';
+    };
+    const serviceTitle = findServiceTitle(menuCategories);
+
     const existingChoiceId = serviceChoiceIds[stopId]?.[serviceId];
 
     if (existingChoiceId) {
       // Update existing choice (quantity 0 = remove)
       try {
-        const result = await apiClient.updateServiceChoice(existingChoiceId, { quantity: Math.max(0, qty) });
+        await apiClient.updateServiceChoice(existingChoiceId, { quantity: Math.max(0, qty) });
         setSelectedMenuItems(prev => {
           const stopItems = { ...(prev[stopId] || {}) };
           if (qty <= 0) {
@@ -396,6 +416,16 @@ export default function CustomerTourDetailPage() {
             stopItems[serviceId] = qty;
           }
           return { ...prev, [stopId]: stopItems };
+        });
+        // Update title map
+        setMenuItemTitles(prev => {
+          const stopTitles = { ...(prev[stopId] || {}) };
+          if (qty <= 0) {
+            delete stopTitles[serviceId];
+          } else if (serviceTitle) {
+            stopTitles[serviceId] = serviceTitle;
+          }
+          return { ...prev, [stopId]: stopTitles };
         });
         if (qty <= 0) {
           setServiceChoiceIds(prev => {
@@ -417,6 +447,13 @@ export default function CustomerTourDetailPage() {
           stopItems[serviceId] = qty;
           return { ...prev, [stopId]: stopItems };
         });
+        // Update title map
+        if (serviceTitle) {
+          setMenuItemTitles(prev => ({
+            ...prev,
+            [stopId]: { ...(prev[stopId] || {}), [serviceId]: serviceTitle },
+          }));
+        }
         // Store the returned choice ID
         if (result && typeof result === 'object') {
           const choiceData = ('data' in result) ? (result as unknown as { data: ClientServiceChoiceDto }).data : result as ClientServiceChoiceDto;
@@ -671,9 +708,27 @@ export default function CustomerTourDetailPage() {
 
                           {/* Selected menu items indicator */}
                           {menuItemCount > 0 && (
-                            <div className="flex items-center gap-1 text-xs text-emerald-600 mt-1 font-medium">
-                              <Check className="h-3 w-3" />
-                              {t.customer.selectedItems}: {menuItemCount} {t.customer.quantity}
+                            <div className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50/50 p-2">
+                              <div className="flex items-center gap-1.5 text-xs text-emerald-700 font-semibold mb-1.5">
+                                <UtensilsCrossed className="h-3 w-3" />
+                                {t.customer.selectedItems} ({menuItemCount})
+                              </div>
+                              {menuItemTitles[stop.id] && Object.keys(selectedMenuItems[stop.id] || {}).length > 0 && (
+                                <div className="space-y-1">
+                                  {Object.entries(selectedMenuItems[stop.id] || {}).map(([svcId, qty]) => {
+                                    const title = menuItemTitles[stop.id]?.[Number(svcId)];
+                                    if (!title || qty <= 0) return null;
+                                    return (
+                                      <div key={svcId} className="flex items-center justify-between text-[11px] text-emerald-800 bg-white/70 rounded-md px-2 py-1">
+                                        <span className="truncate mr-2">{title}</span>
+                                        <span className="shrink-0 font-semibold bg-emerald-100 text-emerald-700 rounded px-1.5 py-0.5 text-[10px]">
+                                          ×{qty}
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
                             </div>
                           )}
 
@@ -718,7 +773,7 @@ export default function CustomerTourDetailPage() {
                                     disabled={!isApproved || !tableInfo || participantStatus !== 'confirmed'}
                                   >
                                     <UtensilsCrossed className="h-3 w-3 mr-1 shrink-0" />
-                                    <span className="truncate">{choicesApproved ? t.customer.viewMenuAction : t.customer.selectMenuAction}</span>
+                                    <span className="truncate">{choicesApproved ? t.customer.viewMenuAction : menuItemCount > 0 ? t.customer.editMenuAction : t.customer.selectMenuAction}</span>
                                     {menuItemCount > 0 && (
                                       <span className="ml-1 bg-orange-100 text-orange-700 rounded-full px-1.5 text-[10px] font-bold shrink-0">
                                         {menuItemCount}
@@ -875,7 +930,7 @@ export default function CustomerTourDetailPage() {
           <DialogHeader className="flex-shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <UtensilsCrossed className="h-5 w-5 text-orange-500" />
-              {tour.stops?.find(s => s.id === menuStopId)?.choicesStatus === 'approved' ? t.customer.viewMenuAction : t.customer.selectMenuAction}
+              {tour.stops?.find(s => s.id === menuStopId)?.choicesStatus === 'approved' ? t.customer.viewMenuAction : (menuStopId && menuTotalItemCount(menuStopId) > 0) ? t.customer.editMenuAction : t.customer.selectMenuAction}
             </DialogTitle>
           </DialogHeader>
 

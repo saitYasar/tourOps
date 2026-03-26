@@ -663,6 +663,7 @@ export const en = {
     price: 'Price',
     selectSeat: 'Select Seat',
     selectMenuAction: 'Select Menu',
+    editMenuAction: 'Edit Menu',
     viewMenuAction: 'View Menu',
     floor: 'Floor',
     room: 'Room',

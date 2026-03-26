@@ -4,7 +4,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect, useRef } from 'react';
 import {
   Calendar,
-  MapPin,
   Compass,
   Plane,
   Mountain,
@@ -15,13 +14,12 @@ import {
   User,
   LogOut,
   Ticket,
-  Clock,
   CheckCircle2,
-  XCircle,
-  AlertCircle,
   FileText,
   Bell,
   X,
+  Save,
+  Loader2,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -30,17 +28,19 @@ import {
   apiClient,
   getAuthStorageKeys,
   type ClientProfileDto,
-  type ClientReservationDto,
   type ClientParticipantTourDto,
   type ClientStopChoicesDto,
   type ClientServiceChoiceDto,
   type ClientTourStopDto,
   type PanelNotificationDto,
+  type UpdateClientProfileDto,
 } from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { LanguageSwitcher } from '@/components/shared';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { LoadingState, ErrorState } from '@/components/shared';
 import { formatDate } from '@/lib/dateUtils';
 import { toast } from 'sonner';
@@ -51,12 +51,12 @@ export default function CustomerDashboard() {
   const { t, locale } = useLanguage();
   const apiLang = locale as 'tr' | 'en' | 'de';
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'reservations' | 'serviceRequests'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'serviceRequests' | 'profile'>('dashboard');
   const queryClient = useQueryClient();
   const [notifOpen, setNotifOpen] = useState(false);
   const [selectedNotif, setSelectedNotif] = useState<PanelNotificationDto | null>(null);
   const [toursPage, setToursPage] = useState(1);
-  const [reservationsPage, setReservationsPage] = useState(1);
+
   const PAGE_SIZE = 10;
   const notifRef = useRef<HTMLDivElement>(null);
 
@@ -103,13 +103,6 @@ export default function CustomerDashboard() {
     queryFn: () => apiClient.getClientProfile(apiLang),
   });
 
-  // Reservations
-  const { data: reservationsData, isLoading: reservationsLoading } = useQuery({
-    queryKey: ['client-reservations', profile?.id, apiLang, reservationsPage],
-    queryFn: () => apiClient.getClientReservations(String(profile!.id), reservationsPage, PAGE_SIZE),
-    enabled: !!profile?.id,
-  });
-
   // Tours - new client API
   const { data: toursData, isLoading: toursLoading } = useQuery({
     queryKey: ['client-my-tours', apiLang, toursPage],
@@ -128,7 +121,7 @@ export default function CustomerDashboard() {
   const [choicesLoading, setChoicesLoading] = useState(false);
 
   useEffect(() => {
-    if (!tours.length) return;
+    if (!tours.length || activeTab !== 'serviceRequests') return;
     let cancelled = false;
     setChoicesLoading(true);
     (async () => {
@@ -175,7 +168,7 @@ export default function CustomerDashboard() {
       }
     })();
     return () => { cancelled = true; };
-  }, [tours.length, apiLang]);
+  }, [tours.length, apiLang, activeTab]);
 
   const handleLogout = () => {
     localStorage.removeItem(customerKeys.token);
@@ -200,14 +193,6 @@ export default function CustomerDashboard() {
     );
   }
 
-  const reservationsResponse = reservationsData as unknown as { data?: ClientReservationDto[]; total?: number; meta?: { total?: number } };
-  const reservations = reservationsResponse?.data ?? (Array.isArray(reservationsData) ? reservationsData as ClientReservationDto[] : []);
-  const reservationsTotalCount = reservationsResponse?.total ?? reservationsResponse?.meta?.total ?? reservations.length;
-  const reservationsTotalPages = Math.ceil(reservationsTotalCount / PAGE_SIZE);
-
-  const pendingReservations = reservations.filter((r: ClientReservationDto) => r.status === 'pending');
-  const approvedReservations = reservations.filter((r: ClientReservationDto) => r.status === 'approved');
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-50 via-orange-50 to-amber-50 overflow-x-hidden">
       {/* Top Navigation */}
@@ -231,17 +216,16 @@ export default function CustomerDashboard() {
                 label={t.nav.dashboard}
               />
               <NavTab
-                active={activeTab === 'reservations'}
-                onClick={() => setActiveTab('reservations')}
-                icon={Ticket}
-                label={t.requests.title}
-                badge={pendingReservations.length || undefined}
-              />
-              <NavTab
                 active={activeTab === 'serviceRequests'}
                 onClick={() => setActiveTab('serviceRequests')}
                 icon={FileText}
                 label={t.customer.serviceRequests}
+              />
+              <NavTab
+                active={activeTab === 'profile'}
+                onClick={() => setActiveTab('profile')}
+                icon={User}
+                label={t.common.profile}
               />
             </div>
 
@@ -328,16 +312,16 @@ export default function CustomerDashboard() {
             label={t.nav.dashboard}
           />
           <MobileNavTab
-            active={activeTab === 'reservations'}
-            onClick={() => setActiveTab('reservations')}
-            icon={Ticket}
-            label={t.requests.title}
-          />
-          <MobileNavTab
             active={activeTab === 'serviceRequests'}
             onClick={() => setActiveTab('serviceRequests')}
             icon={FileText}
             label={t.customer.serviceRequests}
+          />
+          <MobileNavTab
+            active={activeTab === 'profile'}
+            onClick={() => setActiveTab('profile')}
+            icon={User}
+            label={t.common.profile}
           />
         </div>
       </nav>
@@ -348,7 +332,6 @@ export default function CustomerDashboard() {
           <DashboardView
             profile={profile}
             tours={tours}
-            reservations={reservations.filter((r: ClientReservationDto) => r.status !== 'rejected')}
             toursLoading={toursLoading}
             t={t}
             locale={locale}
@@ -357,22 +340,18 @@ export default function CustomerDashboard() {
             onToursPageChange={setToursPage}
           />
         )}
-        {activeTab === 'reservations' && (
-          <ReservationsView
-            reservations={reservations.filter((r: ClientReservationDto) => r.status !== 'rejected')}
-            loading={reservationsLoading}
-            t={t}
-            locale={locale}
-            page={reservationsPage}
-            totalPages={reservationsTotalPages}
-            onPageChange={setReservationsPage}
-          />
-        )}
         {activeTab === 'serviceRequests' && (
           <ServiceChoicesView
             stopChoices={stopChoices}
             loading={choicesLoading}
             t={t}
+          />
+        )}
+        {activeTab === 'profile' && (
+          <ProfileView
+            profile={profile}
+            t={t}
+            apiLang={apiLang}
           />
         )}
       </div>
@@ -424,7 +403,6 @@ export default function CustomerDashboard() {
 function DashboardView({
   profile,
   tours,
-  reservations,
   toursLoading,
   t,
   locale,
@@ -434,7 +412,6 @@ function DashboardView({
 }: {
   profile: ClientProfileDto;
   tours: ClientParticipantTourDto[];
-  reservations: ClientReservationDto[];
   toursLoading: boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   t: any;
@@ -443,9 +420,6 @@ function DashboardView({
   toursTotalPages: number;
   onToursPageChange: (page: number) => void;
 }) {
-  const pendingCount = reservations.filter(r => r.status === 'pending').length;
-  const approvedCount = reservations.filter(r => r.status === 'approved').length;
-
   const participantStatusConfig: Record<string, { color: string; label: string }> = {
     confirmed: { color: 'bg-emerald-50 text-emerald-700', label: t.customer.participantConfirmed },
     pending: { color: 'bg-amber-50 text-amber-700', label: t.customer.participantPending },
@@ -490,44 +464,12 @@ function DashboardView({
               <span className="text-xs sm:text-sm font-medium">{tours.length} {t.customer.tourCount}</span>
             </div>
             <div className="flex items-center gap-1.5 sm:gap-2 bg-white/20 backdrop-blur-sm rounded-full px-2.5 sm:px-4 py-1.5 sm:py-2">
-              <Ticket className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <span className="text-xs sm:text-sm font-medium">{reservations.length} {t.requests.title}</span>
-            </div>
-            <div className="flex items-center gap-1.5 sm:gap-2 bg-white/20 backdrop-blur-sm rounded-full px-2.5 sm:px-4 py-1.5 sm:py-2">
               <Camera className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               <span className="text-xs sm:text-sm font-medium">{t.customer.enjoyTrip}</span>
             </div>
           </div>
         </CardContent>
       </Card>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-        <StatCard
-          icon={Compass}
-          label={t.customer.activeTours}
-          value={tours.length}
-          color="sky"
-        />
-        <StatCard
-          icon={Clock}
-          label={t.requests.pending}
-          value={pendingCount}
-          color="amber"
-        />
-        <StatCard
-          icon={CheckCircle2}
-          label={t.requests.approved}
-          value={approvedCount}
-          color="emerald"
-        />
-        <StatCard
-          icon={Ticket}
-          label={t.requests.title}
-          value={reservations.length}
-          color="violet"
-        />
-      </div>
 
       {/* Tours */}
       <div>
@@ -633,108 +575,6 @@ function DashboardView({
 }
 
 // ============================================
-// Reservations View
-// ============================================
-function ReservationsView({
-  reservations,
-  loading,
-  t,
-  locale,
-  page,
-  totalPages,
-  onPageChange,
-}: {
-  reservations: ClientReservationDto[];
-  loading: boolean;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  t: any;
-  locale: string;
-  page: number;
-  totalPages: number;
-  onPageChange: (page: number) => void;
-}) {
-  if (loading) return <LoadingState message={t.common.loading} />;
-
-  const statusConfig = {
-    pending: { icon: Clock, color: 'text-amber-600 bg-amber-50', label: t.requests.pending },
-    approved: { icon: CheckCircle2, color: 'text-emerald-600 bg-emerald-50', label: t.requests.approved },
-    rejected: { icon: XCircle, color: 'text-red-600 bg-red-50', label: t.requests.rejected },
-    completed: { icon: CheckCircle2, color: 'text-blue-600 bg-blue-50', label: t.tours.completed },
-    cancelled: { icon: AlertCircle, color: 'text-slate-600 bg-slate-50', label: t.tours.cancelled },
-  };
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-2">
-        <Ticket className="h-5 w-5 text-orange-500" />
-        <h3 className="text-lg font-bold text-slate-800">{t.requests.title}</h3>
-      </div>
-
-      {!reservations.length ? (
-        <Card className="bg-white border-dashed border-2 border-orange-200">
-          <CardContent className="p-8 text-center">
-            <Ticket className="h-12 w-12 text-orange-300 mx-auto mb-3" />
-            <h4 className="text-lg font-semibold text-slate-700 mb-2">{t.requests.noRequests}</h4>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-3">
-          {reservations.map((reservation) => {
-            const config = statusConfig[reservation.status] || statusConfig.pending;
-            const StatusIcon = config.icon;
-            return (
-              <Card key={reservation.id} className="bg-white border-0 shadow-sm hover:shadow-md transition-all">
-                <CardContent className="p-3 sm:p-4">
-                  <div className="flex items-start sm:items-center justify-between gap-2">
-                    <div className="flex items-start sm:items-center gap-2 sm:gap-3 min-w-0">
-                      <div className={`p-1.5 sm:p-2 rounded-lg shrink-0 ${config.color}`}>
-                        <StatusIcon className="h-4 w-4 sm:h-5 sm:w-5" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-medium text-slate-800 text-sm sm:text-base truncate">
-                          {t.requests.preReservation} #{String(reservation.id).slice(0, 8)}
-                        </p>
-                        <div className="flex items-center gap-1.5 sm:gap-2 text-xs text-slate-500 mt-0.5 sm:mt-1 flex-wrap">
-                          <span className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            {new Date(reservation.reservationDate).toLocaleDateString(locale)}
-                          </span>
-                          <span className="text-slate-300 hidden sm:inline">|</span>
-                          <span className="flex items-center gap-1">
-                            <User className="h-3 w-3" />
-                            {reservation.numberOfParticipants} {t.tours.people}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <span className={`text-[10px] sm:text-xs font-medium px-2 sm:px-3 py-0.5 sm:py-1 rounded-full shrink-0 ${config.color}`}>
-                      {config.label}
-                    </span>
-                  </div>
-                  {reservation.specialRequests && (
-                    <p className="text-xs text-slate-500 mt-2 pl-6 sm:pl-12">{reservation.specialRequests}</p>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Reservations Pagination */}
-      {totalPages > 1 && (
-        <Pagination
-          page={page}
-          totalPages={totalPages}
-          onPageChange={onPageChange}
-          t={t}
-        />
-      )}
-    </div>
-  );
-}
-
-// ============================================
 // Service Choices View
 // ============================================
 function ServiceChoicesView({
@@ -776,6 +616,12 @@ function ServiceChoicesView({
                   <div className="min-w-0">
                     <p className="font-medium text-slate-800 text-sm sm:text-base truncate">{stop.organization?.name}</p>
                     <p className="text-xs text-slate-500 truncate">{tourName}</p>
+                    {stop.scheduledStartTime && (
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        {new Date(stop.scheduledStartTime).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        {stop.scheduledEndTime && <> - {new Date(stop.scheduledEndTime).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</>}
+                      </p>
+                    )}
                   </div>
                 </div>
                 {choices.serviceChoices && choices.serviceChoices.length > 0 && (
@@ -793,6 +639,214 @@ function ServiceChoicesView({
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ============================================
+// Profile View
+// ============================================
+function ProfileView({
+  profile,
+  t,
+  apiLang,
+}: {
+  profile: ClientProfileDto;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  t: any;
+  apiLang: 'tr' | 'en' | 'de';
+}) {
+  const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [firstName, setFirstName] = useState(profile.firstName || '');
+  const [lastName, setLastName] = useState(profile.lastName || '');
+  const [phoneCountryCode, setPhoneCountryCode] = useState(
+    profile.phoneCountryCode ? String(profile.phoneCountryCode) : '90'
+  );
+  const [phone, setPhone] = useState(profile.phone || '');
+  const [profilePhoto, setProfilePhoto] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(profile.profilePhoto || null);
+
+  const updateMutation = useMutation({
+    mutationFn: async () => {
+      const data: UpdateClientProfileDto = {};
+      if (firstName !== profile.firstName) data.firstName = firstName;
+      if (lastName !== profile.lastName) data.lastName = lastName;
+      if (phoneCountryCode && phoneCountryCode !== String(profile.phoneCountryCode || '')) {
+        data.phoneCountryCode = Number(phoneCountryCode);
+      }
+      if (phone && phone !== (profile.phone || '')) {
+        data.phone = Number(phone);
+      }
+      return apiClient.updateClientProfile(data, profilePhoto || undefined, apiLang);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['client-profile'] });
+      toast.success(t.customer.profileUpdated);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || t.auth.generalError);
+    },
+  });
+
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const MAX_SIZE = 5 * 1024 * 1024;
+      if (file.size > MAX_SIZE) {
+        toast.error(t.common.fileTooLarge);
+        e.target.value = '';
+        return;
+      }
+      setProfilePhoto(file);
+      const reader = new FileReader();
+      reader.onload = () => setPhotoPreview(reader.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-2">
+        <User className="h-5 w-5 text-orange-500" />
+        <h3 className="text-lg font-bold text-slate-800">{t.common.profile}</h3>
+      </div>
+
+      <Card className="bg-white border-0 shadow-md">
+        <CardContent className="p-6">
+          {/* Profile Photo */}
+          <div className="flex justify-center mb-8">
+            <div className="relative">
+              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-r from-sky-400 to-orange-400 flex items-center justify-center text-white text-2xl sm:text-3xl font-bold overflow-hidden">
+                {photoPreview ? (
+                  <img src={photoPreview} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  profile.firstName.charAt(0) + profile.lastName.charAt(0)
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="absolute bottom-0 right-0 p-2 bg-white rounded-full shadow-md border border-slate-200 hover:bg-slate-50 transition-colors"
+              >
+                <Camera className="h-4 w-4 text-slate-600" />
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={handlePhotoSelect}
+              />
+            </div>
+          </div>
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              updateMutation.mutate();
+            }}
+            className="space-y-4"
+          >
+            {/* First Name */}
+            <div className="space-y-2">
+              <Label htmlFor="profileFirstName" className="text-sm font-medium text-slate-700">
+                {t.auth.firstName}
+              </Label>
+              <Input
+                id="profileFirstName"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                placeholder={t.auth.firstNamePlaceholder}
+                className="h-11 rounded-xl"
+              />
+            </div>
+
+            {/* Last Name */}
+            <div className="space-y-2">
+              <Label htmlFor="profileLastName" className="text-sm font-medium text-slate-700">
+                {t.auth.lastName}
+              </Label>
+              <Input
+                id="profileLastName"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                placeholder={t.auth.lastNamePlaceholder}
+                className="h-11 rounded-xl"
+              />
+            </div>
+
+            {/* Phone */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-slate-700">
+                {t.common.phone}
+              </Label>
+              <div className="flex gap-2">
+                <div className="w-16 sm:w-24">
+                  <Input
+                    value={phoneCountryCode}
+                    onChange={(e) => setPhoneCountryCode(e.target.value.replace(/\D/g, ''))}
+                    placeholder="90"
+                    className="h-11 rounded-xl text-center"
+                    maxLength={4}
+                  />
+                </div>
+                <Input
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
+                  placeholder="5551234567"
+                  className="h-11 rounded-xl flex-1"
+                  maxLength={15}
+                />
+              </div>
+            </div>
+
+            {/* Username (read only) */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-slate-700">
+                {t.auth.username}
+              </Label>
+              <Input
+                value={profile.username}
+                disabled
+                className="h-11 rounded-xl bg-slate-50"
+              />
+            </div>
+
+            {/* Email (read only) */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-slate-700">
+                {t.auth.email}
+              </Label>
+              <Input
+                value={profile.email || '-'}
+                disabled
+                className="h-11 rounded-xl bg-slate-50"
+              />
+            </div>
+
+            {/* Submit */}
+            <Button
+              type="submit"
+              className="w-full h-11 rounded-xl bg-gradient-to-r from-sky-500 to-orange-500 hover:from-sky-600 hover:to-orange-600 text-white mt-6"
+              disabled={updateMutation.isPending}
+            >
+              {updateMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  {t.common.loading}
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  {t.common.save}
+                </>
+              )}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -846,33 +900,6 @@ function MobileNavTab({ active, onClick, icon: Icon, label }: {
       <Icon className="h-4 w-4 shrink-0" />
       <span className="truncate w-full text-center">{label}</span>
     </button>
-  );
-}
-
-function StatCard({ icon: Icon, label, value, color }: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: number;
-  color: string;
-}) {
-  const colorMap: Record<string, string> = {
-    sky: 'from-sky-400 to-sky-500 text-sky-700 bg-sky-50',
-    amber: 'from-amber-400 to-amber-500 text-amber-700 bg-amber-50',
-    emerald: 'from-emerald-400 to-emerald-500 text-emerald-700 bg-emerald-50',
-    violet: 'from-violet-400 to-violet-500 text-violet-700 bg-violet-50',
-  };
-  const colors = colorMap[color] || colorMap.sky;
-
-  return (
-    <Card className="bg-white border-0 shadow-sm">
-      <CardContent className="p-3 sm:p-4">
-        <div className={`p-1.5 sm:p-2 rounded-lg ${colors.split(' ').slice(2).join(' ')} w-fit mb-1.5 sm:mb-2`}>
-          <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-        </div>
-        <p className="text-xl sm:text-2xl font-bold text-slate-800">{value}</p>
-        <p className="text-[10px] sm:text-xs text-slate-500 truncate">{label}</p>
-      </CardContent>
-    </Card>
   );
 }
 
