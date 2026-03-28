@@ -260,7 +260,7 @@ function generateSeedData(): Database {
       // Her kata 1-3 oda
       const roomCount = 1 + Math.floor(Math.random() * 3);
       for (let roi = 0; roi < roomCount; roi++) {
-        const roomNames = ['Ana Salon', 'VIP Bolum', 'Teras', 'Bahce', 'Ozel Oda'];
+        const roomNames = ['Ana Salon', 'VIP Bölüm', 'Teras', 'Bahçe', 'Özel Oda'];
         const room: Room = {
           id: generateId(),
           floorId: floor.id,

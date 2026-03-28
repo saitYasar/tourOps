@@ -37,6 +37,7 @@ import {
   ChevronDown,
   ChevronUp,
   Send,
+  MessageCircle,
   Eye,
   EyeOff,
   RefreshCw,
@@ -839,36 +840,43 @@ export default function TourDetailPage() {
     <div className="flex flex-col h-full">
       <Header title={t.tours.detail} organizationStatus={agencyStatus} lang={locale} />
 
-      <div className="flex-1 p-6 overflow-auto">
+      <div className="flex-1 p-3 md:p-6 overflow-auto">
         {/* Top Info Bar */}
-        <div className="flex items-center gap-4 mb-6">
-          <Button variant="outline" size="icon" onClick={() => router.push('/agency/tours')}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div className="flex-1">
-            <div className="flex items-center gap-3">
-              <h2 className="text-2xl font-bold">{tour.tourName}</h2>
-              <TourStatusBadge status={tour.status} />
+        <div className="space-y-3 mb-4 md:mb-6">
+          {/* Row 1: Back + Title + Status */}
+          <div className="flex items-start gap-2 md:gap-4">
+            <Button variant="outline" size="icon" className="shrink-0 h-8 w-8 md:h-10 md:w-10" onClick={() => router.push('/agency/tours')}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-lg md:text-2xl font-bold truncate">{tour.tourName}</h2>
+                <TourStatusBadge status={tour.status} />
+              </div>
+              <p className="text-xs md:text-sm text-slate-500 mt-0.5 line-clamp-2">{tour.description}</p>
             </div>
-            <p className="text-slate-500 mt-1">{tour.description}</p>
           </div>
-          <div className="flex items-center gap-6 text-sm">
-            <div className="flex items-center gap-2 text-slate-600">
-              <Calendar className="h-4 w-4" />
+
+          {/* Row 2: Meta info */}
+          <div className="flex flex-wrap items-center gap-3 md:gap-6 text-xs md:text-sm">
+            <div className="flex items-center gap-1.5 text-slate-600">
+              <Calendar className="h-3.5 w-3.5" />
               <span>{formatDate(tour.startDate)} - {formatDate(tour.endDate)}</span>
             </div>
-            <div className="flex items-center gap-2 text-slate-600">
-              <Users className="h-4 w-4" />
+            <div className="flex items-center gap-1.5 text-slate-600">
+              <Users className="h-3.5 w-3.5" />
               <span>{tourClients?.length || 0} / {tour.maxParticipants || '-'} {t.tours.people}</span>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+
+          {/* Row 3: Action buttons */}
+          <div className="flex flex-wrap items-center gap-2">
             <Tooltip>
               <TooltipTrigger asChild>
                 <span tabIndex={0}>
                   <Button variant="outline" size="sm" onClick={openEditForm} disabled={tour.status !== 'draft' && tour.status !== 'published'}>
-                    <Pencil className="h-4 w-4 mr-1" />
-                    {t.common.edit}
+                    <Pencil className="h-4 w-4 md:mr-1" />
+                    <span className="hidden md:inline">{t.common.edit}</span>
                   </Button>
                 </span>
               </TooltipTrigger>
@@ -878,8 +886,8 @@ export default function TourDetailPage() {
               <TooltipTrigger asChild>
                 <span tabIndex={0}>
                   <Button size="sm" onClick={() => setStatusAction('publish')} disabled={tour.status !== 'draft'}>
-                    <PlayCircle className="h-4 w-4 mr-1" />
-                    {t.tours.publish}
+                    <PlayCircle className="h-4 w-4 md:mr-1" />
+                    <span className="hidden md:inline">{t.tours.publish}</span>
                   </Button>
                 </span>
               </TooltipTrigger>
@@ -889,8 +897,8 @@ export default function TourDetailPage() {
               <TooltipTrigger asChild>
                 <span tabIndex={0}>
                   <Button size="sm" variant="outline" onClick={() => setStatusAction('complete')} disabled={tour.status !== 'published'}>
-                    <CheckCircle className="h-4 w-4 mr-1" />
-                    {t.tours.complete}
+                    <CheckCircle className="h-4 w-4 md:mr-1" />
+                    <span className="hidden md:inline">{t.tours.complete}</span>
                   </Button>
                 </span>
               </TooltipTrigger>
@@ -900,8 +908,8 @@ export default function TourDetailPage() {
               <TooltipTrigger asChild>
                 <span tabIndex={0}>
                   <Button size="sm" variant="destructive" onClick={() => setStatusAction('cancel')} disabled={tour.status !== 'published'}>
-                    <Ban className="h-4 w-4 mr-1" />
-                    {t.tours.cancel}
+                    <Ban className="h-4 w-4 md:mr-1" />
+                    <span className="hidden md:inline">{t.tours.cancel}</span>
                   </Button>
                 </span>
               </TooltipTrigger>
@@ -911,67 +919,69 @@ export default function TourDetailPage() {
         </div>
 
         {/* Tabs */}
-        <Tabs defaultValue="info" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="info">{t.tours.info}</TabsTrigger>
-            <TabsTrigger value="stops">{t.tours.stops} ({stops?.length || 0})</TabsTrigger>
-            <TabsTrigger value="clients">{t.tours.clients} ({tourClients?.length || 0})</TabsTrigger>
-            <TabsTrigger value="choices">{t.tours.customerChoices}</TabsTrigger>
-          </TabsList>
+        <Tabs defaultValue="info" className="space-y-3 md:space-y-4">
+          <div className="overflow-x-auto -mx-3 px-3 md:mx-0 md:px-0">
+            <TabsList className="w-max md:w-auto">
+              <TabsTrigger value="info" className="text-xs md:text-sm">{t.tours.info}</TabsTrigger>
+              <TabsTrigger value="stops" className="text-xs md:text-sm">{t.tours.stops} ({stops?.length || 0})</TabsTrigger>
+              <TabsTrigger value="clients" className="text-xs md:text-sm">{t.tours.clients} ({tourClients?.length || 0})</TabsTrigger>
+              <TabsTrigger value="choices" className="text-xs md:text-sm">{t.tours.customerChoices}</TabsTrigger>
+            </TabsList>
+          </div>
 
           {/* Info Tab */}
-          <TabsContent value="info" className="space-y-4">
+          <TabsContent value="info" className="space-y-3 md:space-y-4">
             <div className="flex justify-end">
               <Button variant="outline" size="sm" onClick={() => refreshTab('info')} disabled={refreshingTab === 'info'}>
                 <RefreshCw className={`h-4 w-4 mr-1 ${refreshingTab === 'info' ? 'animate-spin' : ''}`} />
-                Yenile
+                {t.common.refresh || 'Yenile'}
               </Button>
             </div>
-            <div className="grid gap-6 lg:grid-cols-2">
+            <div className="grid gap-3 md:gap-6 lg:grid-cols-2">
               {/* Tour Details */}
               <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">{t.tours.info}</CardTitle>
+                <CardHeader className="p-3 md:p-6">
+                  <CardTitle className="text-sm md:text-lg">{t.tours.info}</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                <CardContent className="p-3 pt-0 md:p-6 md:pt-0 space-y-3 md:space-y-4">
+                  <div className="grid grid-cols-2 gap-3 md:gap-4">
                     <div>
-                      <p className="text-sm text-slate-500">{t.tours.tourCode}</p>
-                      <p className="font-mono font-medium">{tour.tourCode}</p>
+                      <p className="text-xs md:text-sm text-slate-500">{t.tours.tourCode}</p>
+                      <p className="font-mono font-medium text-sm md:text-base">{tour.tourCode}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-slate-500">{t.tours.status}</p>
+                      <p className="text-xs md:text-sm text-slate-500">{t.tours.status}</p>
                       <TourStatusBadge status={tour.status} />
                     </div>
                   </div>
                   <Separator />
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-3 md:gap-4">
                     <div>
-                      <p className="text-sm text-slate-500">{t.tours.startDate}</p>
-                      <p className="font-medium">{formatDate(tour.startDate)}</p>
+                      <p className="text-xs md:text-sm text-slate-500">{t.tours.startDate}</p>
+                      <p className="font-medium text-sm md:text-base">{formatDate(tour.startDate)}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-slate-500">{t.tours.endDate}</p>
-                      <p className="font-medium">{formatDate(tour.endDate)}</p>
+                      <p className="text-xs md:text-sm text-slate-500">{t.tours.endDate}</p>
+                      <p className="font-medium text-sm md:text-base">{formatDate(tour.endDate)}</p>
                     </div>
                   </div>
                   <Separator />
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-3 md:gap-4">
                     <div>
-                      <p className="text-sm text-slate-500">{t.tours.minParticipants}</p>
-                      <p className="font-medium">{tour.minParticipants || '-'}</p>
+                      <p className="text-xs md:text-sm text-slate-500">{t.tours.minParticipants}</p>
+                      <p className="font-medium text-sm md:text-base">{tour.minParticipants || '-'}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-slate-500">{t.tours.maxParticipants}</p>
-                      <p className="font-medium">{tour.maxParticipants || '-'}</p>
+                      <p className="text-xs md:text-sm text-slate-500">{t.tours.maxParticipants}</p>
+                      <p className="font-medium text-sm md:text-base">{tour.maxParticipants || '-'}</p>
                     </div>
                   </div>
                   {tour.description && (
                     <>
                       <Separator />
                       <div>
-                        <p className="text-sm text-slate-500">{t.tours.tourDescription}</p>
-                        <p className="mt-1">{tour.description}</p>
+                        <p className="text-xs md:text-sm text-slate-500">{t.tours.tourDescription}</p>
+                        <p className="mt-1 text-sm md:text-base">{tour.description}</p>
                       </div>
                     </>
                   )}
@@ -980,15 +990,15 @@ export default function TourDetailPage() {
 
               {/* Cover Image */}
               <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <ImageIcon className="h-5 w-5" />
+                <CardHeader className="p-3 md:p-6">
+                  <CardTitle className="text-sm md:text-lg flex items-center gap-2">
+                    <ImageIcon className="h-4 w-4 md:h-5 md:w-5" />
                     {t.tours.coverImage}
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
                   {resolveImageUrl(tour.coverImageUrl) ? (
-                    <div className="w-full h-48 rounded-lg overflow-hidden bg-slate-100 cursor-pointer" onClick={() => setLightboxImage(resolveImageUrl(tour.coverImageUrl))}>
+                    <div className="w-full h-36 md:h-48 rounded-lg overflow-hidden bg-slate-100 cursor-pointer" onClick={() => setLightboxImage(resolveImageUrl(tour.coverImageUrl))}>
                       <img
                         src={resolveImageUrl(tour.coverImageUrl)!}
                         alt={tour.tourName}

@@ -93,7 +93,7 @@ const customerSidebarTheme = {
   active: 'bg-gradient-to-r from-sky-600 to-orange-600',
 };
 
-export function Sidebar() {
+export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const { t } = useLanguage();
@@ -130,10 +130,7 @@ export function Sidebar() {
   };
 
   return (
-    <aside className={cn(
-      "w-64 text-white h-screen sticky top-0 flex flex-col",
-      isCustomer ? customerSidebarTheme.bg : "bg-slate-900"
-    )}>
+    <>
       <div className={cn("p-4 border-b", isCustomer ? customerSidebarTheme.border : "border-slate-700")}>
         {isCustomer ? (
           <div className="flex items-center gap-3">
@@ -164,6 +161,7 @@ export function Sidebar() {
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={onNavigate}
                 className={cn(
                   'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
                   isActive
@@ -184,6 +182,7 @@ export function Sidebar() {
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={onNavigate}
                 className={cn(
                   'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors',
                   isActive
@@ -205,6 +204,7 @@ export function Sidebar() {
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={onNavigate}
                 className={cn(
                   'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
                   isActive
@@ -275,6 +275,20 @@ export function Sidebar() {
           {t.auth.logout}
         </Button>
       </div>
+    </>
+  );
+}
+
+export function Sidebar() {
+  const { user } = useAuth();
+  const isCustomer = user?.role === 'customer';
+
+  return (
+    <aside className={cn(
+      "hidden md:flex w-64 text-white h-screen sticky top-0 flex-col",
+      isCustomer ? customerSidebarTheme.bg : "bg-slate-900"
+    )}>
+      <SidebarContent />
     </aside>
   );
 }

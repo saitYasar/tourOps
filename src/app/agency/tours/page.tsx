@@ -297,25 +297,30 @@ export default function ToursPage() {
     <div className="flex flex-col h-full">
       <Header title={t.tours.title} description={t.tours.description} organizationStatus={agencyStatus} lang={locale} />
 
-      <div className="flex-1 p-6">
+      <div className="flex-1 p-3 md:p-6">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-            <CardTitle className="text-lg font-medium">{t.tours.list}</CardTitle>
-            <div className="flex items-center gap-3">
-              <div className="relative">
+          <CardHeader className="p-3 md:p-6 pb-3 md:pb-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base md:text-lg font-medium">{t.tours.list}</CardTitle>
+              <Button size="sm" onClick={openCreateForm} className="md:hidden">
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 md:gap-3">
+              <div className="relative flex-1 min-w-[120px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input
                   placeholder={t.common.search}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-48 pl-9"
+                  className="pl-9"
                 />
               </div>
               <Select
                 value={statusFilter}
                 onValueChange={(v) => setStatusFilter(v as TourStatus | 'all')}
               >
-                <SelectTrigger className="w-36">
+                <SelectTrigger className="w-28 md:w-36">
                   <SelectValue placeholder={t.tours.status} />
                 </SelectTrigger>
                 <SelectContent>
@@ -326,13 +331,13 @@ export default function ToursPage() {
                   <SelectItem value="completed">{t.tours.completed}</SelectItem>
                 </SelectContent>
               </Select>
-              <Button onClick={openCreateForm}>
+              <Button onClick={openCreateForm} className="hidden md:inline-flex">
                 <Plus className="h-4 w-4 mr-2" />
                 {t.tours.new}
               </Button>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
             {toursLoading ? (
               <LoadingState message={t.common.loading} />
             ) : toursError ? (
@@ -351,6 +356,7 @@ export default function ToursPage() {
               />
             ) : (
               <>
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -489,6 +495,7 @@ export default function ToursPage() {
                     ))}
                   </TableBody>
                 </Table>
+                </div>
 
                 {/* Pagination */}
                 <AdminPagination

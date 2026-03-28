@@ -179,12 +179,12 @@ export function Header({ title, description, children, organizationStatus, lang 
 
   return (
     <>
-      <header className="h-16 border-b bg-white px-6 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div>
-            <h1 className="text-xl font-semibold text-slate-900">{title}</h1>
+      <header className="min-h-14 md:min-h-16 border-b bg-white px-3 md:px-6 py-2 md:py-0 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-wrap">
+          <div className="min-w-0">
+            <h1 className="text-base md:text-xl font-semibold text-slate-900 truncate">{title}</h1>
             {description && (
-              <p className="text-sm text-slate-500">{description}</p>
+              <p className="text-xs md:text-sm text-slate-500 hidden sm:block">{description}</p>
             )}
           </div>
           {config && (() => {
@@ -198,9 +198,9 @@ export function Header({ title, description, children, organizationStatus, lang 
           })()}
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 md:gap-4">
           {children}
-          <div className="relative">
+          <div className="relative hidden md:block">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
               placeholder="Yakında..."

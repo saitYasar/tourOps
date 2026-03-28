@@ -399,52 +399,57 @@ export default function AgencyClientsPage() {
     <div className="flex flex-col h-full">
       <Header title={t.agency.clients} description={t.agency.clientsDesc} organizationStatus={agencyStatus} lang={locale} />
 
-      <div className="flex-1 p-6 overflow-auto">
-        <div className="max-w-6xl mx-auto space-y-6">
+      <div className="flex-1 p-3 md:p-6 overflow-auto">
+        <div className="max-w-6xl mx-auto space-y-4 md:space-y-6">
           <Card>
-            <CardHeader>
+            <CardHeader className="p-3 md:p-6 space-y-3">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <Users className="h-6 w-6 text-blue-600" />
+                <div className="flex items-center gap-2 md:gap-3">
+                  <div className="p-1.5 md:p-2 bg-blue-100 rounded-lg">
+                    <Users className="h-4 w-4 md:h-6 md:w-6 text-blue-600" />
                   </div>
                   <div>
-                    <CardTitle>{t.invitations.clientList}</CardTitle>
-                    <CardDescription>{t.invitations.clientsRegistered.replace('{count}', String(meta?.totalCount ?? meta?.total ?? clients.length))}</CardDescription>
+                    <CardTitle className="text-sm md:text-base">{t.invitations.clientList}</CardTitle>
+                    <CardDescription className="text-xs md:text-sm">{t.invitations.clientsRegistered.replace('{count}', String(meta?.totalCount ?? meta?.total ?? clients.length))}</CardDescription>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" disabled={clients.length === 0}>
-                        <Send className="h-4 w-4 mr-2" />
-                        {t.invitations.sendPdf}
-                        <ChevronDown className="h-3.5 w-3.5 ml-1.5" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={handleDownloadPdf}>
-                        <Download className="h-4 w-4 mr-2" />
-                        {t.invitations.downloadPdf}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={handleSendPdfWhatsapp}>
-                        <MessageCircle className="h-4 w-4 mr-2" />
-                        {t.invitations.sendViaWhatsapp}
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                  <Button variant="outline" onClick={() => setIsBatchOpen(true)}>
-                    <FileSpreadsheet className="h-4 w-4 mr-2" />
-                    {t.invitations.batchImport}
-                  </Button>
-                  <Button onClick={() => setIsFormOpen(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    {t.invitations.newClient}
-                  </Button>
-                </div>
+                {/* Mobile: only + button */}
+                <Button size="sm" onClick={() => setIsFormOpen(true)} className="md:hidden">
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+              {/* Action buttons - wrap on mobile */}
+              <div className="flex flex-wrap items-center gap-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" disabled={clients.length === 0}>
+                      <Send className="h-4 w-4 md:mr-2" />
+                      <span className="hidden md:inline">{t.invitations.sendPdf}</span>
+                      <ChevronDown className="h-3.5 w-3.5 ml-1" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={handleDownloadPdf}>
+                      <Download className="h-4 w-4 mr-2" />
+                      {t.invitations.downloadPdf}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleSendPdfWhatsapp}>
+                      <MessageCircle className="h-4 w-4 mr-2" />
+                      {t.invitations.sendViaWhatsapp}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <Button variant="outline" size="sm" onClick={() => setIsBatchOpen(true)}>
+                  <FileSpreadsheet className="h-4 w-4 md:mr-2" />
+                  <span className="hidden md:inline">{t.invitations.batchImport}</span>
+                </Button>
+                <Button size="sm" onClick={() => setIsFormOpen(true)} className="hidden md:inline-flex">
+                  <Plus className="h-4 w-4 mr-2" />
+                  {t.invitations.newClient}
+                </Button>
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
               {/* Search & Tour Filter */}
               <div className="flex flex-col sm:flex-row gap-3 mb-4">
                 <div className="relative flex-1">

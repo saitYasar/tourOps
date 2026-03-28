@@ -195,62 +195,62 @@ export default function AgencyDashboard() {
         lang={locale}
       />
 
-      <div className="flex-1 p-6 overflow-auto">
+      <div className="flex-1 p-4 md:p-6 overflow-auto">
         {/* Ozet Kartlari */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
+        <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4 mb-4 md:mb-6">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{t.nav.tours}</CardTitle>
-              <Route className="h-4 w-4 text-blue-500" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1 md:p-6 md:pb-2">
+              <CardTitle className="text-xs md:text-sm font-medium">{t.nav.tours}</CardTitle>
+              <Route className="h-3.5 w-3.5 md:h-4 md:w-4 text-blue-500" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{tours.length}</div>
-              <p className="text-xs text-muted-foreground">{t.agency.publishedCount.replace('{count}', String(publishedTours))}, {t.agency.draftCount.replace('{count}', String(draftTours))}</p>
+            <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
+              <div className="text-xl md:text-2xl font-bold">{tours.length}</div>
+              <p className="text-[10px] md:text-xs text-muted-foreground">{t.agency.publishedCount.replace('{count}', String(publishedTours))}, {t.agency.draftCount.replace('{count}', String(draftTours))}</p>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{t.nav.team}</CardTitle>
-              <Users className="h-4 w-4 text-green-500" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1 md:p-6 md:pb-2">
+              <CardTitle className="text-xs md:text-sm font-medium">{t.nav.team}</CardTitle>
+              <Users className="h-3.5 w-3.5 md:h-4 md:w-4 text-green-500" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{teamCount}</div>
-              <p className="text-xs text-muted-foreground">{t.agency.teamMember}</p>
+            <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
+              <div className="text-xl md:text-2xl font-bold">{teamCount}</div>
+              <p className="text-[10px] md:text-xs text-muted-foreground">{t.agency.teamMember}</p>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{t.nav.clients}</CardTitle>
-              <User className="h-4 w-4 text-purple-500" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1 md:p-6 md:pb-2">
+              <CardTitle className="text-xs md:text-sm font-medium">{t.nav.clients}</CardTitle>
+              <User className="h-3.5 w-3.5 md:h-4 md:w-4 text-purple-500" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{clientsResult?.success ? ((clientsResult.data as any)?.meta?.totalCount ?? (clientsResult.data as any)?.meta?.total ?? 0) : 0}</div>
-              <p className="text-xs text-muted-foreground">{t.agency.registeredClient}</p>
+            <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
+              <div className="text-xl md:text-2xl font-bold">{clientsResult?.success ? ((clientsResult.data as any)?.meta?.totalCount ?? (clientsResult.data as any)?.meta?.total ?? 0) : 0}</div>
+              <p className="text-[10px] md:text-xs text-muted-foreground">{t.agency.registeredClient}</p>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{t.agency.agencyStatus}</CardTitle>
-              <Clock className="h-4 w-4 text-amber-500" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1 md:p-6 md:pb-2">
+              <CardTitle className="text-xs md:text-sm font-medium">{t.agency.agencyStatus}</CardTitle>
+              <Clock className="h-3.5 w-3.5 md:h-4 md:w-4 text-amber-500" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold capitalize">
+            <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
+              <div className="text-xl md:text-2xl font-bold capitalize">
                 {agency?.status === 'active' ? t.agency.statusActive : agency?.status === 'pending' ? t.agency.statusPending : t.agency.statusSuspended}
               </div>
-              <p className="text-xs text-muted-foreground">{t.agency.agencyStatus}</p>
+              <p className="text-[10px] md:text-xs text-muted-foreground">{t.agency.agencyStatus}</p>
             </CardContent>
           </Card>
         </div>
 
         {/* Acente Bilgileri */}
-        <Card className="mb-6">
-          <CardHeader>
+        <Card className="mb-4 md:mb-6">
+          <CardHeader className="p-3 md:p-6">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-xl flex items-center gap-2">
-                <Briefcase className="h-6 w-6 text-blue-600" />
+              <CardTitle className="text-sm md:text-xl flex items-center gap-2">
+                <Briefcase className="h-4 w-4 md:h-6 md:w-6 text-blue-600" />
                 {t.agency.agencyInfo}
               </CardTitle>
               <Button
@@ -264,75 +264,75 @@ export default function AgencyDashboard() {
               </Button>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
             {/* Kapak Fotografi */}
             {agency?.coverImageUrl && (
-              <div className="mb-6 rounded-lg overflow-hidden">
+              <div className="mb-4 md:mb-6 rounded-lg overflow-hidden">
                 <img
                   src={agency.coverImageUrl}
                   alt="Kapak Fotografi"
-                  className="w-full h-48 md:h-56 object-cover"
+                  className="w-full h-32 md:h-56 object-cover"
                 />
               </div>
             )}
 
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-3 md:gap-6 grid-cols-2 lg:grid-cols-3">
               {/* Acente Adi */}
               <div className="space-y-1">
-                <p className="text-sm text-slate-500 font-medium">{t.agency.agencyName}</p>
-                <p className="text-lg font-semibold text-slate-900">{agency?.name || '-'}</p>
+                <p className="text-xs md:text-sm text-slate-500 font-medium">{t.agency.agencyName}</p>
+                <p className="text-sm md:text-lg font-semibold text-slate-900">{agency?.name || '-'}</p>
               </div>
 
               {/* Telefon */}
               <div className="space-y-1">
-                <p className="text-sm text-slate-500 font-medium">Telefon</p>
-                <p className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-                  <Phone className="h-4 w-4 text-slate-400" />
+                <p className="text-xs md:text-sm text-slate-500 font-medium">{t.agency.agencyPhoneLabel}</p>
+                <p className="text-sm md:text-lg font-semibold text-slate-900 flex items-center gap-2">
+                  <Phone className="h-4 w-4 text-slate-400 hidden md:block" />
                   {agency?.phone ? `+${agency.phoneCountryCode} ${agency.phone}` : '-'}
                 </p>
               </div>
 
               {/* E-posta */}
               <div className="space-y-1">
-                <p className="text-sm text-slate-500 font-medium">E-posta</p>
-                <p className="text-base font-medium text-slate-900 flex items-center gap-2">
-                  <Mail className="h-4 w-4 text-slate-400" />
+                <p className="text-xs md:text-sm text-slate-500 font-medium">{t.agency.agencyEmailLabel}</p>
+                <p className="text-sm md:text-base font-medium text-slate-900 flex items-center gap-2 break-all">
+                  <Mail className="h-4 w-4 text-slate-400 hidden md:block" />
                   {agency?.email || '-'}
                 </p>
               </div>
 
               {/* Resmi Unvan */}
               <div className="space-y-1">
-                <p className="text-sm text-slate-500 font-medium">Resmi Unvan</p>
-                <p className="text-base font-medium text-slate-900">{agency?.legalName || '-'}</p>
+                <p className="text-xs md:text-sm text-slate-500 font-medium">{t.agency.agencyLegalNameLabel}</p>
+                <p className="text-sm md:text-base font-medium text-slate-900">{agency?.legalName || '-'}</p>
               </div>
 
               {/* Vergi Dairesi */}
               <div className="space-y-1">
-                <p className="text-sm text-slate-500 font-medium">Vergi Dairesi</p>
-                <p className="text-base font-medium text-slate-900">{agency?.taxOffice || '-'}</p>
+                <p className="text-xs md:text-sm text-slate-500 font-medium">{t.agency.agencyTaxOfficeLabel}</p>
+                <p className="text-sm md:text-base font-medium text-slate-900">{agency?.taxOffice || '-'}</p>
               </div>
 
               {/* Vergi No */}
               <div className="space-y-1">
-                <p className="text-sm text-slate-500 font-medium">Vergi Numarasi</p>
-                <p className="text-base font-medium text-slate-900 font-mono">{agency?.taxNumber || '-'}</p>
+                <p className="text-xs md:text-sm text-slate-500 font-medium">{t.agency.agencyTaxNumberLabel}</p>
+                <p className="text-sm md:text-base font-medium text-slate-900 font-mono">{agency?.taxNumber || '-'}</p>
               </div>
 
               {/* Adres */}
               <div className="space-y-1 md:col-span-2">
-                <p className="text-sm text-slate-500 font-medium">Adres</p>
-                <p className="text-base text-slate-900 flex items-start gap-2">
-                  <MapPin className="h-4 w-4 text-slate-400 mt-1 shrink-0" />
+                <p className="text-xs md:text-sm text-slate-500 font-medium">{t.agency.agencyAddressLabel}</p>
+                <p className="text-sm md:text-base text-slate-900 flex items-start gap-2">
+                  <MapPin className="h-4 w-4 text-slate-400 mt-1 shrink-0 hidden md:block" />
                   {agency?.address || '-'}
                 </p>
               </div>
 
-              {/* Aciklama */}
+              {/* Açıklama */}
               {agency?.description && (
                 <div className="space-y-1 lg:col-span-3 md:col-span-2">
-                  <p className="text-sm text-slate-500 font-medium">Aciklama</p>
-                  <p className="text-base text-slate-700 bg-slate-50 p-3 rounded-lg">{agency.description}</p>
+                  <p className="text-xs md:text-sm text-slate-500 font-medium">{t.agency.agencyDescriptionLabel}</p>
+                  <p className="text-sm md:text-base text-slate-700 bg-slate-50 p-2 md:p-3 rounded-lg">{agency.description}</p>
                 </div>
               )}
             </div>
@@ -340,26 +340,26 @@ export default function AgencyDashboard() {
         </Card>
 
         {/* Hızlı Erişim */}
-        <div className="space-y-4">
-          <h3 className="font-semibold text-lg">Hızlı Erişim</h3>
-          <div className="grid gap-4 md:grid-cols-3">
+        <div className="space-y-3 md:space-y-4">
+          <h3 className="font-semibold text-sm md:text-lg">{t.agency.quickAccess}</h3>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
             <Link href="/agency/tours">
               <Card className="hover:border-primary transition-colors cursor-pointer h-full">
-                <CardHeader>
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-100 rounded-lg">
-                      <Route className="h-6 w-6 text-blue-600" />
+                <CardHeader className="p-3 md:p-6">
+                  <div className="flex items-center gap-2 md:gap-3">
+                    <div className="p-1.5 md:p-2 bg-blue-100 rounded-lg">
+                      <Route className="h-4 w-4 md:h-6 md:w-6 text-blue-600" />
                     </div>
                     <div>
-                      <CardTitle className="text-lg">{t.nav.tours}</CardTitle>
-                      <p className="text-sm text-slate-500">
+                      <CardTitle className="text-sm md:text-lg">{t.nav.tours}</CardTitle>
+                      <p className="text-xs md:text-sm text-slate-500">
                         {tours.length} {t.agency.tourCount}
                       </p>
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-slate-600">
+                <CardContent className="px-3 pb-3 pt-0 md:px-6 md:pb-6">
+                  <p className="text-xs md:text-sm text-slate-600">
                     {t.agency.toursDesc}
                   </p>
                 </CardContent>
@@ -368,21 +368,21 @@ export default function AgencyDashboard() {
 
             <Link href="/agency/team">
               <Card className="hover:border-primary transition-colors cursor-pointer h-full">
-                <CardHeader>
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-purple-100 rounded-lg">
-                      <Users className="h-6 w-6 text-purple-600" />
+                <CardHeader className="p-3 md:p-6">
+                  <div className="flex items-center gap-2 md:gap-3">
+                    <div className="p-1.5 md:p-2 bg-purple-100 rounded-lg">
+                      <Users className="h-4 w-4 md:h-6 md:w-6 text-purple-600" />
                     </div>
                     <div>
-                      <CardTitle className="text-lg">{t.nav.team}</CardTitle>
-                      <p className="text-sm text-slate-500">
+                      <CardTitle className="text-sm md:text-lg">{t.nav.team}</CardTitle>
+                      <p className="text-xs md:text-sm text-slate-500">
                         {teamCount} {t.agency.memberCount}
                       </p>
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-slate-600">
+                <CardContent className="px-3 pb-3 pt-0 md:px-6 md:pb-6">
+                  <p className="text-xs md:text-sm text-slate-600">
                     {t.agency.teamDesc}
                   </p>
                 </CardContent>
@@ -457,7 +457,7 @@ export default function AgencyDashboard() {
 
             {/* E-posta */}
             <div className="space-y-2">
-              <Label htmlFor="editEmail">E-posta</Label>
+              <Label htmlFor="editEmail">{t.agency.agencyEmailLabel}</Label>
               <Input
                 id="editEmail"
                 type="email"
@@ -469,7 +469,7 @@ export default function AgencyDashboard() {
 
             {/* Telefon */}
             <div className="space-y-2">
-              <Label htmlFor="editPhone">Telefon</Label>
+              <Label htmlFor="editPhone">{t.agency.agencyPhoneLabel}</Label>
               <div className="flex gap-2">
                 <Select
                   value={editPhoneCountryCode.toString()}
@@ -499,19 +499,19 @@ export default function AgencyDashboard() {
 
             {/* Adres */}
             <div className="space-y-2">
-              <Label htmlFor="editAddress">Adres</Label>
+              <Label htmlFor="editAddress">{t.agency.agencyAddressLabel}</Label>
               <Textarea
                 id="editAddress"
                 value={editAddress}
                 onChange={(e) => setEditAddress(e.target.value)}
-                placeholder="Acik adres"
+                placeholder={t.agency.agencyAddressPlaceholder}
                 rows={2}
               />
             </div>
 
-            {/* Aciklama */}
+            {/* Açıklama */}
             <div className="space-y-2">
-              <Label htmlFor="editDescription">Aciklama</Label>
+              <Label htmlFor="editDescription">{t.agency.agencyDescriptionLabel}</Label>
               <Textarea
                 id="editDescription"
                 value={editDescription}
