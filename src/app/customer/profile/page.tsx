@@ -31,6 +31,7 @@ export default function CustomerProfilePage() {
   const [lastName, setLastName] = useState('');
   const [phoneCountryCode, setPhoneCountryCode] = useState('');
   const [phone, setPhone] = useState('');
+  const [gender, setGender] = useState<'m' | 'f'>('m');
   const [profilePhoto, setProfilePhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
@@ -47,6 +48,7 @@ export default function CustomerProfilePage() {
     setLastName(profile.lastName || '');
     setPhoneCountryCode(profile.phoneCountryCode ? String(profile.phoneCountryCode) : '90');
     setPhone(profile.phone || '');
+    setGender(profile.gender === 'f' ? 'f' : 'm');
     if (profile.profilePhoto) {
       setPhotoPreview(profile.profilePhoto);
     }
@@ -63,6 +65,9 @@ export default function CustomerProfilePage() {
       }
       if (phone && phone !== (profile?.phone || '')) {
         data.phone = Number(phone);
+      }
+      if (gender !== (profile?.gender || 'm')) {
+        data.gender = gender;
       }
       return apiClient.updateClientProfile(data, profilePhoto || undefined);
     },
@@ -226,6 +231,37 @@ export default function CustomerProfilePage() {
                     className="h-11 rounded-xl flex-1"
                     maxLength={15}
                   />
+                </div>
+              </div>
+
+              {/* Gender */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-slate-700">
+                  {t.common.gender}
+                </Label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setGender('m')}
+                    className={`flex-1 h-11 rounded-xl border-2 font-medium transition-all ${
+                      gender === 'm'
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'
+                    }`}
+                  >
+                    {t.common.male}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGender('f')}
+                    className={`flex-1 h-11 rounded-xl border-2 font-medium transition-all ${
+                      gender === 'f'
+                        ? 'border-pink-500 bg-pink-50 text-pink-700'
+                        : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'
+                    }`}
+                  >
+                    {t.common.female}
+                  </button>
                 </div>
               </div>
 

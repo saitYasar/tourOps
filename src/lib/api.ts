@@ -253,6 +253,7 @@ export interface CreateAgencyClientDto {
   lastName: string;
   username: string;
   password: string;
+  gender?: 'm' | 'f';
 }
 
 // Agency Response DTO
@@ -857,6 +858,7 @@ export interface ClientProfileDto {
   agencyId: number;
   lastLoginAt: string | null;
   profilePhoto: string | null;
+  gender: 'm' | 'f' | null;
   active: boolean;
   createdAt: string;
   updatedAt: string;
@@ -867,6 +869,7 @@ export interface UpdateClientProfileDto {
   lastName?: string;
   phoneCountryCode?: number;
   phone?: number;
+  gender?: 'm' | 'f';
 }
 
 export interface ClientTourDto {

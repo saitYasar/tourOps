@@ -30,6 +30,7 @@ interface ClientFormData {
   lastName: string;
   username: string;
   password: string;
+  gender: 'm' | 'f';
 }
 
 const initialFormData: ClientFormData = {
@@ -37,6 +38,7 @@ const initialFormData: ClientFormData = {
   lastName: '',
   username: '',
   password: '',
+  gender: 'm',
 };
 
 export default function AgencyClientsPage() {
@@ -293,6 +295,7 @@ export default function AgencyClientsPage() {
       lastName: formData.lastName.trim(),
       username: formData.username.trim(),
       password: formData.password,
+      gender: formData.gender,
     });
   };
 
@@ -810,6 +813,34 @@ export default function AgencyClientsPage() {
                 className={errors.username ? 'border-red-500' : ''}
               />
               {errors.username && <p className="text-xs text-red-500">{errors.username}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label>{t.common.gender}</Label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFormData((prev) => ({ ...prev, gender: 'm' }))}
+                  className={`flex-1 h-9 rounded-md border text-sm font-medium transition-all ${
+                    formData.gender === 'm'
+                      ? 'border-blue-500 bg-blue-50 text-blue-700'
+                      : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'
+                  }`}
+                >
+                  {t.common.male}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData((prev) => ({ ...prev, gender: 'f' }))}
+                  className={`flex-1 h-9 rounded-md border text-sm font-medium transition-all ${
+                    formData.gender === 'f'
+                      ? 'border-pink-500 bg-pink-50 text-pink-700'
+                      : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'
+                  }`}
+                >
+                  {t.common.female}
+                </button>
+              </div>
             </div>
 
             <div className="space-y-2">
