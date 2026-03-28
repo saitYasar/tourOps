@@ -934,7 +934,7 @@ export default function TourDetailPage() {
             <div className="flex justify-end">
               <Button variant="outline" size="sm" onClick={() => refreshTab('info')} disabled={refreshingTab === 'info'}>
                 <RefreshCw className={`h-4 w-4 mr-1 ${refreshingTab === 'info' ? 'animate-spin' : ''}`} />
-                {t.common.refresh || 'Yenile'}
+                Yenile
               </Button>
             </div>
             <div className="grid gap-3 md:gap-6 lg:grid-cols-2">
