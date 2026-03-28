@@ -176,6 +176,7 @@ interface VenueObject {
 export interface TableOccupant {
   clientId: number;
   clientName: string;
+  gender?: 'm' | 'f' | null;
 }
 
 interface VenueModel3DProps {
@@ -391,15 +392,26 @@ function autoTables(tbls: Table[], rw: number, rd: number): TableLayout3D[] {
 // 3D Components
 // ═══════════════════════════════════════════════════════════
 
-const OCCUPIED_CLR = '#16a34a';   // green for occupied chair
-const OCCUPIED_SEAT = '#bbf7d0'; // light green seat
 const SKIN_CLR = '#f0c8a0';     // person skin tone
-const SHIRT_CLR = '#3b82f6';    // person shirt blue
+
+// Gender-based color schemes
+const MALE_CLR = '#2563eb';      // blue-600
+const MALE_SEAT = '#bfdbfe';     // blue-200
+const MALE_LABEL = '#1d4ed8';    // blue-700
+const MALE_SHIRT = '#3b82f6';    // blue-500
+
+const FEMALE_CLR = '#db2777';    // pink-600
+const FEMALE_SEAT = '#fbcfe8';   // pink-200
+const FEMALE_LABEL = '#be185d';  // pink-700
+const FEMALE_SHIRT = '#ec4899';  // pink-500
 
 function Chair3D({ position, rotation, occupant, seatNumber }: { position: [number, number, number]; rotation: number; occupant?: TableOccupant | null; seatNumber?: number }) {
   const isOccupied = !!occupant;
-  const seatColor = isOccupied ? OCCUPIED_SEAT : CHAIR_CLR;
-  const backColor = isOccupied ? OCCUPIED_CLR : WOOD_DARK;
+  const isFemale = occupant?.gender === 'f';
+  const seatColor = isOccupied ? (isFemale ? FEMALE_SEAT : MALE_SEAT) : CHAIR_CLR;
+  const backColor = isOccupied ? (isFemale ? FEMALE_CLR : MALE_CLR) : WOOD_DARK;
+  const shirtColor = isFemale ? FEMALE_SHIRT : MALE_SHIRT;
+  const labelBg = isFemale ? FEMALE_LABEL : MALE_LABEL;
 
   // Person measurements (seated)
   const seatY = TABLE_H * 0.5;          // chair seat height
@@ -434,7 +446,7 @@ function Chair3D({ position, rotation, occupant, seatNumber }: { position: [numb
           {/* Torso */}
           <mesh position={[0, torsoY, 0]} castShadow>
             <cylinderGeometry args={[0.07, 0.06, torsoH, 8]} />
-            <meshStandardMaterial color={SHIRT_CLR} roughness={0.7} />
+            <meshStandardMaterial color={shirtColor} roughness={0.7} />
           </mesh>
           {/* Head */}
           <mesh position={[0, headY, 0]} castShadow>
@@ -444,18 +456,18 @@ function Chair3D({ position, rotation, occupant, seatNumber }: { position: [numb
           {/* Left arm */}
           <mesh position={[-0.09, torsoY - 0.02, 0]} castShadow rotation={[0, 0, 0.2]}>
             <cylinderGeometry args={[0.02, 0.018, 0.18, 6]} />
-            <meshStandardMaterial color={SHIRT_CLR} roughness={0.7} />
+            <meshStandardMaterial color={shirtColor} roughness={0.7} />
           </mesh>
           {/* Right arm */}
           <mesh position={[0.09, torsoY - 0.02, 0]} castShadow rotation={[0, 0, -0.2]}>
             <cylinderGeometry args={[0.02, 0.018, 0.18, 6]} />
-            <meshStandardMaterial color={SHIRT_CLR} roughness={0.7} />
+            <meshStandardMaterial color={shirtColor} roughness={0.7} />
           </mesh>
 
           {/* Name label above head */}
           <Html position={[0, headY + headR + 0.08, 0]} center distanceFactor={4} style={{ pointerEvents: 'none' }}>
             <div style={{
-              background: OCCUPIED_CLR, color: '#fff',
+              background: labelBg, color: '#fff',
               padding: '1px 6px', borderRadius: 4,
               fontSize: 8, fontWeight: 700, whiteSpace: 'nowrap',
               boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
@@ -471,7 +483,7 @@ function Chair3D({ position, rotation, occupant, seatNumber }: { position: [numb
       {seatNumber != null && (
         <Html position={[0, seatY + CHAIR_BACK + 0.06, -CHAIR_SZ / 2 + 0.02]} center distanceFactor={4} style={{ pointerEvents: 'none' }}>
           <div style={{
-            background: isOccupied ? 'rgba(22,163,106,0.85)' : 'rgba(107,76,53,0.85)', color: '#fff',
+            background: isOccupied ? (isFemale ? 'rgba(219,39,119,0.85)' : 'rgba(37,99,235,0.85)') : 'rgba(107,76,53,0.85)', color: '#fff',
             padding: '0px 4px', borderRadius: 3,
             fontSize: 7, fontWeight: 600, whiteSpace: 'nowrap',
           }}>

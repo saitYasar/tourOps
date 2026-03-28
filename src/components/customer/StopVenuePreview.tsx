@@ -120,7 +120,7 @@ function convertToLegacy(floorResources: ResourceDto[], cache: Record<number, Re
           if (chairs.length > 0) {
             const occ: (TableOccupant | null)[] = chairs.map(chair =>
               chair.client
-                ? { clientId: chair.client.id, clientName: `${chair.client.firstName} ${chair.client.lastName}`.trim() }
+                ? { clientId: chair.client.id, clientName: `${chair.client.firstName} ${chair.client.lastName}`.trim(), gender: chair.client.gender }
                 : null,
             );
             if (occ.some(Boolean)) {
@@ -218,9 +218,12 @@ export function StopVenuePreview({ stopId, floors: floorResources, childrenCache
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [expanded, stopId, floorResources.length, ready]);
 
+  const emptyLegacy = useMemo(() => ({ floors: [] as Floor[], rooms: [] as Room[], tables: [] as Table[], objects: [] as VenueObject[], occupancy: {} as Record<string, (TableOccupant | null)[]>, tableIdMap: {} as Record<string, number> }), []);
+
   const { floors, rooms, tables, objects, occupancy, tableIdMap } = useMemo(
-    () => convertToLegacy(floorResources, cache),
-    [floorResources, cache],
+    () => ready ? convertToLegacy(floorResources, cache) : emptyLegacy,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [floorResources, cache, ready],
   );
 
   const handleTableSelect = (legacyTableId: string) => {
@@ -277,8 +280,12 @@ export function StopVenuePreview({ stopId, floors: floorResources, childrenCache
           {/* Legend */}
           <div className="flex flex-wrap gap-4 px-3 py-2 bg-slate-50 border-t text-xs">
             <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-full" style={{ background: '#16a34a' }} />
-              <span className="text-slate-600">{t.customer?.seatOccupied || 'Dolu'}</span>
+              <div className="w-3 h-3 rounded-full" style={{ background: '#2563eb' }} />
+              <span className="text-slate-600">{t.customer?.seatOccupiedMale || 'Dolu (Erkek)'}</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-full" style={{ background: '#db2777' }} />
+              <span className="text-slate-600">{t.customer?.seatOccupiedFemale || 'Dolu (Kadın)'}</span>
             </div>
             <div className="flex items-center gap-1.5">
               <div className="w-3 h-3 rounded-full" style={{ background: '#6B4C35' }} />

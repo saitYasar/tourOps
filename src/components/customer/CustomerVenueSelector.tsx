@@ -81,6 +81,7 @@ export function CustomerVenueSelector({
   const [activeFloorId, setActiveFloorId] = useState<number | null>(null);
   const [activeRoomId, setActiveRoomId] = useState<number | null>(null);
   const [selectedTableId, setSelectedTableId] = useState<number | null>(null);
+  const [tappedChairId, setTappedChairId] = useState<number | null>(null);
 
   // Auto-select first floor and fetch its children on mount
   useEffect(() => {
@@ -216,22 +217,30 @@ export function CustomerVenueSelector({
       return (
         <Tooltip key={chair.id}>
           <TooltipTrigger asChild>
-            <span tabIndex={0} className="group/seat relative">
+            <span
+              tabIndex={0}
+              className="group/seat relative"
+              onClick={() => {
+                if (isOccupiedByOther && occupant) {
+                  setTappedChairId(prev => prev === chair.id ? null : chair.id);
+                } else if (!readOnly && !savingTable) {
+                  onSelectChair(chair);
+                }
+              }}
+            >
               <button
                 disabled={savingTable || isOccupiedByOther}
-                className={`relative flex flex-col items-center justify-center w-[52px] h-[58px] sm:w-[60px] sm:h-[66px] rounded-lg border-2 transition-all ${
+                className={`relative flex flex-col items-center justify-center w-[52px] h-[58px] sm:w-[60px] sm:h-[66px] rounded-lg border-2 transition-all pointer-events-none ${
                   savingTable ? 'opacity-50 cursor-wait' :
                   isOccupiedByOther
-                    ? `${occupiedBorder} ${occupiedBg} cursor-not-allowed`
+                    ? `${occupiedBorder} ${occupiedBg}`
                     : isPending
                       ? 'border-orange-500 bg-orange-100 shadow-md shadow-orange-200/50 ring-2 ring-orange-300'
                       : isOwnSeat || isSelected
                         ? 'border-emerald-500 bg-emerald-100 shadow-md shadow-emerald-200/50'
                         : 'border-slate-200 bg-white hover:border-orange-400 hover:bg-orange-50 hover:shadow-sm'
                 }`}
-                onClick={() => {
-                  if (!readOnly && !isOccupiedByOther) onSelectChair(chair);
-                }}
+                tabIndex={-1}
               >
                 {/* Badge for selected/pending seat */}
                 {isPending ? (
@@ -265,11 +274,11 @@ export function CustomerVenueSelector({
                 </span>
 
               </button>
-              {/* Occupant name on hover — outside button so it works on disabled buttons too */}
+              {/* Occupant name on hover/tap */}
               {occupant && (
-                <span className={`absolute -bottom-5 left-0 opacity-0 group-hover/seat:opacity-100 transition-opacity pointer-events-none whitespace-nowrap text-[9px] font-semibold px-1.5 py-0.5 rounded shadow-sm z-10 ${
-                  isOwnSeat ? 'bg-emerald-600 text-white' : occupiedHoverBg
-                }`}>
+                <span className={`absolute -bottom-5 left-0 transition-opacity pointer-events-none whitespace-nowrap text-[9px] font-semibold px-1.5 py-0.5 rounded shadow-sm z-10 ${
+                  tappedChairId === chair.id ? 'opacity-100' : 'opacity-0 group-hover/seat:opacity-100'
+                } ${isOwnSeat ? 'bg-emerald-600 text-white' : occupiedHoverBg}`}>
                   {occupantName.length > 15 ? occupantName.substring(0, 15) + '…' : occupantName}
                 </span>
               )}
