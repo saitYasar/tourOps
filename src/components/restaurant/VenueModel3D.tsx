@@ -997,8 +997,9 @@ function CameraManager({
       c.setLookAt(sz * 0.3, sz + 2, sz * 0.7, 0, 0, 0, true);
     } else if (viewMode === 'room' && selectedRoom) {
       const { cx, cz, w, d } = selectedRoom;
-      const dist = Math.max(w, d) * 1.3;
-      c.setLookAt(cx + dist, dist + 1.5, cz + dist, cx, 0.3, cz, true);
+      const maxDim = Math.max(w, d);
+      const dist = maxDim * 0.75 + 1.5;
+      c.setLookAt(cx + dist * 0.6, dist * 0.7 + 1, cz + dist * 0.6, cx, 0.3, cz, true);
     }
   }, [viewMode, selectedFloor, selectedRoom, layout]);
 

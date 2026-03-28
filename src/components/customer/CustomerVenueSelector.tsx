@@ -200,19 +200,29 @@ export function CustomerVenueSelector({
       const isSelected = existingResourceId === chair.id;
       const isPending = pendingChairId === chair.id;
       const occupantName = occupant ? `${occupant.firstName} ${occupant.lastName}` : '';
+      const gender = occupant?.gender; // 'm' | 'f' | null | undefined
+      const isMale = isOccupiedByOther && gender === 'm';
+      const isFemale = isOccupiedByOther && gender === 'f';
       // Extract short label: just the number or last part of the name
       const shortLabel = chair.name.replace(/^.*[-–]\s*/, '').replace(/^(Yer|Seat|Sandalye|Koltuk)\s*/i, '') || chair.name;
+
+      // Color scheme based on gender
+      const occupiedBorder = isFemale ? 'border-pink-300' : 'border-blue-300';
+      const occupiedBg = isFemale ? 'bg-pink-100' : 'bg-blue-100';
+      const occupiedIcon = isFemale ? 'text-pink-400' : 'text-blue-400';
+      const occupiedNumber = isFemale ? 'text-pink-600' : 'text-blue-600';
+      const occupiedHoverBg = isFemale ? 'bg-pink-500 text-white' : 'bg-blue-500 text-white';
 
       return (
         <Tooltip key={chair.id}>
           <TooltipTrigger asChild>
-            <span tabIndex={0}>
+            <span tabIndex={0} className="group/seat relative">
               <button
                 disabled={savingTable || isOccupiedByOther}
                 className={`relative flex flex-col items-center justify-center w-[52px] h-[58px] sm:w-[60px] sm:h-[66px] rounded-lg border-2 transition-all ${
                   savingTable ? 'opacity-50 cursor-wait' :
                   isOccupiedByOther
-                    ? 'border-red-300 bg-red-100 cursor-not-allowed'
+                    ? `${occupiedBorder} ${occupiedBg} cursor-not-allowed`
                     : isPending
                       ? 'border-orange-500 bg-orange-100 shadow-md shadow-orange-200/50 ring-2 ring-orange-300'
                       : isOwnSeat || isSelected
@@ -239,7 +249,7 @@ export function CustomerVenueSelector({
                   <Loader2 className="h-5 w-5 sm:h-6 sm:w-6 text-orange-500 animate-spin" />
                 ) : (
                   <Armchair className={`h-5 w-5 sm:h-6 sm:w-6 ${
-                    isOccupiedByOther ? 'text-red-400' :
+                    isOccupiedByOther ? occupiedIcon :
                     isPending ? 'text-orange-600' :
                     isOwnSeat || isSelected ? 'text-emerald-600' : 'text-slate-400'
                   }`} />
@@ -247,19 +257,30 @@ export function CustomerVenueSelector({
 
                 {/* Seat number */}
                 <span className={`text-[10px] sm:text-xs font-bold leading-tight mt-0.5 ${
-                  isOccupiedByOther ? 'text-red-600' :
+                  isOccupiedByOther ? occupiedNumber :
                   isPending ? 'text-orange-700' :
                   isOwnSeat || isSelected ? 'text-emerald-700' : 'text-slate-700'
                 }`}>
                   {shortLabel}
                 </span>
+
               </button>
+              {/* Occupant name on hover — outside button so it works on disabled buttons too */}
+              {occupant && (
+                <span className={`absolute -bottom-5 left-0 opacity-0 group-hover/seat:opacity-100 transition-opacity pointer-events-none whitespace-nowrap text-[9px] font-semibold px-1.5 py-0.5 rounded shadow-sm z-10 ${
+                  isOwnSeat ? 'bg-emerald-600 text-white' : occupiedHoverBg
+                }`}>
+                  {occupantName.length > 15 ? occupantName.substring(0, 15) + '…' : occupantName}
+                </span>
+              )}
             </span>
           </TooltipTrigger>
-          <TooltipContent side="top" className="text-xs">
-            <p className="font-medium">{chair.name}</p>
-            {isOwnSeat && <p className="text-emerald-600">{t.customer.yourSeat}</p>}
-            {isOccupiedByOther && <p className="text-red-500">{occupantName}</p>}
+          <TooltipContent side="top" className="text-xs max-w-[180px]">
+            <p className="font-bold">{chair.name}</p>
+            {isOwnSeat && <p className="text-emerald-600 font-medium">{occupantName}</p>}
+            {isMale && <p className="text-blue-500 font-medium">{occupantName}</p>}
+            {isFemale && <p className="text-pink-500 font-medium">{occupantName}</p>}
+            {isOccupiedByOther && !isMale && !isFemale && <p className="text-slate-500 font-medium">{occupantName}</p>}
             {!occupant && <p className="text-slate-400">{t.customer.seatEmpty}</p>}
           </TooltipContent>
         </Tooltip>
@@ -292,16 +313,16 @@ export function CustomerVenueSelector({
             <span className="text-slate-500">{t.customer.seatEmpty}</span>
           </div>
           <div className="flex items-center gap-1.5">
+            <div className="w-4 h-4 rounded border-2 border-blue-300 bg-blue-100" />
+            <span className="text-blue-600">{t.customer.seatOccupiedMale}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-4 h-4 rounded border-2 border-pink-300 bg-pink-100" />
+            <span className="text-pink-600">{t.customer.seatOccupiedFemale}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
             <div className="w-4 h-4 rounded border-2 border-emerald-500 bg-emerald-100" />
             <span className="text-emerald-600">{t.customer.seatYours}</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-4 h-4 rounded border-2 border-orange-500 bg-orange-100" />
-            <span className="text-orange-600">{t.customer.seatPending || 'Yeni Seçim'}</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-4 h-4 rounded border-2 border-red-300 bg-red-100" />
-            <span className="text-red-500">{t.customer.seatOccupied}</span>
           </div>
         </div>
 
@@ -318,14 +339,14 @@ export function CustomerVenueSelector({
           </div>
         ) : (
           <div className="overflow-x-auto pb-2 -mx-2 px-2">
-            <div className="flex flex-col items-center gap-1.5 py-4" style={{ minWidth: 'fit-content' }}>
+            <div className="flex flex-col items-center gap-6 py-4" style={{ minWidth: 'fit-content' }}>
               {/* Top row of seats */}
               <div className="flex justify-center gap-1.5">
                 {topRow.map(renderSeatTile)}
               </div>
 
               {/* Table visual — stretches to match seat rows */}
-              <div className="w-full px-4 my-0.5">
+              <div className="w-full px-4">
                 <div className={`flex items-center justify-center py-2.5 sm:py-3 border-2 border-amber-300 bg-amber-50 text-amber-800 font-bold text-sm sm:text-base ${
                   chairResources.length <= 2 ? 'rounded-full' : 'rounded-xl'
                 }`}>

@@ -418,6 +418,7 @@ export interface ResourceClientDto {
   lastName: string;
   username?: string;
   profilePhoto?: string | null;
+  gender?: 'm' | 'f' | null;
 }
 
 export interface ResourceDto {

@@ -708,6 +708,8 @@ export const en = {
     noFloors: 'No floors found',
     selectedSeat: 'Selected Seat',
     seatOccupied: 'Occupied',
+    seatOccupiedMale: 'Occupied (Male)',
+    seatOccupiedFemale: 'Occupied (Female)',
     seatEmpty: 'Available',
     seatYours: 'Your Seat',
     seatPending: 'New Selection',

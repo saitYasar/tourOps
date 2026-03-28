@@ -708,6 +708,8 @@ export const de = {
     noFloors: 'Keine Stockwerke gefunden',
     selectedSeat: 'Ausgewählter Platz',
     seatOccupied: 'Belegt',
+    seatOccupiedMale: 'Belegt (Männlich)',
+    seatOccupiedFemale: 'Belegt (Weiblich)',
     seatEmpty: 'Verfügbar',
     seatYours: 'Ihr Platz',
     seatPending: 'Neue Auswahl',

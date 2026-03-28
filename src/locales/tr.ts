@@ -708,6 +708,8 @@ export const tr = {
     noFloors: 'Kat bulunamadı',
     selectedSeat: 'Seçilen Yer',
     seatOccupied: 'Dolu',
+    seatOccupiedMale: 'Dolu (Erkek)',
+    seatOccupiedFemale: 'Dolu (Kadın)',
     seatEmpty: 'Boş',
     seatYours: 'Sizin Yeriniz',
     seatPending: 'Yeni Seçim',
