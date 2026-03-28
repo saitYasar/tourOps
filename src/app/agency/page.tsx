@@ -205,7 +205,7 @@ export default function AgencyDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{tours.length}</div>
-              <p className="text-xs text-muted-foreground">{publishedTours} yayinda, {draftTours} taslak</p>
+              <p className="text-xs text-muted-foreground">{t.agency.publishedCount.replace('{count}', String(publishedTours))}, {t.agency.draftCount.replace('{count}', String(draftTours))}</p>
             </CardContent>
           </Card>
 
@@ -226,8 +226,8 @@ export default function AgencyDashboard() {
               <User className="h-4 w-4 text-purple-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{clientsResult?.success ? (clientsResult.data as any)?.meta?.total || 0 : 0}</div>
-              <p className="text-xs text-muted-foreground">Kayıtlı müşteri</p>
+              <div className="text-2xl font-bold">{clientsResult?.success ? ((clientsResult.data as any)?.meta?.totalCount ?? (clientsResult.data as any)?.meta?.total ?? 0) : 0}</div>
+              <p className="text-xs text-muted-foreground">{t.agency.registeredClient}</p>
             </CardContent>
           </Card>
 

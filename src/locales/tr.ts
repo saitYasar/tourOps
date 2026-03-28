@@ -854,6 +854,9 @@ export const tr = {
     tourCount: 'tur',
     memberCount: 'üye',
     teamMember: 'Ekip üyesi',
+    registeredClient: 'Kayıtlı müşteri',
+    publishedCount: '{count} yayında',
+    draftCount: '{count} taslak',
     // Agency main page
     agencyInfo: 'Acente Bilgileri',
     agencyName: 'Acente Adı',
