@@ -255,7 +255,7 @@ export default function RestaurantGuestsPage() {
                       <p className="text-sm font-medium truncate">{res.tour?.tourName || `#${res.tourId}`}</p>
                       <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
                         <Calendar className="h-3 w-3 shrink-0" />
-                        <span>{formatDate(res.tour?.startDate)}</span>
+                        <span>{formatDate(res.scheduledStartTime || res.tour?.startDate)}</span>
                       </div>
                       {res.tour?.agency?.name && (
                         <p className="text-xs text-slate-400 mt-0.5">{res.tour.agency.name}</p>
