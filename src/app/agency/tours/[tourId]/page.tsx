@@ -837,7 +837,7 @@ export default function TourDetailPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <Header title={tour.tourName} description={tour.tourCode} organizationStatus={agencyStatus} lang={locale} />
+      <Header title={t.tours.detail} organizationStatus={agencyStatus} lang={locale} />
 
       <div className="flex-1 p-6 overflow-auto">
         {/* Top Info Bar */}
@@ -859,7 +859,7 @@ export default function TourDetailPage() {
             </div>
             <div className="flex items-center gap-2 text-slate-600">
               <Users className="h-4 w-4" />
-              <span>{tour.minParticipants || '-'} / {tour.maxParticipants || '-'} {t.tours.people}</span>
+              <span>{tourClients?.length || 0} / {tour.maxParticipants || '-'} {t.tours.people}</span>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -1387,7 +1387,7 @@ export default function TourDetailPage() {
                         completed: t.tours.statusCompleted || 'Tamamlandı',
                         no_show: t.tours.statusNoShow || 'Gelmedi',
                       };
-                      const fullName = `${tc.client.firstName} ${tc.client.lastName}`;
+                      const fullName = [tc.client.firstName, tc.client.lastName].filter(Boolean).join(' ');
                       const initials = `${tc.client.firstName?.[0] || ''}${tc.client.lastName?.[0] || ''}`.toUpperCase();
                       const phoneDisplay = tc.client.phone
                         ? `${tc.client.phoneCountryCode || ''} ${tc.client.phone}`.trim()
@@ -1443,9 +1443,6 @@ export default function TourDetailPage() {
 
                             {/* Right: Status + Controls */}
                             <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                              <Badge variant="outline" className={clientStatusColors[tc.status] || ''}>
-                                {clientStatusLabels[tc.status] || tc.status}
-                              </Badge>
                               <Select
                                 value={tc.status}
                                 onValueChange={(value) =>
@@ -2489,7 +2486,7 @@ export default function TourDetailPage() {
                 (() => {
                   const tourClientIds = new Set(tourClients?.map((tc: TourClientDto) => tc.clientId) || []);
                   const filtered = agencyClients.filter((ac: AgencyClientDto) => {
-                    const name = `${ac.client.firstName} ${ac.client.lastName} ${ac.client.username}`.toLowerCase();
+                    const name = [ac.client.firstName, ac.client.lastName, ac.client.username].filter(Boolean).join(' ').toLowerCase();
                     return name.includes(addParticipantSearch.toLowerCase());
                   });
                   if (filtered.length === 0) {
@@ -2514,7 +2511,7 @@ export default function TourDetailPage() {
                           {ac.client.profilePhoto ? (
                             <img
                               src={ac.client.profilePhoto}
-                              alt={`${ac.client.firstName} ${ac.client.lastName}`}
+                              alt={[ac.client.firstName, ac.client.lastName].filter(Boolean).join(' ')}
                               className="h-9 w-9 rounded-full object-cover"
                             />
                           ) : (
@@ -2523,7 +2520,7 @@ export default function TourDetailPage() {
                             </div>
                           )}
                           <div>
-                            <p className="font-medium text-sm">{ac.client.firstName} {ac.client.lastName}</p>
+                            <p className="font-medium text-sm">{[ac.client.firstName, ac.client.lastName].filter(Boolean).join(' ')}</p>
                             <p className="text-xs text-slate-500">@{ac.client.username}</p>
                           </div>
                         </div>
