@@ -377,7 +377,7 @@ export default function ToursPage() {
                         <TableCell>
                           <div className="flex items-center gap-1">
                             <Users className="h-4 w-4 text-slate-400" />
-                            {tour.minParticipants || '-'} / {tour.maxParticipants || '-'}
+                            {tour.participants?.length || 0} / {tour.maxParticipants || '-'}
                           </div>
                         </TableCell>
                         <TableCell>
