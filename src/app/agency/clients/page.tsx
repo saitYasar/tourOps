@@ -69,6 +69,7 @@ export default function AgencyClientsPage() {
   const [batchTourSearchDebounced, setBatchTourSearchDebounced] = useState('');
   const [batchSelectedTourName, setBatchSelectedTourName] = useState('');
   const batchFileRef = useRef<HTMLInputElement>(null);
+  const [photoPreview, setPhotoPreview] = useState<{ url: string; name: string } | null>(null);
 
   // Fetch agency data for status badge
   const { data: agencyResult } = useQuery({
@@ -537,26 +538,38 @@ export default function AgencyClientsPage() {
                         <th className="pb-3 font-medium">{t.invitations.columnUsername}</th>
                         <th className="pb-3 font-medium">{t.invitations.columnStatus}</th>
                         <th className="pb-3 font-medium">{t.invitations.columnTour}</th>
-                        <th className="pb-3 font-medium">{t.invitations.columnDate}</th>
-                        <th className="pb-3 font-medium text-right">{t.invitations.columnActions}</th>
+                        <th className="pb-3 font-medium w-[90px]">{t.invitations.columnDate}</th>
+                        <th className="pb-3 font-medium text-right w-[100px]">{t.invitations.columnActions}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y">
                       {clients.map((client: AgencyClientDto) => (
                         <tr key={client.id}>
-                          <td className="py-3 max-w-[160px]">
+                          <td className="py-3 max-w-[200px]">
                             <div className="flex items-center gap-3">
-                              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-sky-500 to-blue-500 flex items-center justify-center text-white font-medium text-xs flex-shrink-0">
-                                {getInitials(client.client?.firstName, client.client?.lastName)}
-                              </div>
+                              {client.client?.profilePhoto ? (
+                                <img
+                                  src={client.client.profilePhoto}
+                                  alt={[client.client?.firstName, client.client?.lastName].filter(Boolean).join(' ')}
+                                  className="w-9 h-9 rounded-full object-cover flex-shrink-0 cursor-pointer hover:ring-2 hover:ring-blue-300 transition-all"
+                                  onClick={() => setPhotoPreview({
+                                    url: client.client.profilePhoto!,
+                                    name: [client.client?.firstName, client.client?.lastName].filter(Boolean).join(' '),
+                                  })}
+                                />
+                              ) : (
+                                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-sky-500 to-blue-500 flex items-center justify-center text-white font-medium text-xs flex-shrink-0">
+                                  {getInitials(client.client?.firstName, client.client?.lastName)}
+                                </div>
+                              )}
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <p className="font-medium text-sm truncate min-w-0 cursor-default">
-                                    {client.client?.firstName || ''} {client.client?.lastName || ''}
+                                    {[client.client?.firstName, client.client?.lastName].filter(Boolean).join(' ')}
                                   </p>
                                 </TooltipTrigger>
                                 <TooltipContent side="top">
-                                  <p className="text-xs">{client.client?.firstName || ''} {client.client?.lastName || ''}</p>
+                                  <p className="text-xs">{[client.client?.firstName, client.client?.lastName].filter(Boolean).join(' ')}</p>
                                 </TooltipContent>
                               </Tooltip>
                             </div>
@@ -575,10 +588,10 @@ export default function AgencyClientsPage() {
                               <span className="text-xs text-slate-400">-</span>
                             )}
                           </td>
-                          <td className="py-3 max-w-[130px]">
+                          <td className="py-3 max-w-[150px]">
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <code className="text-sm bg-slate-100 px-2 py-0.5 rounded block truncate cursor-default">{client.client?.username}</code>
+                                <code className="text-sm bg-slate-100 px-2 py-0.5 rounded inline-block max-w-full truncate cursor-default">{client.client?.username}</code>
                               </TooltipTrigger>
                               <TooltipContent side="top">
                                 <p className="text-xs">{client.client?.username}</p>
@@ -598,7 +611,7 @@ export default function AgencyClientsPage() {
                               </span>
                             )}
                           </td>
-                          <td className="py-3 max-w-[200px]">
+                          <td className="py-3 max-w-[240px]">
                             {(() => {
                               const tours = clientTourMap.get(client.clientId);
                               if (!tours || tours.length === 0) {
@@ -609,7 +622,7 @@ export default function AgencyClientsPage() {
                                   {tours.map((name, i) => (
                                     <Tooltip key={i}>
                                       <TooltipTrigger asChild>
-                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 max-w-[140px] truncate cursor-default">
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 max-w-[200px] truncate cursor-default">
                                           {name}
                                         </span>
                                       </TooltipTrigger>
@@ -1188,6 +1201,25 @@ export default function AgencyClientsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Photo Preview Popup */}
+      {photoPreview && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+          onClick={() => setPhotoPreview(null)}
+        >
+          <div
+            className="bg-white rounded-xl p-2 shadow-2xl max-w-xs"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src={photoPreview.url}
+              alt={photoPreview.name}
+              className="w-64 h-64 rounded-lg object-cover"
+            />
+            <p className="text-center text-sm font-medium mt-2 mb-1">{photoPreview.name}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
