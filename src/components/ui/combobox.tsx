@@ -22,6 +22,7 @@ interface ComboboxProps {
   disabled?: boolean;
   className?: string;
   groupBy?: boolean;
+  side?: 'top' | 'bottom';
 }
 
 export function Combobox({
@@ -34,6 +35,7 @@ export function Combobox({
   disabled = false,
   className,
   groupBy = false,
+  side = 'bottom',
 }: ComboboxProps) {
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState('');
@@ -105,7 +107,10 @@ export function Combobox({
       </Button>
 
       {open && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg">
+        <div className={cn(
+          "absolute z-50 w-full bg-white border border-slate-200 rounded-lg shadow-lg",
+          side === 'top' ? 'bottom-full mb-1' : 'top-full mt-1'
+        )}>
           {/* Search Input */}
           <div className="p-2 border-b border-slate-100">
             <div className="relative">

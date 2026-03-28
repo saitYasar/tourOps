@@ -526,6 +526,7 @@ export default function AgencySetupPage() {
                       searchPlaceholder="Vergi dairesi ara..."
                       emptyText="Vergi dairesi bulunamadı"
                       groupBy={true}
+                      side="top"
                       className={errors.taxOffice ? '[&>button]:border-red-500' : ''}
                     />
                     {errors.taxOffice && <p className="text-xs text-red-500">{errors.taxOffice.message}</p>}
