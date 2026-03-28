@@ -1139,6 +1139,18 @@ export default function TourDetailPage() {
                       >
                         <Copy className="h-4 w-4" />
                       </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                        onClick={() => {
+                          const link = `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/agency/login?${agencyResult?.data?.uuid ? `uuid=${agencyResult.data.uuid}&` : ''}tourUuid=${tour.uuid}`;
+                          const msg = (t.tours.tourRegistrationWhatsappMsg || '').replace('{link}', link);
+                          window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+                        }}
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
                 )}
@@ -1164,6 +1176,18 @@ export default function TourDetailPage() {
                         }}
                       >
                         <Copy className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                        onClick={() => {
+                          const link = `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/agency/login?uuid=${agencyResult.data!.uuid}`;
+                          const msg = (t.tours.agencyRegistrationWhatsappMsg || '').replace('{link}', link);
+                          window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+                        }}
+                      >
+                        <MessageCircle className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
@@ -1415,7 +1439,8 @@ export default function TourDetailPage() {
                                 <img
                                   src={tc.client.profilePhoto}
                                   alt={fullName}
-                                  className="h-11 w-11 rounded-full object-cover flex-shrink-0"
+                                  className="h-11 w-11 rounded-full object-cover flex-shrink-0 cursor-pointer hover:ring-2 hover:ring-blue-300 transition-all"
+                                  onClick={() => setLightboxImage(tc.client.profilePhoto)}
                                 />
                               ) : (
                                 <div className="h-11 w-11 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0">
