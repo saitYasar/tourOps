@@ -189,8 +189,8 @@ interface VenueModel3DProps {
   onRoomSelect?: (roomId: string) => void;
   onTableSelect?: (tableId: string) => void;
   selectedTableId?: string | null;
-  /** Read-only occupancy overlay: tableId → list of occupants */
-  occupancy?: Record<string, TableOccupant[]>;
+  /** Read-only occupancy overlay: tableId → list of occupants (null = empty seat) */
+  occupancy?: Record<string, (TableOccupant | null)[]>;
   /** When true, disables interaction (click/hover) — pure view mode */
   readOnly?: boolean;
 }
@@ -396,7 +396,7 @@ const OCCUPIED_SEAT = '#bbf7d0'; // light green seat
 const SKIN_CLR = '#f0c8a0';     // person skin tone
 const SHIRT_CLR = '#3b82f6';    // person shirt blue
 
-function Chair3D({ position, rotation, occupant }: { position: [number, number, number]; rotation: number; occupant?: TableOccupant | null }) {
+function Chair3D({ position, rotation, occupant, seatNumber }: { position: [number, number, number]; rotation: number; occupant?: TableOccupant | null; seatNumber?: number }) {
   const isOccupied = !!occupant;
   const seatColor = isOccupied ? OCCUPIED_SEAT : CHAIR_CLR;
   const backColor = isOccupied ? OCCUPIED_CLR : WOOD_DARK;
@@ -466,6 +466,19 @@ function Chair3D({ position, rotation, occupant }: { position: [number, number, 
           </Html>
         </group>
       )}
+
+      {/* Seat number label */}
+      {seatNumber != null && (
+        <Html position={[0, seatY + CHAIR_BACK + 0.06, -CHAIR_SZ / 2 + 0.02]} center distanceFactor={4} style={{ pointerEvents: 'none' }}>
+          <div style={{
+            background: isOccupied ? 'rgba(22,163,106,0.85)' : 'rgba(107,76,53,0.85)', color: '#fff',
+            padding: '0px 4px', borderRadius: 3,
+            fontSize: 7, fontWeight: 600, whiteSpace: 'nowrap',
+          }}>
+            {seatNumber}
+          </div>
+        </Html>
+      )}
     </group>
   );
 }
@@ -474,7 +487,7 @@ function Table3DObj({
   layout, isSelected, onClick, visible, occupants, readOnly,
 }: {
   layout: TableLayout3D; isSelected: boolean; onClick: () => void; visible: boolean;
-  occupants?: TableOccupant[]; readOnly?: boolean;
+  occupants?: (TableOccupant | null)[]; readOnly?: boolean;
 }) {
   const ref = useRef<THREE.Group>(null);
   const [hov, setHov] = useState(false);
@@ -500,15 +513,30 @@ function Table3DObj({
         pos.push({ x: Math.cos(angle) * r, z: Math.sin(angle) * r, a: angle + Math.PI });
       }
     } else {
+      // Interleave sides: odd indices (1,3,5…) → side A, even indices (2,4,6…) → side B
+      // This matches the real layout where seats 1&2 face each other, 3&4 face each other, etc.
       const sA = Math.ceil(table.capacity / 2);
       const sB = table.capacity - sA;
+      const sideA: { x: number; z: number; a: number }[] = [];
+      const sideB: { x: number; z: number; a: number }[] = [];
       for (let i = 0; i < sA; i++) {
         const sp = w / (sA + 1);
-        pos.push({ x: sp * (i + 1) - w / 2, z: -d / 2 - CHAIR_SZ * 0.8, a: 0 });
+        sideA.push({ x: sp * (i + 1) - w / 2, z: -d / 2 - CHAIR_SZ * 0.8, a: 0 });
       }
       for (let i = 0; i < sB; i++) {
         const sp = w / (sB + 1);
-        pos.push({ x: sp * (i + 1) - w / 2, z: d / 2 + CHAIR_SZ * 0.8, a: Math.PI });
+        sideB.push({ x: sp * (i + 1) - w / 2, z: d / 2 + CHAIR_SZ * 0.8, a: Math.PI });
+      }
+      // Interleave: seat1→sideA[0], seat2→sideB[0], seat3→sideA[1], seat4→sideB[1], …
+      let aIdx = 0, bIdx = 0;
+      for (let i = 0; i < table.capacity; i++) {
+        if (i % 2 === 0 && aIdx < sideA.length) {
+          pos.push(sideA[aIdx++]);
+        } else if (bIdx < sideB.length) {
+          pos.push(sideB[bIdx++]);
+        } else {
+          pos.push(sideA[aIdx++]);
+        }
       }
     }
     return pos;
@@ -583,7 +611,7 @@ function Table3DObj({
         </group>
       )}
       {chairs.map((ch, i) => (
-        <Chair3D key={i} position={[ch.x, 0, ch.z]} rotation={ch.a} occupant={occupants?.[i] ?? null} />
+        <Chair3D key={i} position={[ch.x, 0, ch.z]} rotation={ch.a} occupant={occupants?.[i] ?? null} seatNumber={i + 1} />
       ))}
       {isSelected && <pointLight position={[0, TABLE_H + 0.4, 0]} color={SEL_CLR} intensity={3} distance={2} />}
       {visible && (
@@ -594,7 +622,7 @@ function Table3DObj({
             fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap',
             boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
           }}>
-            {table.name} · {occupants?.length ? `${occupants.length}/` : ''}{table.capacity}{isWindow ? ' 🪟' : ''}
+            {table.name} · {occupants?.length ? `${occupants.filter(Boolean).length}/` : ''}{table.capacity}{isWindow ? ' 🪟' : ''}
           </div>
         </Html>
       )}
@@ -689,7 +717,7 @@ function Room3D({
   selectedTableId?: string | null;
   onRoomClick: () => void;
   onTableSelect?: (tableId: string) => void;
-  occupancy?: Record<string, TableOccupant[]>;
+  occupancy?: Record<string, (TableOccupant | null)[]>;
   readOnly?: boolean;
 }) {
   const wallRef = useRef<THREE.Group>(null);
@@ -864,7 +892,7 @@ function FloorSlab3D({
   selectedRoomId: string | null; internalSelectedTableId: string | null;
   onFloorClick: () => void; onRoomClick: (room: Room) => void;
   onTableSelect: (tableId: string) => void;
-  occupancy?: Record<string, TableOccupant[]>; readOnly?: boolean;
+  occupancy?: Record<string, (TableOccupant | null)[]>; readOnly?: boolean;
 }) {
   const ref = useRef<THREE.Group>(null);
   const [hov, setHov] = useState(false);
@@ -997,7 +1025,7 @@ function Scene3D({
   onFloorClick: (id: string) => void;
   onRoomClick: (room: Room) => void;
   onTableSelect: (tableId: string) => void;
-  occupancy?: Record<string, TableOccupant[]>; readOnly?: boolean;
+  occupancy?: Record<string, (TableOccupant | null)[]>; readOnly?: boolean;
 }) {
   const selectedFloor = layout.find(f => f.floor.id === selectedFloorId) ?? null;
   const selectedRoom = selectedFloor?.rooms.find(r => r.room.id === selectedRoomId) ?? null;
@@ -1144,49 +1172,48 @@ export function VenueModel3D({
       </Canvas>
 
       {/* UI Overlay */}
-      <div className="absolute top-3 left-3 flex items-center gap-2 z-10">
+      <div className="absolute top-2 left-2 right-2 z-10 flex flex-wrap items-center gap-1.5 sm:gap-2">
         <Tooltip>
           <TooltipTrigger asChild>
             <span tabIndex={0}>
-              <Button variant="outline" size="sm" onClick={handleBack} disabled={viewMode === 'building'} className="bg-white/90 backdrop-blur-sm shadow-sm">
-                <ChevronLeft className="h-4 w-4 mr-1" />
+              <Button variant="outline" size="sm" onClick={handleBack} disabled={viewMode === 'building'} className="bg-white/90 backdrop-blur-sm shadow-sm h-7 px-2 text-xs sm:h-8 sm:px-3 sm:text-sm">
+                <ChevronLeft className="h-3.5 w-3.5 mr-0.5 sm:h-4 sm:w-4 sm:mr-1" />
                 {t.common.back}
               </Button>
             </span>
           </TooltipTrigger>
           {viewMode === 'building' && <TooltipContent>{t.tooltips.notInBuildingView}</TooltipContent>}
         </Tooltip>
-        <div className="flex items-center gap-1.5 bg-white/90 backdrop-blur-sm rounded-lg px-3 py-1.5 shadow-sm text-sm">
-          <Building2 className="h-3.5 w-3.5 text-slate-500" />
-          <span className="text-slate-600 font-medium">{t.venue.buildingModel}</span>
+        <div className="flex items-center gap-1 bg-white/90 backdrop-blur-sm rounded-lg px-2 py-1 sm:px-3 sm:py-1.5 shadow-sm text-xs sm:text-sm">
+          <Building2 className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-slate-500 shrink-0" />
+          <span className="text-slate-600 font-medium truncate max-w-[80px] sm:max-w-none">{t.venue.buildingModel}</span>
           {selectedFloor && (
             <>
               <span className="text-slate-300">/</span>
-              <span className="text-slate-700 font-semibold">{selectedFloor.floor.name}</span>
+              <span className="text-slate-700 font-semibold truncate max-w-[60px] sm:max-w-none">{selectedFloor.floor.name}</span>
             </>
           )}
           {selectedRoom && (
             <>
               <span className="text-slate-300">/</span>
-              <span className="font-semibold" style={{ color: selectedRoom.color }}>{selectedRoom.room.name}</span>
+              <span className="font-semibold truncate max-w-[60px] sm:max-w-none" style={{ color: selectedRoom.color }}>{selectedRoom.room.name}</span>
             </>
           )}
         </div>
-      </div>
-
-      <div className="absolute top-3 right-3 flex items-center gap-1.5 z-10">
-        <Badge variant="outline" className="bg-white/90 backdrop-blur-sm gap-1 text-xs">
-          <DoorOpen className="h-3 w-3" />
-          {rooms.length} {t.venue.room}
-        </Badge>
-        <Badge variant="outline" className="bg-white/90 backdrop-blur-sm gap-1 text-xs">
-          <Armchair className="h-3 w-3" />
-          {tables.length} {t.venue.table}
-        </Badge>
-        <Badge variant="secondary" className="bg-white/90 backdrop-blur-sm gap-1 text-xs">
-          <Users className="h-3 w-3" />
-          {tables.reduce((s, tbl) => s + tbl.capacity, 0)} {t.venue.persons}
-        </Badge>
+        <div className="flex items-center gap-1 ml-auto">
+          <Badge variant="outline" className="bg-white/90 backdrop-blur-sm gap-0.5 text-[10px] sm:text-xs px-1.5 sm:px-2">
+            <DoorOpen className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+            {rooms.length} {t.venue.room}
+          </Badge>
+          <Badge variant="outline" className="bg-white/90 backdrop-blur-sm gap-0.5 text-[10px] sm:text-xs px-1.5 sm:px-2">
+            <Armchair className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+            {tables.length} {t.venue.table}
+          </Badge>
+          <Badge variant="secondary" className="bg-white/90 backdrop-blur-sm gap-0.5 text-[10px] sm:text-xs px-1.5 sm:px-2">
+            <Users className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+            {tables.reduce((s, tbl) => s + tbl.capacity, 0)} {t.venue.persons}
+          </Badge>
+        </div>
       </div>
 
       {viewMode === 'building' && (

@@ -85,7 +85,7 @@ function convertToLegacy(floorResources: ResourceDto[], cache: Record<number, Re
   const rooms: Room[] = [];
   const tables: Table[] = [];
   const objects: VenueObject[] = [];
-  const occupancy: Record<string, TableOccupant[]> = {};
+  const occupancy: Record<string, (TableOccupant | null)[]> = {};
   const tableIdMap: TableIdMap = {};
 
   for (const floor of floorResources) {
@@ -124,7 +124,7 @@ function convertToLegacy(floorResources: ResourceDto[], cache: Record<number, Re
                 : null,
             );
             if (occ.some(Boolean)) {
-              occupancy[cid] = occ as TableOccupant[];
+              occupancy[cid] = occ;
             }
           }
         } else if (isObjectResource(child)) {
