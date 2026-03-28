@@ -544,7 +544,7 @@ export function LayoutEditor({
         onUndo={handleUndo}
       />
 
-      <div className="flex" style={{ height: 'calc(100vh - 260px)', minHeight: 600 }}>
+      <div className="flex flex-col md:flex-row" style={{ height: 'calc(100vh - 260px)', minHeight: 400 }}>
         {loading ? (
           <div className="flex-1 flex items-center justify-center bg-slate-50 rounded-lg border">
             <LoadingState message="Kat verisi yükleniyor..." />

@@ -63,7 +63,7 @@ export function LayoutInspector({
 
   if (!selectedRoom && !selectedTable && !selectedObject) {
     return (
-      <div className="w-64 border-l bg-slate-50 p-4 flex items-center justify-center">
+      <div className="hidden md:flex w-64 border-l bg-slate-50 p-4 items-center justify-center">
         {confirmDialog}
         <p className="text-sm text-slate-400 text-center">
           {le?.selectItem ?? 'Düzenlemek için bir oda veya masa seçin'}
@@ -74,7 +74,7 @@ export function LayoutInspector({
 
   if (selectedRoom) {
     return (
-      <div className="w-64 border-l bg-slate-50 p-4 space-y-4 overflow-y-auto">
+      <div className="hidden md:block w-64 border-l bg-slate-50 p-4 space-y-4 overflow-y-auto">
         <h3 className="font-semibold text-sm">{le?.roomProperties ?? 'Oda Özellikleri'}</h3>
 
         <div className="space-y-2">
@@ -189,7 +189,7 @@ export function LayoutInspector({
 
   if (selectedTable) {
     return (
-      <div className="w-64 border-l bg-slate-50 p-4 space-y-4 overflow-y-auto">
+      <div className="hidden md:block w-64 border-l bg-slate-50 p-4 space-y-4 overflow-y-auto">
         <h3 className="font-semibold text-sm">{le?.tableProperties ?? 'Masa Özellikleri'}</h3>
 
         <div className="space-y-2">
@@ -331,7 +331,7 @@ export function LayoutInspector({
     const config = OBJECT_KIND_CONFIG[selectedObject.kind];
 
     return (
-      <div className="w-64 border-l bg-slate-50 p-4 space-y-4 overflow-y-auto">
+      <div className="hidden md:block w-64 border-l bg-slate-50 p-4 space-y-4 overflow-y-auto">
         <h3 className="font-semibold text-sm">{le?.objectProperties ?? 'Nesne Özellikleri'}</h3>
 
         {/* Type (read-only) */}

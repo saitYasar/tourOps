@@ -222,11 +222,11 @@ export default function RestaurantGuestsPage() {
     <div>
       <Header title={t.guests.title} description={t.guests.description} />
 
-      <div className="p-6">
-        <div className="flex gap-6 min-h-[calc(100vh-180px)]">
+      <div className="p-3 md:p-6">
+        <div className="flex flex-col md:flex-row gap-3 md:gap-6 min-h-[calc(100vh-180px)]">
           {/* Left Panel - Reservation List (1/3) */}
-          <div className="w-1/3 space-y-2">
-            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3">
+          <div className="w-full md:w-1/3 space-y-2">
+            <h3 className="text-xs md:text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2 md:mb-3">
               {t.requests.approved}
             </h3>
             {reservationsLoading ? (
@@ -281,7 +281,7 @@ export default function RestaurantGuestsPage() {
           </div>
 
           {/* Right Panel - Details (2/3) */}
-          <div className="w-2/3">
+          <div className="w-full md:w-2/3">
             {!selectedReservation ? (
               <Card className="h-full flex items-center justify-center">
                 <CardContent>
@@ -295,13 +295,13 @@ export default function RestaurantGuestsPage() {
               <div className="space-y-4">
                 {/* Reservation Info */}
                 <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Info className="h-5 w-5" />
+                  <CardHeader className="p-3 pb-2 md:p-6 md:pb-2">
+                    <CardTitle className="text-sm md:text-lg flex items-center gap-2">
+                      <Info className="h-4 w-4 md:h-5 md:w-5" />
                       {t.guests.reservationInfo}
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                       <div>
                         <p className="text-xs text-slate-500 mb-0.5">{t.guests.tourName}</p>
@@ -390,13 +390,13 @@ export default function RestaurantGuestsPage() {
 
                 {/* Service Summary */}
                 <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <DollarSign className="h-5 w-5" />
+                  <CardHeader className="p-3 pb-2 md:p-6 md:pb-2">
+                    <CardTitle className="text-sm md:text-lg flex items-center gap-2">
+                      <DollarSign className="h-4 w-4 md:h-5 md:w-5" />
                       {t.guests.serviceSummary}
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
                     {summaryLoading ? (
                       <LoadingState message={t.common.loading} />
                     ) : !serviceSummary?.services?.length ? (
@@ -480,13 +480,13 @@ export default function RestaurantGuestsPage() {
 
                 {/* Customer Choices */}
                 <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <ClipboardList className="h-5 w-5" />
+                  <CardHeader className="p-3 pb-2 md:p-6 md:pb-2">
+                    <CardTitle className="text-sm md:text-lg flex items-center gap-2">
+                      <ClipboardList className="h-4 w-4 md:h-5 md:w-5" />
                       {t.guests.customerChoices}
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
                     {choicesLoading ? (
                       <LoadingState message={t.common.loading} />
                     ) : !choices.length ? (
@@ -582,11 +582,12 @@ export default function RestaurantGuestsPage() {
                 </Card>
 
                 {/* Action Buttons */}
-                <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-2 md:gap-3 flex-wrap">
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <span tabIndex={0}>
                         <Button
+                          size="sm"
                           className="bg-green-600 hover:bg-green-700"
                           onClick={() => {
                             if (confirm(t.guests.approveChoicesConfirm)) {
@@ -595,8 +596,8 @@ export default function RestaurantGuestsPage() {
                           }}
                           disabled={selectedReservation.choicesStatus !== 'submitted' || approveChoicesMutation.isPending}
                         >
-                          <CheckCircle className="h-4 w-4 mr-2" />
-                          {t.guests.approveChoices}
+                          <CheckCircle className="h-4 w-4 md:mr-2" />
+                          <span className="hidden md:inline">{t.guests.approveChoices}</span>
                         </Button>
                       </span>
                     </TooltipTrigger>
@@ -610,11 +611,12 @@ export default function RestaurantGuestsPage() {
                       <span tabIndex={0}>
                         <Button
                           variant="destructive"
+                          size="sm"
                           onClick={() => { setActionType('reject'); setActionNote(''); }}
                           disabled={selectedReservation.choicesStatus !== 'submitted' || rejectChoicesMutation.isPending}
                         >
-                          <XCircle className="h-4 w-4 mr-2" />
-                          {t.guests.rejectChoices}
+                          <XCircle className="h-4 w-4 md:mr-2" />
+                          <span className="hidden md:inline">{t.guests.rejectChoices}</span>
                         </Button>
                       </span>
                     </TooltipTrigger>
@@ -628,12 +630,13 @@ export default function RestaurantGuestsPage() {
                       <span tabIndex={0}>
                         <Button
                           variant="outline"
+                          size="sm"
                           className="border-yellow-500 text-yellow-700 hover:bg-yellow-50"
                           onClick={() => { setActionType('revision'); setActionNote(''); }}
                           disabled={selectedReservation.choicesStatus !== 'submitted' || revisionMutation.isPending}
                         >
-                          <RotateCcw className="h-4 w-4 mr-2" />
-                          {t.guests.requestRevision}
+                          <RotateCcw className="h-4 w-4 md:mr-2" />
+                          <span className="hidden md:inline">{t.guests.requestRevision}</span>
                         </Button>
                       </span>
                     </TooltipTrigger>
@@ -647,11 +650,12 @@ export default function RestaurantGuestsPage() {
                       <span tabIndex={0}>
                         <Button
                           variant="outline"
+                          size="sm"
                           onClick={() => setReceiptOpen(true)}
                           disabled={choices.length === 0}
                         >
-                          <Printer className="h-4 w-4 mr-2" />
-                          {t.guests.printReceipt}
+                          <Printer className="h-4 w-4 md:mr-2" />
+                          <span className="hidden md:inline">{t.guests.printReceipt}</span>
                         </Button>
                       </span>
                     </TooltipTrigger>

@@ -897,37 +897,38 @@ export default function VenuePage() {
     <div className="flex flex-col h-full">
       <Header title={t.venue.title} description={t.venue.description} organizationStatus={orgStatus} lang={locale} />
 
-      <div className="flex-1 p-6">
+      <div className="flex-1 p-3 md:p-6">
         <Tabs value={activeTab} onValueChange={(tab) => {
           setActiveTab(tab);
           // 3D model tabına geçişte: editor hazırsa cache'i yenile, değilse editorReady sonrası otomatik yüklenecek
           if (tab === 'model' && editorReady && !childrenLoadingInProgress) {
             setChildrenLoaded(false);
           }
-        }} className="space-y-4">
-          <div className="flex items-center justify-between">
+        }} className="space-y-3 md:space-y-4">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <TabsList>
-              <TabsTrigger value="summary" className="gap-2">
-                <MapPin className="h-4 w-4" />
+              <TabsTrigger value="summary" className="gap-1.5 md:gap-2 text-xs md:text-sm">
+                <MapPin className="h-3.5 w-3.5 md:h-4 md:w-4" />
                 {t.venue.floorPlan}
               </TabsTrigger>
-              <TabsTrigger value="model" className="gap-2">
-                <Box className="h-4 w-4" />
+              <TabsTrigger value="model" className="gap-1.5 md:gap-2 text-xs md:text-sm">
+                <Box className="h-3.5 w-3.5 md:h-4 md:w-4" />
                 {t.venue.modelView}
               </TabsTrigger>
             </TabsList>
             {typesLoading ? (
-              <Button disabled>
+              <Button size="sm" disabled>
                 <Plus className="h-4 w-4 mr-2" />
                 {t.common.loading}
               </Button>
             ) : rootType ? (
-              <Button onClick={() => openCreateForm(null, rootType.id)}>
-                <Plus className="h-4 w-4 mr-2" />
-                {t.venue.addNew} {rootType.name}
+              <Button size="sm" onClick={() => openCreateForm(null, rootType.id)}>
+                <Plus className="h-4 w-4 mr-1 md:mr-2" />
+                <span className="hidden md:inline">{t.venue.addNew} {rootType.name}</span>
+                <span className="md:hidden">{rootType.name}</span>
               </Button>
             ) : (
-              <Button variant="outline" disabled>
+              <Button variant="outline" size="sm" disabled>
                 <Plus className="h-4 w-4 mr-2" />
                 {t.venue.selectResourceType}
               </Button>
@@ -953,21 +954,21 @@ export default function VenuePage() {
                       {t.venue.createSeatingDesc}
                     </p>
 
-                    <div className="grid grid-cols-3 gap-4 mb-8 w-full">
-                      <div className="flex flex-col items-center p-4 bg-slate-50 rounded-lg">
-                        <Layers className="h-6 w-6 text-indigo-500 mb-2" />
-                        <span className="text-sm font-medium text-slate-700">{t.venue.addFloorStep}</span>
-                        <span className="text-xs text-slate-400 mt-1">{t.venue.addFloorStepDesc}</span>
+                    <div className="grid grid-cols-3 gap-2 md:gap-4 mb-6 md:mb-8 w-full">
+                      <div className="flex flex-col items-center p-2 md:p-4 bg-slate-50 rounded-lg">
+                        <Layers className="h-5 w-5 md:h-6 md:w-6 text-indigo-500 mb-1 md:mb-2" />
+                        <span className="text-xs md:text-sm font-medium text-slate-700 text-center">{t.venue.addFloorStep}</span>
+                        <span className="text-[10px] md:text-xs text-slate-400 mt-1 text-center">{t.venue.addFloorStepDesc}</span>
                       </div>
-                      <div className="flex flex-col items-center p-4 bg-slate-50 rounded-lg">
-                        <Square className="h-6 w-6 text-blue-500 mb-2" />
-                        <span className="text-sm font-medium text-slate-700">{t.venue.addRoomStep}</span>
-                        <span className="text-xs text-slate-400 mt-1">{t.venue.addRoomStepDesc}</span>
+                      <div className="flex flex-col items-center p-2 md:p-4 bg-slate-50 rounded-lg">
+                        <Square className="h-5 w-5 md:h-6 md:w-6 text-blue-500 mb-1 md:mb-2" />
+                        <span className="text-xs md:text-sm font-medium text-slate-700 text-center">{t.venue.addRoomStep}</span>
+                        <span className="text-[10px] md:text-xs text-slate-400 mt-1 text-center">{t.venue.addRoomStepDesc}</span>
                       </div>
-                      <div className="flex flex-col items-center p-4 bg-slate-50 rounded-lg">
-                        <Circle className="h-6 w-6 text-amber-500 mb-2" />
-                        <span className="text-sm font-medium text-slate-700">{t.venue.addTableStep}</span>
-                        <span className="text-xs text-slate-400 mt-1">{t.venue.addTableStepDesc}</span>
+                      <div className="flex flex-col items-center p-2 md:p-4 bg-slate-50 rounded-lg">
+                        <Circle className="h-5 w-5 md:h-6 md:w-6 text-amber-500 mb-1 md:mb-2" />
+                        <span className="text-xs md:text-sm font-medium text-slate-700 text-center">{t.venue.addTableStep}</span>
+                        <span className="text-[10px] md:text-xs text-slate-400 mt-1 text-center">{t.venue.addTableStepDesc}</span>
                       </div>
                     </div>
 
@@ -986,24 +987,24 @@ export default function VenuePage() {
               </Card>
             ) : (
               <>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
                   {/* Stats Cards */}
                   <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">{t.venue.totalFloors}</CardTitle>
-                      <Layers className="h-4 w-4 text-muted-foreground" />
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1 md:p-6 md:pb-2">
+                      <CardTitle className="text-xs md:text-sm font-medium">{t.venue.totalFloors}</CardTitle>
+                      <Layers className="h-3.5 w-3.5 md:h-4 md:w-4 text-muted-foreground" />
                     </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">{resources.length}</div>
+                    <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
+                      <div className="text-xl md:text-2xl font-bold">{resources.length}</div>
                     </CardContent>
                   </Card>
                   <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">{t.venue.totalRooms}</CardTitle>
-                      <Square className="h-4 w-4 text-muted-foreground" />
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1 md:p-6 md:pb-2">
+                      <CardTitle className="text-xs md:text-sm font-medium">{t.venue.totalRooms}</CardTitle>
+                      <Square className="h-3.5 w-3.5 md:h-4 md:w-4 text-muted-foreground" />
                     </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">
+                    <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
+                      <div className="text-xl md:text-2xl font-bold">
                         {resources.reduce((acc, floor) => {
                           const children = childrenCache[floor.id] || floor.children || [];
                           return acc + children.length;
@@ -1012,12 +1013,12 @@ export default function VenuePage() {
                     </CardContent>
                   </Card>
                   <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">{t.venue.totalTables}</CardTitle>
-                      <Circle className="h-4 w-4 text-muted-foreground" />
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1 md:p-6 md:pb-2">
+                      <CardTitle className="text-xs md:text-sm font-medium">{t.venue.totalTables}</CardTitle>
+                      <Circle className="h-3.5 w-3.5 md:h-4 md:w-4 text-muted-foreground" />
                     </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">
+                    <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
+                      <div className="text-xl md:text-2xl font-bold">
                         {resources.reduce((acc, floor) => {
                           const rooms = childrenCache[floor.id] || floor.children || [];
                           return acc + rooms.reduce((roomAcc, room) => {
@@ -1029,12 +1030,12 @@ export default function VenuePage() {
                     </CardContent>
                   </Card>
                   <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">{t.venue.totalCapacity}</CardTitle>
-                      <User className="h-4 w-4 text-muted-foreground" />
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1 md:p-6 md:pb-2">
+                      <CardTitle className="text-xs md:text-sm font-medium">{t.venue.totalCapacity}</CardTitle>
+                      <User className="h-3.5 w-3.5 md:h-4 md:w-4 text-muted-foreground" />
                     </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">
+                    <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
+                      <div className="text-xl md:text-2xl font-bold">
                         {resources.reduce((acc, floor) => acc + floor.capacity, 0)} {t.venue.people}
                       </div>
                     </CardContent>

@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { useAutoSelect } from '@/hooks/useAutoSelect';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ClipboardList, Building2, UtensilsCrossed, CheckCircle, XCircle, Clock, MapPin, Users, Settings, Pencil, X, Phone, Mail, FileText, Globe, Hash, ImageIcon, Upload } from 'lucide-react';
+import { ClipboardList, Building2, UtensilsCrossed, CheckCircle, XCircle, Clock, MapPin, Pencil, Phone, Mail, ImageIcon, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
@@ -326,60 +326,60 @@ export default function RestaurantDashboard() {
     <div className="flex flex-col h-full">
       <Header title={organization?.name || t.restaurant.title} organizationStatus={organization?.status} lang={locale} />
 
-      <div className="flex-1 p-6 overflow-auto">
+      <div className="flex-1 p-4 md:p-6 overflow-auto">
         {/* Ozet Kartlari */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
+        <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4 mb-4 md:mb-6">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{t.restaurant.pendingRequests}</CardTitle>
-              <Clock className="h-4 w-4 text-yellow-500" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1 md:p-6 md:pb-2">
+              <CardTitle className="text-xs md:text-sm font-medium">{t.restaurant.pendingRequests}</CardTitle>
+              <Clock className="h-3.5 w-3.5 md:h-4 md:w-4 text-yellow-500" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{pendingRequests}</div>
-              <p className="text-xs text-muted-foreground">{t.restaurant.waitingApproval}</p>
+            <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
+              <div className="text-xl md:text-2xl font-bold">{pendingRequests}</div>
+              <p className="text-[10px] md:text-xs text-muted-foreground">{t.restaurant.waitingApproval}</p>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{t.restaurant.approvedRequests}</CardTitle>
-              <CheckCircle className="h-4 w-4 text-green-500" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1 md:p-6 md:pb-2">
+              <CardTitle className="text-xs md:text-sm font-medium">{t.restaurant.approvedRequests}</CardTitle>
+              <CheckCircle className="h-3.5 w-3.5 md:h-4 md:w-4 text-green-500" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{approvedRequests}</div>
-              <p className="text-xs text-muted-foreground">{t.restaurant.reservationApproved}</p>
+            <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
+              <div className="text-xl md:text-2xl font-bold">{approvedRequests}</div>
+              <p className="text-[10px] md:text-xs text-muted-foreground">{t.restaurant.reservationApproved}</p>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{t.restaurant.rejectedRequests}</CardTitle>
-              <XCircle className="h-4 w-4 text-red-500" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1 md:p-6 md:pb-2">
+              <CardTitle className="text-xs md:text-sm font-medium">{t.restaurant.rejectedRequests}</CardTitle>
+              <XCircle className="h-3.5 w-3.5 md:h-4 md:w-4 text-red-500" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{rejectedRequests}</div>
-              <p className="text-xs text-muted-foreground">{t.restaurant.reservationRejected}</p>
+            <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
+              <div className="text-xl md:text-2xl font-bold">{rejectedRequests}</div>
+              <p className="text-[10px] md:text-xs text-muted-foreground">{t.restaurant.reservationRejected}</p>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{t.restaurant.totalRequests}</CardTitle>
-              <ClipboardList className="h-4 w-4 text-slate-500" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1 md:p-6 md:pb-2">
+              <CardTitle className="text-xs md:text-sm font-medium">{t.restaurant.totalRequests}</CardTitle>
+              <ClipboardList className="h-3.5 w-3.5 md:h-4 md:w-4 text-slate-500" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{requests.length}</div>
-              <p className="text-xs text-muted-foreground">{t.restaurant.allTime}</p>
+            <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
+              <div className="text-xl md:text-2xl font-bold">{requests.length}</div>
+              <p className="text-[10px] md:text-xs text-muted-foreground">{t.restaurant.allTime}</p>
             </CardContent>
           </Card>
         </div>
 
         {/* İşletme Bilgileri - Tam Genişlik */}
-        <Card className="mb-6">
-          <CardHeader>
+        <Card className="mb-4 md:mb-6">
+          <CardHeader className="p-3 md:p-6">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-xl flex items-center gap-2">
-                <Building2 className="h-6 w-6 text-blue-600" />
+              <CardTitle className="text-sm md:text-xl flex items-center gap-2">
+                <Building2 className="h-4 w-4 md:h-6 md:w-6 text-blue-600" />
                 {t.restaurant.orgInfo}
               </CardTitle>
               <Button
@@ -393,30 +393,30 @@ export default function RestaurantDashboard() {
               </Button>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
             {/* Kapak Fotoğrafı */}
             {organization?.coverImageUrl && (
-              <div className="mb-6 rounded-lg overflow-hidden">
+              <div className="mb-4 md:mb-6 rounded-lg overflow-hidden">
                 <img
                   src={organization.coverImageUrl}
                   alt={t.tours.coverImage}
-                  className="w-full h-48 md:h-56 object-cover"
+                  className="w-full h-32 md:h-56 object-cover"
                 />
               </div>
             )}
 
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-3 md:gap-6 grid-cols-2 lg:grid-cols-3">
               {/* İşletme Adı */}
               <div className="space-y-1">
-                <p className="text-sm text-slate-500 font-medium">{t.restaurant.orgName}</p>
-                <p className="text-lg font-semibold text-slate-900">{organization?.name || '-'}</p>
+                <p className="text-xs md:text-sm text-slate-500 font-medium">{t.restaurant.orgName}</p>
+                <p className="text-sm md:text-lg font-semibold text-slate-900">{organization?.name || '-'}</p>
               </div>
 
               {/* Kategori */}
               <div className="space-y-1">
-                <p className="text-sm text-slate-500 font-medium">{t.admin.categoryLabel}</p>
+                <p className="text-xs md:text-sm text-slate-500 font-medium">{t.admin.categoryLabel}</p>
                 <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                  <span className="inline-flex items-center px-2 py-0.5 md:px-3 md:py-1 rounded-full text-xs md:text-sm font-medium bg-blue-100 text-blue-800">
                     {organization?.category?.name || '-'}
                   </span>
                 </div>
@@ -424,52 +424,52 @@ export default function RestaurantDashboard() {
 
               {/* Telefon */}
               <div className="space-y-1">
-                <p className="text-sm text-slate-500 font-medium">{t.common.phone}</p>
-                <p className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-                  <Phone className="h-4 w-4 text-slate-400" />
+                <p className="text-xs md:text-sm text-slate-500 font-medium">{t.common.phone}</p>
+                <p className="text-sm md:text-lg font-semibold text-slate-900 flex items-center gap-2">
+                  <Phone className="h-4 w-4 text-slate-400 hidden md:block" />
                   {organization?.phone ? `+${organization.phoneCountryCode} ${organization.phone}` : '-'}
                 </p>
               </div>
 
               {/* E-posta */}
               <div className="space-y-1">
-                <p className="text-sm text-slate-500 font-medium">{t.admin.emailLabel}</p>
-                <p className="text-base font-medium text-slate-900 flex items-center gap-2">
-                  <Mail className="h-4 w-4 text-slate-400" />
+                <p className="text-xs md:text-sm text-slate-500 font-medium">{t.admin.emailLabel}</p>
+                <p className="text-sm md:text-base font-medium text-slate-900 flex items-center gap-2 break-all">
+                  <Mail className="h-4 w-4 text-slate-400 hidden md:block" />
                   {organization?.email || '-'}
                 </p>
               </div>
 
               {/* Resmi Ünvan */}
               <div className="space-y-1">
-                <p className="text-sm text-slate-500 font-medium">{t.admin.legalName}</p>
-                <p className="text-base font-medium text-slate-900">{organization?.legalName || '-'}</p>
+                <p className="text-xs md:text-sm text-slate-500 font-medium">{t.admin.legalName}</p>
+                <p className="text-sm md:text-base font-medium text-slate-900">{organization?.legalName || '-'}</p>
               </div>
 
               {/* Vergi Dairesi */}
               <div className="space-y-1">
-                <p className="text-sm text-slate-500 font-medium">{t.admin.taxOffice}</p>
-                <p className="text-base font-medium text-slate-900">{organization?.taxOffice || '-'}</p>
+                <p className="text-xs md:text-sm text-slate-500 font-medium">{t.admin.taxOffice}</p>
+                <p className="text-sm md:text-base font-medium text-slate-900">{organization?.taxOffice || '-'}</p>
               </div>
 
               {/* Vergi No */}
               <div className="space-y-1">
-                <p className="text-sm text-slate-500 font-medium">{t.admin.taxNumber}</p>
-                <p className="text-base font-medium text-slate-900 font-mono">{organization?.taxNumber || '-'}</p>
+                <p className="text-xs md:text-sm text-slate-500 font-medium">{t.admin.taxNumber}</p>
+                <p className="text-sm md:text-base font-medium text-slate-900 font-mono">{organization?.taxNumber || '-'}</p>
               </div>
 
               {/* Acente Komisyon Oranı */}
               <div className="space-y-1">
-                <p className="text-sm text-slate-500 font-medium">{t.tours.agencyCommission}</p>
-                <p className="text-lg font-semibold text-orange-600">
+                <p className="text-xs md:text-sm text-slate-500 font-medium">{t.tours.agencyCommission}</p>
+                <p className="text-sm md:text-lg font-semibold text-orange-600">
                   {organization?.agencyCommissionRate != null ? `%${organization.agencyCommissionRate}` : '-'}
                 </p>
               </div>
 
               {/* Para Birimi */}
               <div className="space-y-1">
-                <p className="text-sm text-slate-500 font-medium">{t.restaurant.currency}</p>
-                <p className="text-lg font-semibold text-slate-900">
+                <p className="text-xs md:text-sm text-slate-500 font-medium">{t.restaurant.currency}</p>
+                <p className="text-sm md:text-lg font-semibold text-slate-900">
                   {organization?.currency ? `${organization.currency} (${getCurrencySymbol(organization.currency)})` : 'TRY (₺)'}
                 </p>
               </div>
@@ -477,8 +477,8 @@ export default function RestaurantDashboard() {
               {/* Sistem Komisyon Oranı */}
               {organization?.system_commission && (
                 <div className="space-y-1">
-                  <p className="text-sm text-slate-500 font-medium">{t.tours.systemCommission}</p>
-                  <p className="text-lg font-semibold text-violet-600">
+                  <p className="text-xs md:text-sm text-slate-500 font-medium">{t.tours.systemCommission}</p>
+                  <p className="text-sm md:text-lg font-semibold text-violet-600">
                     %{organization.system_commission.value}
                   </p>
                 </div>
@@ -486,9 +486,9 @@ export default function RestaurantDashboard() {
 
               {/* Adres - Tam Genişlik */}
               <div className="space-y-1 md:col-span-2">
-                <p className="text-sm text-slate-500 font-medium">{t.admin.addressLabel}</p>
-                <p className="text-base text-slate-900 flex items-start gap-2">
-                  <MapPin className="h-4 w-4 text-slate-400 mt-1 shrink-0" />
+                <p className="text-xs md:text-sm text-slate-500 font-medium">{t.admin.addressLabel}</p>
+                <p className="text-sm md:text-base text-slate-900 flex items-start gap-2">
+                  <MapPin className="h-4 w-4 text-slate-400 mt-1 shrink-0 hidden md:block" />
                   {organization?.address || '-'}
                 </p>
               </div>
@@ -496,112 +496,92 @@ export default function RestaurantDashboard() {
               {/* Açıklama - Tam Genişlik */}
               {organization?.description && (
                 <div className="space-y-1 lg:col-span-3 md:col-span-2">
-                  <p className="text-sm text-slate-500 font-medium">{t.admin.descriptionLabel}</p>
-                  <p className="text-base text-slate-700 bg-slate-50 p-3 rounded-lg">{organization.description}</p>
+                  <p className="text-xs md:text-sm text-slate-500 font-medium">{t.admin.descriptionLabel}</p>
+                  <p className="text-sm md:text-base text-slate-700 bg-slate-50 p-2 md:p-3 rounded-lg">{organization.description}</p>
                 </div>
               )}
             </div>
           </CardContent>
         </Card>
 
-        {/* Konum ve Hızlı Erişim */}
-        <div className="grid gap-6 lg:grid-cols-3 mb-6">
-          {/* Konum Kartı */}
-          <Card className="lg:col-span-2">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <MapPin className="h-5 w-5 text-emerald-600" />
-                  {t.restaurant.locationStep}
-                </CardTitle>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleOpenLocationDialog}
-                  className="gap-2"
-                >
-                  <Pencil className="h-4 w-4" />
-                  {t.common.edit}
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {/* İl ve İlçe Bilgisi */}
-              <div className="flex items-center gap-2 flex-wrap mb-4">
-                {organization?.country && (
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-slate-100 text-slate-800">
-                    {organization.country.name}
-                  </span>
-                )}
-                {organization?.city && (
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
-                    {organization.city.name}
-                  </span>
-                )}
-                {organization?.district && (
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-emerald-100 text-emerald-800">
-                    {organization.district.name}
-                  </span>
-                )}
-                {!organization?.city && !organization?.district && (
-                  <span className="text-sm text-slate-400">{t.admin.noLocation}</span>
-                )}
-              </div>
-              {mapRestaurants && mapCenter ? (
-                <RestaurantMap
-                  restaurants={mapRestaurants}
-                  selectedRestaurantId={selectedRestaurantId}
-                  height="250px"
-                  zoom={15}
-                  center={mapCenter}
-                />
-              ) : (
-                <div className="h-[250px] bg-slate-100 rounded-lg flex items-center justify-center">
-                  <p className="text-slate-500">{t.admin.noLocation}</p>
-                </div>
+        {/* Konum */}
+        <Card className="mb-4 md:mb-6">
+          <CardHeader className="p-3 pb-2 md:p-6 md:pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm md:text-lg flex items-center gap-2">
+                <MapPin className="h-4 w-4 md:h-5 md:w-5 text-emerald-600" />
+                {t.restaurant.locationStep}
+              </CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleOpenLocationDialog}
+                className="gap-2"
+              >
+                <Pencil className="h-4 w-4" />
+                <span className="hidden md:inline">{t.common.edit}</span>
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
+            {/* İl ve İlçe Bilgisi */}
+            <div className="flex items-center gap-1.5 md:gap-2 flex-wrap mb-3 md:mb-4">
+              {organization?.country && (
+                <span className="inline-flex items-center px-2 py-0.5 md:px-3 md:py-1 rounded-full text-xs md:text-sm font-medium bg-slate-100 text-slate-800">
+                  {organization.country.name}
+                </span>
               )}
-            </CardContent>
-          </Card>
-
-          {/* Hızlı Erişim */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg">{t.admin.quickActions}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <Link href="/restaurant/team" className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors border">
-                <Users className="h-5 w-5 text-blue-500" />
-                <span className="text-sm font-medium">{t.restaurant.teamManagement}</span>
-              </Link>
-              <Link href="/restaurant/photos" className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors border">
-                <Settings className="h-5 w-5 text-purple-500" />
-                <span className="text-sm font-medium">{t.nav.photos}</span>
-              </Link>
-            </CardContent>
-          </Card>
-        </div>
+              {organization?.city && (
+                <span className="inline-flex items-center px-2 py-0.5 md:px-3 md:py-1 rounded-full text-xs md:text-sm font-medium bg-blue-100 text-blue-800">
+                  {organization.city.name}
+                </span>
+              )}
+              {organization?.district && (
+                <span className="inline-flex items-center px-2 py-0.5 md:px-3 md:py-1 rounded-full text-xs md:text-sm font-medium bg-emerald-100 text-emerald-800">
+                  {organization.district.name}
+                </span>
+              )}
+              {!organization?.city && !organization?.district && (
+                <span className="text-xs md:text-sm text-slate-400">{t.admin.noLocation}</span>
+              )}
+            </div>
+            {mapRestaurants && mapCenter ? (
+              <RestaurantMap
+                restaurants={mapRestaurants}
+                selectedRestaurantId={selectedRestaurantId}
+                height="250px"
+                zoom={15}
+                center={mapCenter}
+              />
+            ) : (
+              <div className="h-[200px] md:h-[250px] bg-slate-100 rounded-lg flex items-center justify-center">
+                <p className="text-xs md:text-sm text-slate-500">{t.admin.noLocation}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Hızlı Eylemler */}
-        <div className="space-y-4">
-          <h3 className="font-semibold text-lg">{t.admin.quickActions}</h3>
-          <div className="grid gap-4 md:grid-cols-3">
+        <div className="space-y-3 md:space-y-4">
+          <h3 className="font-semibold text-sm md:text-lg">{t.admin.quickActions}</h3>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
             <Link href="/restaurant/requests">
               <Card className="hover:border-primary transition-colors cursor-pointer h-full">
-                <CardHeader>
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-100 rounded-lg">
-                      <ClipboardList className="h-6 w-6 text-blue-600" />
+                <CardHeader className="p-3 md:p-6">
+                  <div className="flex items-center gap-2 md:gap-3">
+                    <div className="p-1.5 md:p-2 bg-blue-100 rounded-lg">
+                      <ClipboardList className="h-4 w-4 md:h-6 md:w-6 text-blue-600" />
                     </div>
                     <div>
-                      <CardTitle className="text-lg">{t.requests.title}</CardTitle>
-                      <p className="text-sm text-slate-500">
+                      <CardTitle className="text-sm md:text-lg">{t.requests.title}</CardTitle>
+                      <p className="text-xs md:text-sm text-slate-500">
                         {pendingRequests} {t.requests.pending.toLowerCase()}
                       </p>
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-slate-600">
+                <CardContent className="px-3 pb-3 pt-0 md:px-6 md:pb-6">
+                  <p className="text-xs md:text-sm text-slate-600">
                     {t.requests.description}
                   </p>
                 </CardContent>
@@ -610,21 +590,21 @@ export default function RestaurantDashboard() {
 
             <Link href="/restaurant/venue">
               <Card className="hover:border-primary transition-colors cursor-pointer h-full">
-                <CardHeader>
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-green-100 rounded-lg">
-                      <Building2 className="h-6 w-6 text-green-600" />
+                <CardHeader className="p-3 md:p-6">
+                  <div className="flex items-center gap-2 md:gap-3">
+                    <div className="p-1.5 md:p-2 bg-green-100 rounded-lg">
+                      <Building2 className="h-4 w-4 md:h-6 md:w-6 text-green-600" />
                     </div>
                     <div>
-                      <CardTitle className="text-lg">{t.venue.title}</CardTitle>
-                      <p className="text-sm text-slate-500">
+                      <CardTitle className="text-sm md:text-lg">{t.venue.title}</CardTitle>
+                      <p className="text-xs md:text-sm text-slate-500">
                         {floors.length} {t.venue.floor.toLowerCase()}
                       </p>
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-slate-600">
+                <CardContent className="px-3 pb-3 pt-0 md:px-6 md:pb-6">
+                  <p className="text-xs md:text-sm text-slate-600">
                     {t.venue.description}
                   </p>
                 </CardContent>
@@ -633,21 +613,21 @@ export default function RestaurantDashboard() {
 
             <Link href="/restaurant/menu">
               <Card className="hover:border-primary transition-colors cursor-pointer h-full">
-                <CardHeader>
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-orange-100 rounded-lg">
-                      <UtensilsCrossed className="h-6 w-6 text-orange-600" />
+                <CardHeader className="p-3 md:p-6">
+                  <div className="flex items-center gap-2 md:gap-3">
+                    <div className="p-1.5 md:p-2 bg-orange-100 rounded-lg">
+                      <UtensilsCrossed className="h-4 w-4 md:h-6 md:w-6 text-orange-600" />
                     </div>
                     <div>
-                      <CardTitle className="text-lg">{t.menu.title}</CardTitle>
-                      <p className="text-sm text-slate-500">
+                      <CardTitle className="text-sm md:text-lg">{t.menu.title}</CardTitle>
+                      <p className="text-xs md:text-sm text-slate-500">
                         {categories.length} {t.menu.categories.toLowerCase()}
                       </p>
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-slate-600">
+                <CardContent className="px-3 pb-3 pt-0 md:px-6 md:pb-6">
+                  <p className="text-xs md:text-sm text-slate-600">
                     {t.menu.description}
                   </p>
                 </CardContent>

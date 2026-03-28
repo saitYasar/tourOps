@@ -1274,9 +1274,9 @@ export default function MenuPage() {
       {/* Menu Preview Dialog — Phone mockup */}
       {/* ============================================ */}
       <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
-        <DialogContent className="max-w-md p-0 gap-0 overflow-hidden bg-transparent border-0 shadow-none [&>button]:hidden">
+        <DialogContent className="max-w-sm md:max-w-md p-0 gap-0 overflow-hidden bg-transparent border-0 shadow-none" onInteractOutside={() => setIsPreviewOpen(false)}>
           {/* Phone Frame */}
-          <div className="mx-auto w-[375px] bg-stone-50 rounded-[2rem] shadow-2xl border-[6px] border-stone-800 overflow-hidden relative">
+          <div className="mx-auto w-full max-w-[375px] bg-stone-50 rounded-[2rem] shadow-2xl border-[6px] border-stone-800 overflow-hidden relative">
             {/* Phone Notch */}
             <div className="bg-stone-800 flex items-center justify-center py-1">
               <div className="w-20 h-5 bg-stone-900 rounded-b-xl" />

@@ -156,14 +156,14 @@ export default function RestaurantRequestsPage() {
         lang={locale}
       />
 
-      <div className="flex-1 p-6">
+      <div className="flex-1 p-3 md:p-6">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-3 md:p-6 md:pb-4">
             <Select
               value={statusFilter}
               onValueChange={(v) => setStatusFilter(v as PreReservationStatus | 'all')}
             >
-              <SelectTrigger className="w-40">
+              <SelectTrigger className="w-32 md:w-40">
                 <SelectValue placeholder={t.requests.status} />
               </SelectTrigger>
               <SelectContent>
@@ -174,7 +174,7 @@ export default function RestaurantRequestsPage() {
               </SelectContent>
             </Select>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
             {isLoading ? (
               <LoadingState message={t.common.loading} />
             ) : error ? (
@@ -199,21 +199,21 @@ export default function RestaurantRequestsPage() {
 
                   return (
                     <Card key={request.id} className="border transition-all duration-200">
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="space-y-2 flex-1 min-w-0">
-                            <div className="flex items-center gap-3 flex-wrap">
-                              <h3 className="font-semibold text-lg">
+                      <CardContent className="p-3 md:p-4">
+                        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3 md:gap-4">
+                          <div className="space-y-1.5 md:space-y-2 flex-1 min-w-0">
+                            <div className="flex items-center gap-2 md:gap-3 flex-wrap">
+                              <h3 className="font-semibold text-sm md:text-lg">
                                 {getTourName(request)}
                               </h3>
                               <RequestStatusBadge status={request.status} />
                             </div>
 
                             {/* Summary row: description snippet + createdAt */}
-                            <div className="flex flex-wrap items-center gap-4 text-sm text-slate-600">
+                            <div className="flex flex-wrap items-center gap-2 md:gap-4 text-xs md:text-sm text-slate-600">
                               {(request.scheduledStartTime || request.scheduledEndTime) && (
                                 <span className="flex items-center gap-1">
-                                  <Clock className="h-4 w-4" />
+                                  <Clock className="h-3.5 w-3.5 md:h-4 md:w-4" />
                                   {request.scheduledStartTime && formatShortDateTime(request.scheduledStartTime)}
                                   {request.scheduledStartTime && request.scheduledEndTime && ' - '}
                                   {request.scheduledEndTime && formatShortDateTime(request.scheduledEndTime)}
@@ -221,25 +221,25 @@ export default function RestaurantRequestsPage() {
                               )}
                               {request.headcount != null && (
                                 <span className="flex items-center gap-1">
-                                  <Users className="h-4 w-4" />
+                                  <Users className="h-3.5 w-3.5 md:h-4 md:w-4" />
                                   {request.headcount} {t.venue.persons}
                                 </span>
                               )}
                               {(request.tour?.minParticipants != null || request.tour?.maxParticipants != null) && (
                                 <span className="flex items-center gap-1">
-                                  <Users className="h-4 w-4 text-indigo-500" />
+                                  <Users className="h-3.5 w-3.5 md:h-4 md:w-4 text-indigo-500" />
                                   {(t.tours as Record<string, string>).estimatedParticipation}: {request.tour?.minParticipants ?? '?'} - {request.tour?.maxParticipants ?? '?'} {t.venue.persons}
                                 </span>
                               )}
                               {request.tour?.agency && (
                                 <span className="flex items-center gap-1">
-                                  <Building2 className="h-4 w-4" />
+                                  <Building2 className="h-3.5 w-3.5 md:h-4 md:w-4" />
                                   {request.tour.agency.name}
                                 </span>
                               )}
                               {request.organization?.agencyCommissionRate != null && (
                                 <span className="flex items-center gap-1">
-                                  <Percent className="h-4 w-4" />
+                                  <Percent className="h-3.5 w-3.5 md:h-4 md:w-4" />
                                   {t.tours.commissionRate}: %{request.organization.agencyCommissionRate}
                                 </span>
                               )}
@@ -247,7 +247,7 @@ export default function RestaurantRequestsPage() {
 
                             {/* Description snippet (always visible, truncated) */}
                             {request.tour?.description && !isExpanded && (
-                              <div className="flex items-center gap-1 text-sm text-slate-500">
+                              <div className="flex items-center gap-1 text-xs md:text-sm text-slate-500">
                                 <FileText className="h-3.5 w-3.5 shrink-0" />
                                 <span className="line-clamp-1">{request.tour.description}</span>
                               </div>
@@ -257,7 +257,7 @@ export default function RestaurantRequestsPage() {
                             {isExpanded && (
                               <div className="space-y-2 pt-2 border-t border-slate-100 animate-in fade-in slide-in-from-top-2 duration-200">
                                 {request.tour?.description && (
-                                  <div className="text-sm text-slate-600 bg-slate-50 p-3 rounded-lg">
+                                  <div className="text-xs md:text-sm text-slate-600 bg-slate-50 p-2 md:p-3 rounded-lg">
                                     <span className="font-medium flex items-center gap-1 mb-1">
                                       <FileText className="h-3.5 w-3.5" />
                                       {t.requests.tourDescription}
@@ -267,13 +267,13 @@ export default function RestaurantRequestsPage() {
                                 )}
 
                                 {request.note && (
-                                  <div className="text-sm text-slate-500 bg-slate-50 p-2 rounded">
+                                  <div className="text-xs md:text-sm text-slate-500 bg-slate-50 p-2 rounded">
                                     <span className="font-medium">{t.requests.note}:</span> {request.note}
                                   </div>
                                 )}
 
                                 {request.rejectionReason && (
-                                  <div className="text-sm text-red-600 bg-red-50 p-2 rounded">
+                                  <div className="text-xs md:text-sm text-red-600 bg-red-50 p-2 rounded">
                                     <span className="font-medium">{t.requests.rejectionReason}:</span>{' '}
                                     {request.rejectionReason}
                                   </div>
@@ -313,7 +313,7 @@ export default function RestaurantRequestsPage() {
                                     onClick={() => openRejectDialog(request)}
                                   >
                                     <XCircle className="h-4 w-4 mr-1 text-red-500" />
-                                    {t.requests.reject}
+                                    <span className="hidden md:inline">{t.requests.reject}</span>
                                   </Button>
                                 </span>
                               </TooltipTrigger>
@@ -330,7 +330,7 @@ export default function RestaurantRequestsPage() {
                                     onClick={() => openApproveDialog(request)}
                                   >
                                     <CheckCircle className="h-4 w-4 mr-1" />
-                                    {t.requests.approve}
+                                    <span className="hidden md:inline">{t.requests.approve}</span>
                                   </Button>
                                 </span>
                               </TooltipTrigger>
