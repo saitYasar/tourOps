@@ -1235,12 +1235,17 @@ export interface ApiTourDto {
     status?: string;
     notes?: string;
     pricePaid?: string;
+    paidAt?: string | null;
     client?: {
       id: number;
       firstName?: string;
       lastName?: string;
+      gender?: 'm' | 'f' | string;
       email?: string;
-      phone?: string;
+      phone?: number | string;
+      phoneCountryCode?: number | string;
+      profilePhoto?: string | null;
+      active?: boolean;
       username?: string;
       [key: string]: unknown;
     };
@@ -4296,29 +4301,29 @@ class ApiClient {
     if (filters.search) params.set('search', filters.search);
     if (filters.sortBy) params.set('sortBy', filters.sortBy);
     if (filters.sortOrder) params.set('sortOrder', filters.sortOrder);
-    return this.request<{ data: SystemCommissionDto[]; meta: { total: number; totalCount?: number; page: number; limit: number } }>(`/admin/system-commissions?${params.toString()}`, { method: 'GET' }, filters.lang || 'tr');
+    return this.request<{ data: SystemCommissionDto[]; meta: { total: number; totalCount?: number; page: number; limit: number } }>(`/admin/system-commissions?${params.toString()}`, { method: 'GET' }, filters.lang || 'tr', true);
   }
 
   async getSystemCommission(id: number, lang: 'tr' | 'en' | 'de' = 'tr') {
-    return this.request<SystemCommissionDto>(`/admin/system-commissions/${id}`, { method: 'GET' }, lang);
+    return this.request<SystemCommissionDto>(`/admin/system-commissions/${id}`, { method: 'GET' }, lang, true);
   }
 
   async createSystemCommission(data: CreateSystemCommissionDto, lang: 'tr' | 'en' | 'de' = 'tr') {
     return this.request<SystemCommissionDto>('/admin/system-commissions', {
       method: 'POST',
       body: JSON.stringify(data),
-    }, lang);
+    }, lang, true);
   }
 
   async updateSystemCommission(id: number, data: UpdateSystemCommissionDto, lang: 'tr' | 'en' | 'de' = 'tr') {
     return this.request<SystemCommissionDto>(`/admin/system-commissions/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
-    }, lang);
+    }, lang, true);
   }
 
   async deleteSystemCommission(id: number, lang: 'tr' | 'en' | 'de' = 'tr') {
-    return this.request<{ message: string }>(`/admin/system-commissions/${id}`, { method: 'DELETE' }, lang);
+    return this.request<{ message: string }>(`/admin/system-commissions/${id}`, { method: 'DELETE' }, lang, true);
   }
 }
 

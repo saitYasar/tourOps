@@ -537,20 +537,38 @@ export default function AdminToursPage() {
                           {tourDetail.participants.map((p) => {
                             const client = p.client;
                             const name = client
-                              ? `${client.firstName || ''} ${client.lastName || ''}`.trim()
+                              ? `${client.firstName || ''} ${client.lastName || ''}`.trim() || `#${p.clientId}`
                               : p.clientName || `#${p.clientId}`;
                             const isExpanded = expandedParticipantId === p.id;
+                            const phoneDisplay = client?.phone
+                              ? `+${client.phoneCountryCode || '90'} ${client.phone}`
+                              : null;
+                            const genderLabel = client?.gender === 'm' ? t.common.male : client?.gender === 'f' ? t.common.female : null;
                             return (
                               <Fragment key={p.id}>
                                 <button
-                                  className="w-full flex items-center justify-between p-2 bg-slate-50 hover:bg-slate-100 rounded text-sm transition-colors cursor-pointer"
+                                  className="w-full flex items-center justify-between p-2.5 bg-slate-50 hover:bg-slate-100 rounded-lg text-sm transition-colors cursor-pointer"
                                   onClick={() => setExpandedParticipantId(isExpanded ? null : p.id)}
                                 >
-                                  <div className="flex items-center gap-2">
-                                    <Users className="h-3.5 w-3.5 text-slate-400" />
-                                    <span className="font-medium">{name}</span>
+                                  <div className="flex items-center gap-2.5">
+                                    {client?.profilePhoto ? (
+                                      <img src={resolveImageUrl(client.profilePhoto) || ''} alt={name} className="h-7 w-7 rounded-full object-cover" />
+                                    ) : (
+                                      <div className="h-7 w-7 rounded-full bg-violet-100 text-violet-600 flex items-center justify-center text-xs font-bold">
+                                        {name.charAt(0).toUpperCase()}
+                                      </div>
+                                    )}
+                                    <div className="text-left">
+                                      <span className="font-medium">{name}</span>
+                                      {client?.email && (
+                                        <span className="text-xs text-slate-400 ml-2">{client.email}</span>
+                                      )}
+                                    </div>
                                   </div>
                                   <div className="flex items-center gap-2">
+                                    {genderLabel && (
+                                      <Badge variant="outline" className="text-[10px] px-1.5">{genderLabel}</Badge>
+                                    )}
                                     {p.status && (
                                       <Badge variant="outline" className="text-xs">
                                         {p.status}
@@ -559,30 +577,30 @@ export default function AdminToursPage() {
                                     <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                                   </div>
                                 </button>
-                                {isExpanded && client && (
-                                  <div className="ml-6 p-3 bg-white border border-slate-200 rounded-lg text-xs space-y-1.5">
-                                    {client.username && (
+                                {isExpanded && (
+                                  <div className="ml-9 p-3 bg-white border border-slate-200 rounded-lg text-xs space-y-1.5">
+                                    {phoneDisplay && (
                                       <div className="flex items-center gap-2 text-slate-600">
-                                        <User className="h-3 w-3 text-slate-400" />
-                                        <span className="font-medium text-slate-800">{client.username}</span>
+                                        <Phone className="h-3 w-3 text-slate-400" />
+                                        <span className="font-medium text-slate-800">{phoneDisplay}</span>
                                       </div>
                                     )}
-                                    {client.email && (
+                                    {client?.email && (
                                       <div className="flex items-center gap-2 text-slate-600">
                                         <Mail className="h-3 w-3 text-slate-400" />
                                         <span className="font-medium text-slate-800">{client.email}</span>
-                                      </div>
-                                    )}
-                                    {client.phone && (
-                                      <div className="flex items-center gap-2 text-slate-600">
-                                        <Phone className="h-3 w-3 text-slate-400" />
-                                        <span className="font-medium text-slate-800">{client.phone}</span>
                                       </div>
                                     )}
                                     {p.pricePaid != null && (
                                       <div className="flex items-center gap-2 text-slate-600">
                                         <DollarSign className="h-3 w-3 text-slate-400" />
                                         <span className="font-medium text-slate-800">{Number(p.pricePaid).toFixed(2)} {getCurrencySymbol()}</span>
+                                      </div>
+                                    )}
+                                    {p.paidAt && (
+                                      <div className="flex items-center gap-2 text-slate-600">
+                                        <Clock className="h-3 w-3 text-slate-400" />
+                                        <span className="font-medium text-slate-800">{formatDate(p.paidAt)}</span>
                                       </div>
                                     )}
                                   </div>
