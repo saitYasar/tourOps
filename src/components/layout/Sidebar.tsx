@@ -71,9 +71,9 @@ const adminNavItems: AdminNavItem[] = [
   { label: 'dashboard', href: '/admin', icon: LayoutGrid },
   { label: 'users', href: '/admin/users', icon: Users },
   { label: 'tours', href: '/admin/tours', icon: Calendar },
+  { label: 'tourStops', href: '/admin/requests', icon: ClipboardList },
   { label: 'restaurants', href: '/admin/restaurants', icon: Building2 },
   { label: 'agencies', href: '/admin/agencies', icon: Briefcase },
-  { label: 'requests', href: '/admin/requests', icon: ClipboardList },
   { label: 'notifications', href: '/admin/notifications', icon: Bell },
   { label: 'commissions', href: '/admin/commissions', icon: Percent },
 ];
