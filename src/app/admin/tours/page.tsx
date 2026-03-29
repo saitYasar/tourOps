@@ -438,24 +438,6 @@ export default function AdminToursPage() {
                     </div>
                   )}
 
-                  {/* Gallery */}
-                  {tourDetail.galleryImages && tourDetail.galleryImages.length > 0 && (
-                    <div>
-                      <p className="text-sm text-slate-500 mb-2">{t.tours.gallery} ({tourDetail.galleryImages.length})</p>
-                      <div className="grid grid-cols-6 gap-2">
-                        {tourDetail.galleryImages.map((img) => {
-                          const imgSrc = resolveImageUrl(img.imageUrl);
-                          if (!imgSrc) return null;
-                          return (
-                            <div key={img.id} className="h-24 rounded-lg overflow-hidden bg-slate-100">
-                              <img src={imgSrc} alt="" className="w-full h-full object-cover" />
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
                   {/* Info Grid */}
                   <div className="grid grid-cols-3 lg:grid-cols-6 gap-4 text-sm">
                     <div>
@@ -606,6 +588,27 @@ export default function AdminToursPage() {
                                   </div>
                                 )}
                               </Fragment>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Gallery */}
+                  {tourDetail.galleryImages && tourDetail.galleryImages.length > 0 && (
+                    <>
+                      <Separator />
+                      <div>
+                        <p className="text-sm font-medium text-slate-700 mb-2">{t.tours.gallery} ({tourDetail.galleryImages.length})</p>
+                        <div className="grid grid-cols-6 gap-2">
+                          {tourDetail.galleryImages.map((img) => {
+                            const imgSrc = resolveImageUrl(img.imageUrl);
+                            if (!imgSrc) return null;
+                            return (
+                              <div key={img.id} className="h-24 rounded-lg overflow-hidden bg-slate-100">
+                                <img src={imgSrc} alt="" className="w-full h-full object-cover" />
+                              </div>
                             );
                           })}
                         </div>
