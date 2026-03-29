@@ -23,6 +23,8 @@ interface ComboboxProps {
   className?: string;
   groupBy?: boolean;
   side?: 'top' | 'bottom';
+  onSearchChange?: (search: string) => void;
+  loading?: boolean;
 }
 
 export function Combobox({
@@ -36,6 +38,8 @@ export function Combobox({
   className,
   groupBy = false,
   side = 'bottom',
+  onSearchChange,
+  loading = false,
 }: ComboboxProps) {
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState('');
@@ -45,6 +49,8 @@ export function Combobox({
   const selectedOption = options.find((opt) => opt.value === value);
 
   const filteredOptions = React.useMemo(() => {
+    // Skip client-side filtering when server-side search is active
+    if (onSearchChange) return options;
     if (!search.trim()) return options;
     const query = search.toLowerCase().trim();
     return options.filter(
@@ -52,7 +58,7 @@ export function Combobox({
         opt.label.toLowerCase().includes(query) ||
         (opt.group && opt.group.toLowerCase().includes(query))
     );
-  }, [options, search]);
+  }, [options, search, onSearchChange]);
 
   // Group options by group field
   const groupedOptions = React.useMemo(() => {
@@ -120,7 +126,7 @@ export function Combobox({
                 type="text"
                 placeholder={searchPlaceholder}
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => { setSearch(e.target.value); onSearchChange?.(e.target.value); }}
                 className="pl-9 pr-8 h-9"
               />
               {search && (
@@ -137,7 +143,9 @@ export function Combobox({
 
           {/* Options List */}
           <div className="max-h-80 overflow-y-auto p-1">
-            {filteredOptions.length === 0 ? (
+            {loading ? (
+              <div className="py-6 text-center text-sm text-slate-400">...</div>
+            ) : filteredOptions.length === 0 ? (
               <div className="py-6 text-center text-sm text-slate-500">{emptyText}</div>
             ) : groupBy ? (
               Object.entries(groupedOptions).map(([group, opts]) => (

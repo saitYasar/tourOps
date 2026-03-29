@@ -1287,6 +1287,127 @@ export interface ApiTourStopDto {
   updatedAt?: string;
 }
 
+export interface AdminTourStopFinancialSummary {
+  grandTotal: number;
+  currency: string;
+  commissionRate: number;
+  commissionAmount: number;
+  systemCommissionRate: number;
+  systemCommissionAmount: number;
+}
+
+export interface AdminTourStopDto {
+  id: number;
+  tourId: number;
+  organizationId: number;
+  description: string;
+  scheduledStartTime: string;
+  scheduledEndTime: string;
+  preReservationStatus: 'pending' | 'approved' | 'rejected';
+  rejectionReason: string | null;
+  showPriceToCustomer: boolean;
+  maxSpendLimit: number | null;
+  choiceDeadline: number | null;
+  agencyCommissionRate: number;
+  choicesStatus: 'in_progress' | 'submitted' | 'approved' | 'rejected';
+  organizationChoicesNote: string | null;
+  choicesSubmittedAt: string | null;
+  choicesResolvedAt: string | null;
+  menuSnapshot: unknown;
+  systemCommissionPaid: boolean;
+  systemCommissionPaidAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  organization: {
+    id: number;
+    uuid: string;
+    name: string;
+    email: string;
+    phone: number;
+    phoneCountryCode: number;
+    address: string;
+    lat: number;
+    lng: number;
+    legalName: string;
+    taxNumber: number;
+    taxOffice: string;
+    status: string;
+    categoryId: number;
+    countryId: number;
+    cityId: number;
+    districtId: number;
+    description: string;
+    socialMediaUrls: Record<string, string>;
+    currency: string;
+    agencyCommissionRate: number;
+    totalReviews: number;
+    averageRating: number;
+    coverImageKey: string | null;
+    authorizedPersonId: number;
+    relatedAgencyId: number | null;
+    createdAt: string;
+    updatedAt: string;
+  };
+  tour: {
+    id: number;
+    uuid: string;
+    agencyId: number;
+    tourCode: string;
+    tourName: string;
+    description: string;
+    startDate: string;
+    endDate: string;
+    maxParticipants: number;
+    minParticipants: number;
+    currentParticipants: number;
+    status: string;
+    coverImageKey: string | null;
+    metadata: unknown;
+    createdAt: string;
+    updatedAt: string;
+    agency: {
+      id: number;
+      uuid: string;
+      name: string;
+      email: string;
+      phone: number;
+      phoneCountryCode: number;
+      legalName: string;
+      taxNumber: number;
+      taxOffice: string;
+      address: string;
+      status: string;
+      description: string;
+      coverImageKey: string | null;
+      authorizedPersonId: number;
+      relatedOrganizationId: number | null;
+      createdAt: string;
+      updatedAt: string;
+    };
+  };
+  translations: Array<{
+    id: number;
+    tourStopId: number;
+    language: string;
+    description: string;
+  }>;
+  financialSummary: AdminTourStopFinancialSummary;
+}
+
+export interface AdminTourStopsFilters {
+  page?: number;
+  limit?: number;
+  lang?: string;
+  organizationId?: number;
+  agencyId?: number;
+  tourId?: number;
+  preReservationStatus?: string;
+  choicesStatus?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  systemCommissionPaid?: boolean;
+}
+
 export interface ChoiceDeadlineRemainingDto {
   tourStopId: number;
   scheduledEndTime: string;
@@ -3705,6 +3826,28 @@ class ApiClient {
     }, lang);
   }
 
+  async getAdminTourStops(filters: AdminTourStopsFilters = {}) {
+    const params = new URLSearchParams();
+    if (filters.page) params.set('page', String(filters.page));
+    if (filters.limit) params.set('limit', String(filters.limit));
+    if (filters.organizationId) params.set('organizationId', String(filters.organizationId));
+    if (filters.agencyId) params.set('agencyId', String(filters.agencyId));
+    if (filters.tourId) params.set('tourId', String(filters.tourId));
+    if (filters.preReservationStatus) params.set('preReservationStatus', filters.preReservationStatus);
+    if (filters.choicesStatus) params.set('choicesStatus', filters.choicesStatus);
+    if (filters.dateFrom) params.set('dateFrom', filters.dateFrom);
+    if (filters.dateTo) params.set('dateTo', filters.dateTo);
+    if (filters.systemCommissionPaid !== undefined) params.set('systemCommissionPaid', String(filters.systemCommissionPaid));
+    return this.request<PaginatedResponse<AdminTourStopDto>>(`/admin/tour-stops?${params.toString()}`, {}, filters.lang as 'tr' | 'en' | 'de' || 'tr');
+  }
+
+  async updateAdminTourStopSystemCommissionPaid(id: number, systemCommissionPaid: boolean, lang: 'tr' | 'en' | 'de' = 'tr') {
+    return this.request<AdminTourStopDto>(`/admin/tour-stops/${id}/system-commission-paid`, {
+      method: 'PUT',
+      body: JSON.stringify({ systemCommissionPaid }),
+    }, lang);
+  }
+
   // ============================================
   // Tour Stop - Public
   // ============================================
@@ -5691,6 +5834,24 @@ export const adminApi = {
         return tour;
       });
       return { success: true, data, meta: response.meta };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async getTourStops(filters: AdminTourStopsFilters = {}) {
+    try {
+      const response = await apiClient.getAdminTourStops(filters);
+      return { success: true, data: response.data || [], meta: response.meta };
+    } catch (error) {
+      return { success: false, error: (error as Error).message, data: [], meta: { page: 1, limit: 10, totalCount: 0, totalPages: 0 } };
+    }
+  },
+
+  async updateTourStopSystemCommissionPaid(id: number, systemCommissionPaid: boolean, lang: 'tr' | 'en' | 'de' = 'tr') {
+    try {
+      const response = await apiClient.updateAdminTourStopSystemCommissionPaid(id, systemCommissionPaid, lang);
+      return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
