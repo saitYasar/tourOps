@@ -62,6 +62,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { LoadingState, ErrorState, AdminPagination } from '@/components/shared';
+import { AdminStopVenuePreview } from '@/components/admin/AdminStopVenuePreview';
 
 const preResStatusConfig: Record<string, { bg: string; text: string; icon: React.ComponentType<{ className?: string }> }> = {
   pending: { bg: 'bg-amber-100', text: 'text-amber-700', icon: Clock },
@@ -673,6 +674,10 @@ export default function AdminRequestsPage() {
                     <DollarSign className="h-4 w-4" />
                     {t.admin.financialSummary}
                   </TabsTrigger>
+                  <TabsTrigger value="venue3d" className="gap-1.5">
+                    <Building2 className="h-4 w-4" />
+                    3D
+                  </TabsTrigger>
                 </TabsList>
 
                 {/* ── Tour & Stop Info Tab ── */}
@@ -880,6 +885,11 @@ export default function AdminRequestsPage() {
                       </table>
                     </CardContent>
                   </Card>
+                </TabsContent>
+
+                {/* ── 3D Venue Tab ── */}
+                <TabsContent value="venue3d" className="flex-1 overflow-y-auto mt-4">
+                  <AdminStopVenuePreview stopId={selectedStop.id} />
                 </TabsContent>
               </Tabs>
             </DialogContent>

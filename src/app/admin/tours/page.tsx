@@ -62,9 +62,10 @@ import {
 import {
   LoadingState, EmptyState, ErrorState, TourStatusBadge, AdminPagination,
   CompactReceipt, DetailedListReceipt, KitchenSummaryReceipt, ReceiptServiceSummary,
-  handleReceiptPrint, exportReceiptExcel, ChoiceDeadlineCountdown, VenueOccupancyViewer,
+  handleReceiptPrint, exportReceiptExcel, ChoiceDeadlineCountdown,
 } from '@/components/shared';
 import type { ReceiptTemplate } from '@/components/shared';
+import { AdminStopVenuePreview } from '@/components/admin/AdminStopVenuePreview';
 
 function resolveImageUrl(url?: string | null): string | null {
   return url || null;
@@ -823,7 +824,7 @@ export default function AdminToursPage() {
                             </Card>
 
                             {/* 3D Venue Occupancy */}
-                            {selectedStop && choicesArr.length > 0 && (
+                            {selectedStop && (
                               <Card>
                                 <CardHeader className="pb-2">
                                   <CardTitle className="text-sm flex items-center gap-2">
@@ -832,10 +833,7 @@ export default function AdminToursPage() {
                                   </CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                  <VenueOccupancyViewer
-                                    organizationId={selectedStop.organizationId}
-                                    choices={choicesArr}
-                                  />
+                                  <AdminStopVenuePreview stopId={selectedStop.id} />
                                 </CardContent>
                               </Card>
                             )}
