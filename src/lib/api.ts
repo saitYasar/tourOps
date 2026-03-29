@@ -6291,6 +6291,7 @@ export const preReservationOrgApi = {
       const data = raw.map((item: any) => ({
         ...item,
         status: item.status || item.preReservationStatus || 'pending',
+        tourStopId: item.tourStopId ?? item.tour_stop_id ?? item.tourStop?.id ?? null,
       }));
       return { success: true, data };
     } catch (error) {

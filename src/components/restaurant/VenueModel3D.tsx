@@ -1124,6 +1124,25 @@ export function VenueModel3D({
 
   const layout = useMemo(() => computeLayout(floors, rooms, tables, objects), [floors, rooms, tables, objects]);
 
+  // Auto-advance: skip building/floor view when only 1 floor / 1 room
+  const autoAdvancedRef = useRef(false);
+  useEffect(() => {
+    if (autoAdvancedRef.current || !hasRealData || layout.length === 0) return;
+    if (layout.length === 1) {
+      const fl = layout[0];
+      setSelectedFloorId(fl.floor.id);
+      onFloorSelect?.(fl.floor.id);
+      if (fl.rooms.length === 1) {
+        setSelectedRoomId(fl.rooms[0].room.id);
+        setViewMode('room');
+        onRoomSelect?.(fl.rooms[0].room.id);
+      } else {
+        setViewMode('floor');
+      }
+      autoAdvancedRef.current = true;
+    }
+  }, [layout, hasRealData, onFloorSelect, onRoomSelect]);
+
   const selectedFloor = layout.find(f => f.floor.id === selectedFloorId) ?? null;
   const selectedRoom = selectedFloor?.rooms.find(r => r.room.id === selectedRoomId) ?? null;
 

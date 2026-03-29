@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Calendar,
@@ -34,6 +34,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { formatDate, formatShortDateTime } from '@/lib/dateUtils';
 
 import { Header } from '@/components/layout/Header';
+import { ReservationVenuePreview } from '@/components/restaurant/ReservationVenuePreview';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -134,7 +135,7 @@ export default function RestaurantGuestsPage() {
     queryFn: () => preReservationOrgApi.getChoices(selectedId!, apiLang),
     enabled: !!selectedId,
   });
-  const choices = choicesResult?.success ? choicesResult.data || [] : [];
+  const choices = useMemo(() => choicesResult?.success ? choicesResult.data || [] : [], [choicesResult]);
 
   // Service summary for selected reservation
   const { data: summaryResult, isLoading: summaryLoading } = useQuery({
@@ -477,6 +478,9 @@ export default function RestaurantGuestsPage() {
                     })()}
                   </CardContent>
                 </Card>
+
+                {/* 3D Gösterim */}
+                <ReservationVenuePreview tourStopId={selectedReservation.tourStopId} tourId={selectedReservation.tourId} organizationId={selectedReservation.organizationId} choices={choices} />
 
                 {/* Customer Choices */}
                 <Card>
