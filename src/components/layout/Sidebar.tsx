@@ -124,7 +124,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     tours: t.admin.tours,
     restaurants: t.admin.restaurants,
     agencies: t.admin.agencies,
-    requests: t.admin.requests,
+    tourStops: t.admin.tourStops,
     notifications: t.admin.notifications,
     commissions: t.admin.commissions,
   };
