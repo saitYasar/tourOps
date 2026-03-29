@@ -3751,7 +3751,7 @@ class ApiClient {
     if (filters?.search) params.set('search', filters.search);
     return this.request<PaginatedResponse<AdminUserDto>>(`/admin/users?${params.toString()}`, {
       method: 'GET',
-    }, lang);
+    }, lang, true);
   }
 
   async getUserById(id: number, lang: 'tr' | 'en' | 'de' = 'tr') {
