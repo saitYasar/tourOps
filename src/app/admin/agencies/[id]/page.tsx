@@ -479,13 +479,18 @@ export default function AgencyDetailPage() {
         onOpenChange={() => setStatusUpdateTarget(null)}
         title={a.statusLabel}
         description={
-          statusUpdateTarget
-            ? `"${agency.name}" - ${a[`agencyStatus${statusUpdateTarget.charAt(0).toUpperCase()}${statusUpdateTarget.slice(1)}` as string] || statusUpdateTarget}`
-            : ''
+          statusUpdateTarget === 'suspended'
+            ? (a.agencyConfirmSuspend || '').replace('{name}', agency.name)
+            : statusUpdateTarget === 'active'
+              ? (a.agencyConfirmApprove || '').replace('{name}', agency.name)
+              : statusUpdateTarget === 'pending'
+                ? (a.agencyConfirmPending || '').replace('{name}', agency.name)
+                : ''
         }
         onConfirm={() => statusUpdateTarget && statusMutation.mutate(statusUpdateTarget)}
         variant={statusUpdateTarget === 'suspended' ? 'destructive' : 'default'}
-        confirmLabel={a.saveChanges}
+        confirmLabel={t.common.yes}
+        cancelLabel={t.common.no}
       />
 
       {/* Delete Confirmation */}
