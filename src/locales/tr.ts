@@ -1639,7 +1639,7 @@ export const tr = {
   },
   homepage: {
     customerLogin: 'Müşteri Girişi',
-    companyLogin: 'Ata Köse',
+    companyLogin: 'Firma Girişi',
     heroBadge: "Türkiye'nin Her Köşesine Ulaşın",
     heroTitle1: 'Tur Yönetiminin',
     heroTitle2: 'Dijital Merkezi',
