@@ -1610,7 +1610,7 @@ export const en = {
   },
   homepage: {
     customerLogin: 'Customer Login',
-    companyLogin: 'Company Login',
+    companyLogin: 'Ata Köse',
     heroBadge: 'Reach Every Corner of Türkiye',
     heroTitle1: 'The Digital Hub of',
     heroTitle2: 'Tour Management',

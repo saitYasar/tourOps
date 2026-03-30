@@ -1610,7 +1610,7 @@ export const de = {
   },
   homepage: {
     customerLogin: 'Kundenanmeldung',
-    companyLogin: 'Firmenanmeldung',
+    companyLogin: 'Ata Köse',
     heroBadge: 'Erreichen Sie jede Ecke der Türkei',
     heroTitle1: 'Das digitale Zentrum des',
     heroTitle2: 'Tourmanagements',
