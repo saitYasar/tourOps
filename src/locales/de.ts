@@ -1068,7 +1068,7 @@ export const de = {
     tourLoadError: 'Touren konnten nicht geladen werden',
     tourDetailLoadError: 'Tourdetails konnten nicht geladen werden',
     // Tour Stops management
-    tourStops: 'Haltestellen',
+    tourStops: 'Tourstopps',
     addTourStop: 'Haltestelle hinzufügen',
     removeTourStop: 'Haltestelle entfernen',
     removeTourStopConfirm: 'Möchten Sie diese Haltestelle wirklich entfernen?',
@@ -1313,7 +1313,6 @@ export const de = {
     noParent: 'Keine (Stammebene)',
     noResources: 'Noch keine Ressourcen',
     // Tour Stops page
-    tourStops: 'Tourstopps',
     tourStopManagement: 'Tourstopps-Verwaltung',
     tourStopManagementDesc: 'Alle Tourstopps filtern und verwalten',
     tourStopNotFound: 'Tourstopp nicht gefunden',

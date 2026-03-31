@@ -1077,7 +1077,7 @@ export const tr = {
     tourLoadError: 'Turlar yüklenemedi',
     tourDetailLoadError: 'Tur detayı yüklenemedi',
     // Tour Stops management
-    tourStops: 'Duraklar',
+    tourStops: 'Tur Durakları',
     addTourStop: 'Durak Ekle',
     removeTourStop: 'Durağı Kaldır',
     removeTourStopConfirm: 'Bu durağı kaldırmak istediğinize emin misiniz?',
@@ -1325,7 +1325,6 @@ export const tr = {
     noParent: 'Yok (Kök Seviye)',
     noResources: 'Henüz kaynak yok',
     // Tour Stops page
-    tourStops: 'Tur Durakları',
     tourStopManagement: 'Tur Durak Yönetimi',
     tourStopManagementDesc: 'Tüm tur duraklarını filtreleyin ve yönetin',
     tourStopNotFound: 'Tur durağı bulunamadı',

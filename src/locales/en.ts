@@ -1068,7 +1068,7 @@ export const en = {
     tourLoadError: 'Failed to load tours',
     tourDetailLoadError: 'Failed to load tour detail',
     // Tour Stops management
-    tourStops: 'Stops',
+    tourStops: 'Tour Stops',
     addTourStop: 'Add Stop',
     removeTourStop: 'Remove Stop',
     removeTourStopConfirm: 'Are you sure you want to remove this stop?',
@@ -1313,7 +1313,6 @@ export const en = {
     noParent: 'None (Root Level)',
     noResources: 'No resources yet',
     // Tour Stops page
-    tourStops: 'Tour Stops',
     tourStopManagement: 'Tour Stop Management',
     tourStopManagementDesc: 'Filter and manage all tour stops',
     tourStopNotFound: 'Tour stop not found',
