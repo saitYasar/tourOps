@@ -3853,6 +3853,36 @@ class ApiClient {
     }, lang);
   }
 
+  async createAdminTourStop(data: CreateTourStopPayload, lang: 'tr' | 'en' | 'de' = 'tr') {
+    return this.request<ApiTourStopDto>('/admin/tour-stops', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }, lang);
+  }
+
+  async approveAdminTourStop(stopId: number, lang: 'tr' | 'en' | 'de' = 'tr') {
+    return this.request<{ message: string }>(`/admin/tour-stops/${stopId}/approve`, {
+      method: 'PUT',
+    }, lang);
+  }
+
+  async rejectAdminTourStop(stopId: number, reason: string, lang: 'tr' | 'en' | 'de' = 'tr') {
+    return this.request<{ message: string }>(`/admin/tour-stops/${stopId}/reject`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason }),
+    }, lang);
+  }
+
+  async updateSystemCommissionPaid(stopId: number, systemCommissionPaid: boolean) {
+    return this.request<{ message: string }>(`/admin/tour-stops/${stopId}/system-commission-paid`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ systemCommissionPaid }),
+    });
+  }
+
   // ============================================
   // Tour Stop - Public
   // ============================================
@@ -5960,6 +5990,42 @@ export const adminApi = {
   async getStopServiceSummary(stopId: number, lang: 'tr' | 'en' | 'de' = 'tr'): Promise<{ success: boolean; data?: AgencyStopServiceSummaryDto; error?: string }> {
     try {
       const response = await apiClient.getAdminStopServiceSummary(stopId, lang);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async createTourStop(data: CreateTourStopPayload, lang: 'tr' | 'en' | 'de' = 'tr') {
+    try {
+      const response = await apiClient.createAdminTourStop(data, lang);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async deleteTourStop(id: number, lang: 'tr' | 'en' | 'de' = 'tr') {
+    try {
+      await apiClient.deleteTourStop(id, lang);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async approveTourStop(stopId: number, lang: 'tr' | 'en' | 'de' = 'tr') {
+    try {
+      const response = await apiClient.approveAdminTourStop(stopId, lang);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async rejectTourStop(stopId: number, reason: string, lang: 'tr' | 'en' | 'de' = 'tr') {
+    try {
+      const response = await apiClient.rejectAdminTourStop(stopId, reason, lang);
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };

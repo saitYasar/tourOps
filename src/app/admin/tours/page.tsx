@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback, Fragment } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Calendar,
   Search,
@@ -22,12 +22,22 @@ import {
   Printer,
   FileSpreadsheet,
   ArrowUpDown,
+  Plus,
+  Trash2,
+  CheckCircle,
+  XCircle,
+  X,
+  Loader2,
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useDebounce } from '@/hooks/useDebounce';
 import { adminApi } from '@/lib/api';
-import type { ApiTourDto, AgencyStopChoicesDto, AgencyStopServiceSummaryDto } from '@/lib/api';
+import type { ApiTourDto, AgencyStopChoicesDto, AgencyStopServiceSummaryDto, CreateTourStopPayload } from '@/lib/api';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { ConfirmDialog } from '@/components/shared';
 import { getCurrencySymbol } from '@/lib/utils';
 import { formatDate, formatShortDateTime } from '@/lib/dateUtils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -97,6 +107,20 @@ export default function AdminToursPage() {
   const printRef = useRef<HTMLDivElement>(null);
 
   const lang = locale as 'tr' | 'en' | 'de';
+  const queryClient = useQueryClient();
+
+  // Tour stops management
+  const [addStopOpen, setAddStopOpen] = useState(false);
+  const [addStopOrgSearch, setAddStopOrgSearch] = useState('');
+  const debouncedOrgSearch = useDebounce(addStopOrgSearch, 400);
+  const [selectedOrgDetail, setSelectedOrgDetail] = useState<{ id: number; name: string; address?: string; email?: string; phone?: string; phoneCountryCode?: number } | null>(null);
+  const [stopStartTime, setStopStartTime] = useState('');
+  const [stopEndTime, setStopEndTime] = useState('');
+  const [stopShowPrice, setStopShowPrice] = useState(true);
+  const [stopMaxSpend, setStopMaxSpend] = useState('');
+  const [deleteStopId, setDeleteStopId] = useState<number | null>(null);
+  const [rejectStopId, setRejectStopId] = useState<number | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
 
   // Reset page on filter change
   const prevFilters = useRef({ debouncedSearch, statusFilter, agencyFilter, sortBy, sortOrder });
@@ -192,6 +216,90 @@ export default function AdminToursPage() {
       setExpandedClientId(null);
     }
   }, [selectedTourId]);
+
+  // Organization search for add stop dialog
+  const { data: orgsResult, isLoading: orgSearchLoading } = useQuery({
+    queryKey: ['admin-organizations-for-stop', debouncedOrgSearch],
+    queryFn: () => adminApi.getOrganizationsList({ name: debouncedOrgSearch || undefined, limit: 20, status: 'active' as any }),
+    enabled: addStopOpen && !selectedOrgDetail,
+  });
+  const searchedOrgs = orgsResult?.success ? (orgsResult.data?.data || []) : [];
+
+  // Mutations
+  const invalidateTourDetail = () => {
+    queryClient.invalidateQueries({ queryKey: ['admin-tour-detail', selectedTourId, lang] });
+  };
+
+  const addStopMutation = useMutation({
+    mutationFn: async (data: CreateTourStopPayload) => {
+      const result = await adminApi.createTourStop(data, lang);
+      if (!result.success) throw new Error(result.error);
+      return result.data;
+    },
+    onSuccess: () => {
+      toast.success(t.admin.tourStopAdded);
+      invalidateTourDetail();
+      setAddStopOpen(false);
+      setSelectedOrgDetail(null);
+      setStopStartTime('');
+      setStopEndTime('');
+      setStopShowPrice(true);
+      setStopMaxSpend('');
+      setAddStopOrgSearch('');
+    },
+    onError: (err: Error) => toast.error(err.message || t.admin.tourStopError),
+  });
+
+  const deleteStopMutation = useMutation({
+    mutationFn: async (stopId: number) => {
+      const result = await adminApi.deleteTourStop(stopId, lang);
+      if (!result.success) throw new Error(result.error);
+    },
+    onSuccess: () => {
+      toast.success(t.admin.tourStopRemoved);
+      invalidateTourDetail();
+      setDeleteStopId(null);
+    },
+    onError: (err: Error) => toast.error(err.message || t.admin.tourStopError),
+  });
+
+  const approveStopMutation = useMutation({
+    mutationFn: async (stopId: number) => {
+      const result = await adminApi.approveTourStop(stopId, lang);
+      if (!result.success) throw new Error(result.error);
+    },
+    onSuccess: () => {
+      toast.success(t.admin.tourStopApproved);
+      invalidateTourDetail();
+    },
+    onError: (err: Error) => toast.error(err.message || t.admin.tourStopError),
+  });
+
+  const rejectStopMutation = useMutation({
+    mutationFn: async ({ stopId, reason }: { stopId: number; reason: string }) => {
+      const result = await adminApi.rejectTourStop(stopId, reason, lang);
+      if (!result.success) throw new Error(result.error);
+    },
+    onSuccess: () => {
+      toast.success(t.admin.tourStopRejected);
+      invalidateTourDetail();
+      setRejectStopId(null);
+      setRejectReason('');
+    },
+    onError: (err: Error) => toast.error(err.message || t.admin.tourStopError),
+  });
+
+  const handleAddStop = () => {
+    if (!selectedTourId || !selectedOrgDetail || !stopStartTime || !stopEndTime) return;
+    addStopMutation.mutate({
+      tourId: selectedTourId,
+      organizationId: selectedOrgDetail.id,
+      scheduledStartTime: new Date(stopStartTime).toISOString(),
+      scheduledEndTime: new Date(stopEndTime).toISOString(),
+      showPriceToCustomer: stopShowPrice,
+      maxSpendLimit: stopMaxSpend ? Number(stopMaxSpend) : null,
+    });
+  };
 
   // Receipt helpers
   const choicesArr: AgencyStopChoicesDto[] = stopChoices || [];
@@ -417,6 +525,13 @@ export default function AdminToursPage() {
                     <Eye className="h-4 w-4" />
                     {t.admin.detail}
                   </TabsTrigger>
+                  <TabsTrigger value="stops" className="gap-1.5">
+                    <MapPin className="h-4 w-4" />
+                    {t.admin.tourStops}
+                    {tourDetail.stops && tourDetail.stops.length > 0 && (
+                      <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">{tourDetail.stops.length}</Badge>
+                    )}
+                  </TabsTrigger>
                   <TabsTrigger value="choices" className="gap-1.5">
                     <ClipboardList className="h-4 w-4" />
                     {t.tours.customerChoices}
@@ -633,6 +748,125 @@ export default function AdminToursPage() {
                         </div>
                       </div>
                     </>
+                  )}
+                </TabsContent>
+
+                {/* ===== TAB: Duraklar ===== */}
+                <TabsContent value="stops" className="flex-1 overflow-y-auto mt-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium text-slate-700">
+                      {t.admin.tourStops} ({tourDetail.stops?.length || 0})
+                    </p>
+                    <Button size="sm" onClick={() => setAddStopOpen(true)} className="gap-1.5">
+                      <Plus className="h-4 w-4" />
+                      {t.admin.addTourStop}
+                    </Button>
+                  </div>
+
+                  {!tourDetail.stops?.length ? (
+                    <EmptyState icon={MapPin} title={t.admin.tourStops} description={t.tours.noStops} />
+                  ) : (
+                    <div className="space-y-2">
+                      {tourDetail.stops.map((stop, index) => (
+                        <Card key={stop.id} className="border shadow-sm">
+                          <CardContent className="p-4">
+                            <div className="flex items-start gap-3">
+                              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-violet-100 text-violet-600 text-sm font-bold shrink-0 mt-0.5">
+                                {index + 1}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <p className="font-medium text-sm">
+                                    {stop.organization?.name || `${t.tours.organization} #${stop.organizationId}`}
+                                  </p>
+                                  {stop.preReservationStatus && (
+                                    <Badge
+                                      variant={stop.preReservationStatus === 'approved' ? 'default' : stop.preReservationStatus === 'rejected' ? 'destructive' : 'secondary'}
+                                      className="text-[10px] px-1.5 py-0"
+                                    >
+                                      {stop.preReservationStatus === 'approved' ? t.tours.stopStatusApproved
+                                        : stop.preReservationStatus === 'rejected' ? t.tours.stopStatusRejected
+                                        : t.tours.stopStatusPending}
+                                    </Badge>
+                                  )}
+                                  {stop.choicesStatus && (
+                                    <Badge
+                                      variant={stop.choicesStatus === 'approved' ? 'default' : stop.choicesStatus === 'rejected' ? 'destructive' : 'outline'}
+                                      className="text-[10px] px-1.5 py-0"
+                                    >
+                                      {stop.choicesStatus === 'approved' ? t.tours.choicesStatusApproved
+                                        : stop.choicesStatus === 'submitted' ? t.tours.choicesStatusSubmitted
+                                        : stop.choicesStatus === 'rejected' ? t.tours.choicesStatusRejected
+                                        : stop.choicesStatus === 'revision_requested' ? t.tours.choicesStatusRevisionRequested
+                                        : t.tours.choicesStatusInProgress}
+                                    </Badge>
+                                  )}
+                                </div>
+                                {stop.organization?.address && (
+                                  <p className="text-slate-400 text-xs flex items-center gap-1 mb-1">
+                                    <MapPin className="h-3 w-3" />
+                                    {stop.organization.address}
+                                  </p>
+                                )}
+                                <p className="text-slate-500 text-xs flex items-center gap-1">
+                                  <Clock className="h-3 w-3" />
+                                  {formatShortDateTime(stop.scheduledStartTime)} - {formatShortDateTime(stop.scheduledEndTime)}
+                                </p>
+                                {stop.description && (
+                                  <p className="text-slate-500 text-xs mt-1">{stop.description}</p>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1 shrink-0">
+                                {stop.preReservationStatus === 'pending' && (
+                                  <>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+                                          onClick={() => approveStopMutation.mutate(stop.id)}
+                                          disabled={approveStopMutation.isPending}
+                                        >
+                                          <CheckCircle className="h-4 w-4" />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>{t.admin.approvePreReservation}</TooltipContent>
+                                    </Tooltip>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                          onClick={() => setRejectStopId(stop.id)}
+                                        >
+                                          <XCircle className="h-4 w-4" />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>{t.admin.rejectPreReservation}</TooltipContent>
+                                    </Tooltip>
+                                  </>
+                                )}
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                                      onClick={() => setDeleteStopId(stop.id)}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>{t.admin.removeTourStop}</TooltipContent>
+                                </Tooltip>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
                   )}
                 </TabsContent>
 
@@ -1049,6 +1283,222 @@ export default function AdminToursPage() {
               <Printer className="h-4 w-4" />
               {t.guests.printReceipt}
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Tour Stop Dialog */}
+      <Dialog open={addStopOpen} onOpenChange={(open) => {
+        if (!open) {
+          setAddStopOpen(false);
+          setSelectedOrgDetail(null);
+          setStopStartTime('');
+          setStopEndTime('');
+          setStopShowPrice(true);
+          setStopMaxSpend('');
+          setAddStopOrgSearch('');
+        }
+      }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{t.admin.addTourStop}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {/* Organization Search */}
+            <div className="space-y-2">
+              <Label>{t.tours.organization} *</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Input
+                  placeholder={t.admin.searchOrganization}
+                  value={addStopOrgSearch}
+                  onChange={(e) => {
+                    setAddStopOrgSearch(e.target.value);
+                    if (selectedOrgDetail) {
+                      setSelectedOrgDetail(null);
+                    }
+                  }}
+                  className="pl-9"
+                />
+                {orgSearchLoading && (
+                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-slate-400" />
+                )}
+              </div>
+
+              {/* Search results dropdown */}
+              {!selectedOrgDetail && searchedOrgs.length > 0 && (
+                <div className="border rounded-lg max-h-48 overflow-y-auto bg-white shadow-sm">
+                  {searchedOrgs.map((org) => (
+                    <button
+                      key={org.id}
+                      type="button"
+                      className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 text-left transition-colors border-b last:border-b-0"
+                      onClick={() => {
+                        setSelectedOrgDetail({ id: org.id, name: org.name, address: org.address, email: org.email, phone: org.phone, phoneCountryCode: org.phoneCountryCode });
+                        setAddStopOrgSearch(org.name);
+                      }}
+                    >
+                      <Building2 className="h-4 w-4 text-slate-400 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{org.name}</p>
+                        {org.address && (
+                          <p className="text-xs text-slate-500 truncate max-w-[320px]" title={org.address}>{org.address}</p>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {!selectedOrgDetail && !orgSearchLoading && searchedOrgs.length === 0 && (
+                <p className="text-sm text-slate-500 text-center py-2">{t.admin.noOrganizationsFound}</p>
+              )}
+
+              {/* Selected organization detail card */}
+              {selectedOrgDetail && (
+                <Card className="border-green-200 bg-green-50/50">
+                  <CardContent className="p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <CheckCircle className="h-4 w-4 text-green-600 shrink-0" />
+                        <span className="font-medium text-sm truncate">{selectedOrgDetail.name}</span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 shrink-0"
+                        onClick={() => {
+                          setSelectedOrgDetail(null);
+                          setAddStopOrgSearch('');
+                        }}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-600 mt-2">
+                      {selectedOrgDetail.address && (
+                        <div className="col-span-2 flex items-start gap-1">
+                          <MapPin className="h-3 w-3 mt-0.5 shrink-0 text-slate-400" />
+                          <span>{selectedOrgDetail.address}</span>
+                        </div>
+                      )}
+                      {selectedOrgDetail.email && (
+                        <div className="flex items-center gap-1">
+                          <Mail className="h-3 w-3 text-slate-400" />
+                          <span>{selectedOrgDetail.email}</span>
+                        </div>
+                      )}
+                      {selectedOrgDetail.phone && (
+                        <div className="flex items-center gap-1">
+                          <Phone className="h-3 w-3 text-slate-400" />
+                          <span>{selectedOrgDetail.phoneCountryCode ? `+${selectedOrgDetail.phoneCountryCode} ` : ''}{selectedOrgDetail.phone}</span>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+
+            {/* Time fields */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>{t.admin.scheduledStartTime}</Label>
+                <Input
+                  type="datetime-local"
+                  value={stopStartTime}
+                  min={tourDetail?.startDate ? `${tourDetail.startDate.split('T')[0]}T00:00` : undefined}
+                  max={tourDetail?.endDate ? `${tourDetail.endDate.split('T')[0]}T23:59` : undefined}
+                  onChange={(e) => setStopStartTime(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{t.admin.scheduledEndTime}</Label>
+                <Input
+                  type="datetime-local"
+                  value={stopEndTime}
+                  min={tourDetail?.startDate ? `${tourDetail.startDate.split('T')[0]}T00:00` : undefined}
+                  max={tourDetail?.endDate ? `${tourDetail.endDate.split('T')[0]}T23:59` : undefined}
+                  onChange={(e) => setStopEndTime(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Show price toggle */}
+            <div className="flex items-center gap-3">
+              <Switch
+                checked={stopShowPrice}
+                onCheckedChange={setStopShowPrice}
+              />
+              <Label>{t.tours.showPriceToCustomer}</Label>
+            </div>
+
+            {/* Max spend limit */}
+            <div className="space-y-2">
+              <Label>{t.tours.maxSpendLimit}</Label>
+              <Input
+                type="number"
+                min={0}
+                step="0.01"
+                placeholder={t.tours.maxSpendLimitPlaceholder}
+                value={stopMaxSpend}
+                onChange={(e) => setStopMaxSpend(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setAddStopOpen(false)}>
+              {t.common.cancel}
+            </Button>
+            <Button
+              onClick={handleAddStop}
+              disabled={!selectedOrgDetail || !stopStartTime || !stopEndTime || addStopMutation.isPending}
+            >
+              {addStopMutation.isPending ? t.common.loading : t.admin.addTourStop}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Stop Confirm */}
+      <ConfirmDialog
+        open={!!deleteStopId}
+        onOpenChange={(open) => { if (!open) setDeleteStopId(null); }}
+        title={t.admin.removeTourStop}
+        description={t.admin.removeTourStopConfirm}
+        onConfirm={() => { if (deleteStopId) deleteStopMutation.mutate(deleteStopId); }}
+        variant="destructive"
+      />
+
+      {/* Reject Stop Dialog */}
+      <Dialog open={!!rejectStopId} onOpenChange={(open) => { if (!open) { setRejectStopId(null); setRejectReason(''); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t.admin.rejectPreReservation}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label className="text-sm font-medium mb-1.5 block">{t.admin.rejectReason}</Label>
+              <Input
+                placeholder={t.admin.rejectReasonPlaceholder}
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => { setRejectStopId(null); setRejectReason(''); }}>
+                {t.common.cancel}
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => { if (rejectStopId) rejectStopMutation.mutate({ stopId: rejectStopId, reason: rejectReason }); }}
+                disabled={!rejectReason.trim() || rejectStopMutation.isPending}
+              >
+                {rejectStopMutation.isPending ? t.common.loading : t.admin.rejectPreReservation}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
