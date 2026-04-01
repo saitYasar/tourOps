@@ -337,6 +337,7 @@ export default function AdminToursPage() {
   const choicesOrgName = selectedStop?.organization?.name || '';
   const receiptTourInfo = tourDetail ? {
     tourName: tourDetail.tourName,
+    agencyName: tourDetail.agency?.name || '',
     startDate: tourDetail.startDate,
     stopStartDate: selectedStop?.scheduledStartTime,
     stopEndDate: selectedStop?.scheduledEndTime,

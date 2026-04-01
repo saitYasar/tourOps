@@ -14,6 +14,7 @@ export type ReceiptTemplate = 'compact' | 'detailed' | 'kitchen';
 
 export interface ReceiptTourInfo {
   tourName?: string;
+  agencyName?: string;
   startDate?: string;
   stopStartDate?: string;
   stopEndDate?: string;
@@ -80,6 +81,7 @@ export function CompactReceipt({
     <div className="font-mono text-xs" style={{ width: '80mm' }}>
       <div className="text-center border-b border-dashed pb-2 mb-2">
         <p className="font-bold text-sm">{orgName}</p>
+        {tourInfo.agencyName && <p className="font-semibold">{tourInfo.agencyName}</p>}
         <p>{tourInfo.tourName}</p>
         <p>{formatShortDateTime(tourInfo.stopStartDate || tourInfo.startDate)} - {formatShortDateTime(tourInfo.stopEndDate)}</p>
         <p className="text-[10px] mt-1">{t.guests.printedAt}: {new Date().toLocaleString()}</p>
@@ -190,6 +192,7 @@ export function DetailedListReceipt({
     <div style={{ fontSize: '0.875rem', maxWidth: '297mm' }}>
       <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
         <h2 style={{ fontWeight: 'bold', fontSize: '1.25rem', margin: '0 0 4px 0' }}>{orgName}</h2>
+        {tourInfo.agencyName && <p style={{ margin: '2px 0', fontWeight: 600 }}>{tourInfo.agencyName}</p>}
         <p style={{ margin: '2px 0' }}>{tourInfo.tourName} — {formatShortDateTime(tourInfo.stopStartDate || tourInfo.startDate)} - {formatShortDateTime(tourInfo.stopEndDate)}</p>
         <p style={{ margin: '2px 0', fontSize: '0.75rem', color: '#64748b' }}>{t.guests.printedAt}: {new Date().toLocaleString()}</p>
       </div>
@@ -308,6 +311,7 @@ export function KitchenSummaryReceipt({
     <div className="text-sm" style={{ maxWidth: '210mm' }}>
       <div className="text-center mb-4">
         <h2 className="font-bold text-lg">{orgName}</h2>
+        {tourInfo.agencyName && <p className="font-semibold">{tourInfo.agencyName}</p>}
         <p>{tourInfo.tourName} — {formatShortDateTime(tourInfo.stopStartDate || tourInfo.startDate)} - {formatShortDateTime(tourInfo.stopEndDate)}</p>
         <p className="text-xs text-slate-500">{t.guests.printedAt}: {new Date().toLocaleString()}</p>
       </div>

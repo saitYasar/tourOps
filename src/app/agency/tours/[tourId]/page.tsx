@@ -387,8 +387,10 @@ export default function TourDetailPage() {
   // Receipt helpers
   const selectedStop = stops?.find(s => s.id === choicesStopId);
   const choicesOrgName = selectedStop?.organization?.name || '';
+  const agencyName = agencyResult?.success ? agencyResult.data?.name : undefined;
   const receiptTourInfo = tour ? {
     tourName: tour.tourName,
+    agencyName: agencyName || '',
     startDate: tour.startDate,
     stopStartDate: selectedStop?.scheduledStartTime,
     stopEndDate: selectedStop?.scheduledEndTime,
