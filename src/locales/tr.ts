@@ -1500,6 +1500,7 @@ export const tr = {
     firstName: 'ADI',
     uncategorized: 'Diğer',
     serviceSeats: 'alan sandalyeler',
+    tableBasedServices: 'Masa Bazlı Servisler',
     exportExcel: 'Excel İndir',
     reservationInfo: 'Rezervasyon Bilgileri',
     headcount: 'Kişi Sayısı',

@@ -1488,6 +1488,7 @@ export const en = {
     firstName: 'FIRST NAME',
     uncategorized: 'Other',
     serviceSeats: 'ordered by seats',
+    tableBasedServices: 'Table Based Services',
     exportExcel: 'Export Excel',
     reservationInfo: 'Reservation Details',
     headcount: 'Headcount',

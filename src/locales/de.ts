@@ -1488,6 +1488,7 @@ export const de = {
     firstName: 'VORNAME',
     uncategorized: 'Sonstige',
     serviceSeats: 'bestellt von Sitzplätzen',
+    tableBasedServices: 'Tischbasierte Dienstleistungen',
     exportExcel: 'Excel herunterladen',
     reservationInfo: 'Reservierungsdetails',
     headcount: 'Personenanzahl',

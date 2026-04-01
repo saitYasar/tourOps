@@ -51,7 +51,7 @@ import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import {
   LoadingState, EmptyState, ErrorState,
-  CompactReceipt, DetailedListReceipt, KitchenSummaryReceipt, ReceiptServiceSummary,
+  CompactReceipt, DetailedListReceipt, KitchenSummaryReceipt, ReceiptTableServices, ReceiptServiceSummary,
   handleReceiptPrint, exportReceiptExcel, ChoiceDeadlineCountdown,
 } from '@/components/shared';
 import type { ReceiptTemplate } from '@/components/shared';
@@ -762,6 +762,7 @@ export default function RestaurantGuestsPage() {
                 {receiptTemplate === 'kitchen' && (
                   <KitchenSummaryReceipt tourInfo={tourInfo} choices={choices} orgName={orgName} t={t} />
                 )}
+                <ReceiptTableServices choices={choices} t={t} />
                 <ReceiptServiceSummary serviceSummary={serviceSummary} t={t} />
               </>
             )}

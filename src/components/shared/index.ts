@@ -8,7 +8,7 @@ export { RequestStatusBadge, TourStatusBadge } from './StatusBadge';
 export { LanguageSwitcher } from './LanguageSwitcher';
 export { RestaurantMap } from './RestaurantMap';
 export { ImageCropper } from './ImageCropper';
-export { CompactReceipt, DetailedListReceipt, KitchenSummaryReceipt, ReceiptServiceSummary, handleReceiptPrint, exportReceiptExcel, COMBINATION_COLORS, getResourceLabel } from './ReceiptTemplates';
+export { CompactReceipt, DetailedListReceipt, KitchenSummaryReceipt, ReceiptTableServices, ReceiptServiceSummary, handleReceiptPrint, exportReceiptExcel, COMBINATION_COLORS, getResourceLabel } from './ReceiptTemplates';
 export type { ReceiptTemplate, ReceiptTourInfo } from './ReceiptTemplates';
 export { ChoiceDeadlineCountdown } from './ChoiceDeadlineCountdown';
 export { ServiceDetailDialog } from './ServiceDetailDialog';

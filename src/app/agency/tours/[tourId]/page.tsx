@@ -105,7 +105,7 @@ import {
 } from '@/components/ui/select';
 import {
   LoadingState, EmptyState, ErrorState, TourStatusBadge, ConfirmDialog,
-  CompactReceipt, DetailedListReceipt, KitchenSummaryReceipt, ReceiptServiceSummary,
+  CompactReceipt, DetailedListReceipt, KitchenSummaryReceipt, ReceiptTableServices, ReceiptServiceSummary,
   handleReceiptPrint, exportReceiptExcel, ChoiceDeadlineCountdown,
 } from '@/components/shared';
 import type { ReceiptTemplate } from '@/components/shared';
@@ -1945,6 +1945,7 @@ export default function TourDetailPage() {
                 {receiptTemplate === 'kitchen' && (
                   <KitchenSummaryReceipt tourInfo={receiptTourInfo} choices={choicesArr} orgName={choicesOrgName} t={t} />
                 )}
+                <ReceiptTableServices choices={choicesArr} t={t} />
                 <ReceiptServiceSummary serviceSummary={serviceSummary} t={t} />
               </>
             )}

@@ -368,6 +368,61 @@ export function KitchenSummaryReceipt({
 }
 
 // ============================================
+// Table-Based Services (grouped by table)
+// ============================================
+
+/** Build a table label from resource choices (floor + room + table) */
+function getTableLabel(choice: AgencyStopChoicesDto): string {
+  if (!choice.resourceChoice || !Array.isArray(choice.resourceChoice)) return '';
+  const parts: string[] = [];
+  for (const item of choice.resourceChoice as ClientResourceChoiceItemDto[]) {
+    if (item.resourceTypeCode === 'floor' || item.resourceTypeCode === 'room' || item.resourceTypeCode === 'table') {
+      parts.push(`${item.resourceTypeName}: ${item.resourceName}`);
+    }
+  }
+  return parts.join(' · ');
+}
+
+export function ReceiptTableServices({
+  choices,
+  t,
+}: {
+  choices: AgencyStopChoicesDto[];
+  t: T;
+}) {
+  // Group services by table label, aggregating quantities
+  const tableMap = new Map<string, Map<string, number>>();
+  for (const choice of choices) {
+    const tableLabel = getTableLabel(choice);
+    if (!tableLabel) continue;
+    if (!tableMap.has(tableLabel)) tableMap.set(tableLabel, new Map());
+    const serviceMap = tableMap.get(tableLabel)!;
+    for (const sc of choice.serviceChoices || []) {
+      const title = sc.service?.title || `#${sc.serviceId}`;
+      serviceMap.set(title, (serviceMap.get(title) || 0) + (sc.quantity || 1));
+    }
+  }
+
+  if (tableMap.size === 0) return null;
+
+  return (
+    <div style={{ marginTop: '1.5rem', borderTop: '2px solid #334155', paddingTop: '1rem' }}>
+      <h3 style={{ fontWeight: 'bold', fontSize: '0.95rem', marginBottom: '0.5rem' }}>{t.guests.tableBasedServices}</h3>
+      {Array.from(tableMap.entries()).map(([tableLabel, serviceMap]) => (
+        <div key={tableLabel} style={{ marginBottom: '0.75rem', padding: '8px 12px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '4px' }}>
+          <p style={{ fontWeight: 'bold', fontSize: '0.85rem', marginBottom: '4px' }}>{tableLabel}</p>
+          {Array.from(serviceMap.entries()).map(([title, qty]) => (
+            <p key={title} style={{ fontSize: '0.8rem', margin: '2px 0', paddingLeft: '8px' }}>
+              {title} x{qty}
+            </p>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ============================================
 // Service Summary (for print output)
 // ============================================
 export function ReceiptServiceSummary({
