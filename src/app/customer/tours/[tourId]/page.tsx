@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -20,6 +20,7 @@ import {
   UtensilsCrossed,
   MessageSquare,
   ChevronDown,
+  Search,
 } from 'lucide-react';
 
 import { getCurrencySymbol } from '@/lib/utils';
@@ -49,6 +50,8 @@ import { toast } from 'sonner';
 import { CustomerVenueSelector } from '@/components/customer/CustomerVenueSelector';
 import { StopVenuePreview } from '@/components/customer/StopVenuePreview';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
 
 // ============================================
 // Types
@@ -81,6 +84,7 @@ export default function CustomerTourDetailPage() {
   const [detailService, setDetailService] = useState<ClientStopMenuServiceDto | null>(null);
   // Gallery lightbox
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const [stopSearchQuery, setStopSearchQuery] = useState('');
 
   // Persisted selections across stops (synced from backend)
   const [selectedTables, setSelectedTables] = useState<Record<number, SelectedTableInfo>>({});
@@ -605,6 +609,18 @@ export default function CustomerTourDetailPage() {
             const visibleStops = (tour.stops || []).filter(
               (s: ClientTourStopDto) => s.preReservationStatus !== 'rejected'
             );
+
+            const isStopExpired = (stop: ClientTourStopDto) => {
+              if (!stop.scheduledEndTime) return false;
+              const stripped = stop.scheduledEndTime.replace(/[Zz]$/, '').replace(/[+-]\d{2}:\d{2}$/, '');
+              const hours = stop.choiceDeadline ?? 0;
+              const deadlineMs = new Date(stripped).getTime() - hours * 3600000;
+              return Date.now() > deadlineMs;
+            };
+
+            const activeStops = visibleStops.filter((s: ClientTourStopDto) => !isStopExpired(s));
+            const pastStops = visibleStops.filter((s: ClientTourStopDto) => isStopExpired(s));
+
             return (
               <>
           <div className="flex items-center gap-2 mb-4">
@@ -621,8 +637,56 @@ export default function CustomerTourDetailPage() {
               </CardContent>
             </Card>
           ) : (
+            <Tabs defaultValue="active" className="w-full">
+              <TabsList className="w-full mb-3">
+                <TabsTrigger value="active" className="flex-1">
+                  {t.customer.activeChoices}
+                  {activeStops.length > 0 && (
+                    <span className="ml-1.5 bg-orange-100 text-orange-700 rounded-full px-1.5 text-[10px] font-bold">
+                      {activeStops.length}
+                    </span>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="past" className="flex-1">
+                  {t.customer.pastChoices}
+                  {pastStops.length > 0 && (
+                    <span className="ml-1.5 bg-slate-100 text-slate-600 rounded-full px-1.5 text-[10px] font-bold">
+                      {pastStops.length}
+                    </span>
+                  )}
+                </TabsTrigger>
+              </TabsList>
+
+              <div className="relative mb-3">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Input
+                  placeholder={t.customer.searchStops}
+                  value={stopSearchQuery}
+                  onChange={(e) => setStopSearchQuery(e.target.value)}
+                  className="pl-9 h-9 text-sm"
+                />
+              </div>
+
+              {['active', 'past'].map((tabKey) => {
+                const tabStops = tabKey === 'active' ? activeStops : pastStops;
+                const query = stopSearchQuery.toLowerCase().trim();
+                const stops = query
+                  ? tabStops.filter((s: ClientTourStopDto) => s.organization.name.toLowerCase().includes(query))
+                  : tabStops;
+                return (
+                  <TabsContent key={tabKey} value={tabKey}>
+                    {stops.length === 0 ? (
+                      <Card className="bg-white border-dashed border-2 border-slate-200">
+                        <CardContent className="p-6 text-center">
+                          <MapPin className="h-10 w-10 text-slate-300 mx-auto mb-2" />
+                          <p className="text-sm text-slate-500">
+                            {tabKey === 'active' ? t.customer.noStops : t.customer.noStops}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    ) : (
             <div className="space-y-3">
-              {visibleStops.map((stop: ClientTourStopDto) => {
+              {stops.map((stop: ClientTourStopDto) => {
                 const org = stop.organization;
                 const preResCfg = stop.preReservationStatus
                   ? preResStatusConfig[stop.preReservationStatus] || preResStatusConfig.pending
@@ -796,6 +860,11 @@ export default function CustomerTourDetailPage() {
                 );
               })}
             </div>
+                    )}
+                  </TabsContent>
+                );
+              })}
+            </Tabs>
           )}
               </>
             );
