@@ -3875,6 +3875,18 @@ class ApiClient {
     }, lang);
   }
 
+  async submitAndApproveChoices(stopId: number, lang: 'tr' | 'en' | 'de' = 'tr') {
+    return this.request<{ message: string }>(`/admin/tour-stops/${stopId}/submit-and-approve-choices`, {
+      method: 'PUT',
+    }, lang);
+  }
+
+  async revokeChoicesApproval(stopId: number, lang: 'tr' | 'en' | 'de' = 'tr') {
+    return this.request<{ message: string }>(`/admin/tour-stops/${stopId}/revoke-choices-approval`, {
+      method: 'PUT',
+    }, lang);
+  }
+
   async updateSystemCommissionPaid(stopId: number, systemCommissionPaid: boolean) {
     return this.request<{ message: string }>(`/admin/tour-stops/${stopId}/system-commission-paid`, {
       method: 'PUT',
@@ -6026,6 +6038,24 @@ export const adminApi = {
   async rejectTourStop(stopId: number, reason: string, lang: 'tr' | 'en' | 'de' = 'tr') {
     try {
       const response = await apiClient.rejectAdminTourStop(stopId, reason, lang);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async submitAndApproveChoices(stopId: number, lang: 'tr' | 'en' | 'de' = 'tr') {
+    try {
+      const response = await apiClient.submitAndApproveChoices(stopId, lang);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async revokeChoicesApproval(stopId: number, lang: 'tr' | 'en' | 'de' = 'tr') {
+    try {
+      const response = await apiClient.revokeChoicesApproval(stopId, lang);
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };

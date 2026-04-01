@@ -28,6 +28,8 @@ import {
   XCircle,
   X,
   Loader2,
+  Lock,
+  Unlock,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -287,6 +289,34 @@ export default function AdminToursPage() {
       setRejectReason('');
     },
     onError: (err: Error) => toast.error(err.message || t.admin.tourStopError),
+  });
+
+  const lockChoicesMutation = useMutation({
+    mutationFn: async (stopId: number) => {
+      const result = await adminApi.submitAndApproveChoices(stopId, lang);
+      if (!result.success) throw new Error(result.error);
+    },
+    onSuccess: () => {
+      toast.success(t.tours.choicesLocked);
+      invalidateTourDetail();
+      queryClient.invalidateQueries({ queryKey: ['admin-stop-choices', choicesStopId, lang] });
+      queryClient.invalidateQueries({ queryKey: ['admin-stop-service-summary', choicesStopId, lang] });
+    },
+    onError: (err: Error) => toast.error(err.message || t.tours.choicesLockError),
+  });
+
+  const unlockChoicesMutation = useMutation({
+    mutationFn: async (stopId: number) => {
+      const result = await adminApi.revokeChoicesApproval(stopId, lang);
+      if (!result.success) throw new Error(result.error);
+    },
+    onSuccess: () => {
+      toast.success(t.tours.choicesUnlocked);
+      invalidateTourDetail();
+      queryClient.invalidateQueries({ queryKey: ['admin-stop-choices', choicesStopId, lang] });
+      queryClient.invalidateQueries({ queryKey: ['admin-stop-service-summary', choicesStopId, lang] });
+    },
+    onError: (err: Error) => toast.error(err.message || t.tours.choicesUnlockError),
   });
 
   const handleAddStop = () => {
@@ -1207,12 +1237,38 @@ export default function AdminToursPage() {
                                       </Badge>
                                     </div>
                                   ) : <div />}
-                                  {choicesArr.length > 0 && (
-                                    <Button variant="outline" size="sm" onClick={() => setReceiptOpen(true)} className="gap-2">
-                                      <Printer className="h-4 w-4" />
-                                      {t.guests.printReceipt}
-                                    </Button>
-                                  )}
+                                  <div className="flex items-center gap-2">
+                                    {currentStop?.preReservationStatus === 'approved' && cs === 'in_progress' && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => choicesStopId && lockChoicesMutation.mutate(choicesStopId)}
+                                        disabled={lockChoicesMutation.isPending}
+                                        className="gap-2"
+                                      >
+                                        {lockChoicesMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
+                                        {t.tours.lockChoices}
+                                      </Button>
+                                    )}
+                                    {(cs === 'approved' || cs === 'submitted') && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => choicesStopId && unlockChoicesMutation.mutate(choicesStopId)}
+                                        disabled={unlockChoicesMutation.isPending}
+                                        className="gap-2"
+                                      >
+                                        {unlockChoicesMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Unlock className="h-4 w-4" />}
+                                        {t.tours.unlockChoices}
+                                      </Button>
+                                    )}
+                                    {choicesArr.length > 0 && (
+                                      <Button variant="outline" size="sm" onClick={() => setReceiptOpen(true)} className="gap-2">
+                                        <Printer className="h-4 w-4" />
+                                        {t.guests.printReceipt}
+                                      </Button>
+                                    )}
+                                  </div>
                                 </div>
                               );
                             })()}
