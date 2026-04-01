@@ -2,7 +2,7 @@
 
 import React from 'react';
 import XLSX from 'xlsx-js-style';
-import { formatDate } from '@/lib/dateUtils';
+import { formatDate, formatShortDateTime } from '@/lib/dateUtils';
 import type { AgencyStopChoicesDto, AgencyStopServiceSummaryDto, ClientResourceChoiceItemDto } from '@/lib/api';
 import { getCurrencySymbol } from '@/lib/utils';
 import type { useLanguage } from '@/contexts/LanguageContext';
@@ -81,7 +81,7 @@ export function CompactReceipt({
       <div className="text-center border-b border-dashed pb-2 mb-2">
         <p className="font-bold text-sm">{orgName}</p>
         <p>{tourInfo.tourName}</p>
-        <p>{formatDate(tourInfo.stopStartDate || tourInfo.startDate)} - {formatDate(tourInfo.stopEndDate)}</p>
+        <p>{formatShortDateTime(tourInfo.stopStartDate || tourInfo.startDate)} - {formatShortDateTime(tourInfo.stopEndDate)}</p>
         <p className="text-[10px] mt-1">{t.guests.printedAt}: {new Date().toLocaleString()}</p>
       </div>
       {sortChoicesBySeat(choices).map((choice, idx) => {
@@ -190,7 +190,7 @@ export function DetailedListReceipt({
     <div style={{ fontSize: '0.875rem', maxWidth: '297mm' }}>
       <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
         <h2 style={{ fontWeight: 'bold', fontSize: '1.25rem', margin: '0 0 4px 0' }}>{orgName}</h2>
-        <p style={{ margin: '2px 0' }}>{tourInfo.tourName} — {formatDate(tourInfo.stopStartDate || tourInfo.startDate)} - {formatDate(tourInfo.stopEndDate)}</p>
+        <p style={{ margin: '2px 0' }}>{tourInfo.tourName} — {formatShortDateTime(tourInfo.stopStartDate || tourInfo.startDate)} - {formatShortDateTime(tourInfo.stopEndDate)}</p>
         <p style={{ margin: '2px 0', fontSize: '0.75rem', color: '#64748b' }}>{t.guests.printedAt}: {new Date().toLocaleString()}</p>
       </div>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
@@ -308,7 +308,7 @@ export function KitchenSummaryReceipt({
     <div className="text-sm" style={{ maxWidth: '210mm' }}>
       <div className="text-center mb-4">
         <h2 className="font-bold text-lg">{orgName}</h2>
-        <p>{tourInfo.tourName} — {formatDate(tourInfo.stopStartDate || tourInfo.startDate)} - {formatDate(tourInfo.stopEndDate)}</p>
+        <p>{tourInfo.tourName} — {formatShortDateTime(tourInfo.stopStartDate || tourInfo.startDate)} - {formatShortDateTime(tourInfo.stopEndDate)}</p>
         <p className="text-xs text-slate-500">{t.guests.printedAt}: {new Date().toLocaleString()}</p>
       </div>
       {!serviceOrder.length ? (
@@ -510,7 +510,7 @@ export function exportReceiptExcel(
   if (!choices.length) return;
   const sortedChoices = sortChoicesBySeat(choices);
   const tourName = tourInfo.tourName || '';
-  const tourDate = `${formatDate(tourInfo.stopStartDate || tourInfo.startDate)} - ${formatDate(tourInfo.stopEndDate)}`;
+  const tourDate = `${formatShortDateTime(tourInfo.stopStartDate || tourInfo.startDate)} - ${formatShortDateTime(tourInfo.stopEndDate)}`;
   const wb = XLSX.utils.book_new();
 
   const toArgb = (hex: string) => hex.replace('#', '');

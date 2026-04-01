@@ -335,7 +335,12 @@ export default function AdminToursPage() {
   const choicesArr: AgencyStopChoicesDto[] = stopChoices || [];
   const selectedStop = stops?.find(s => s.id === choicesStopId);
   const choicesOrgName = selectedStop?.organization?.name || '';
-  const receiptTourInfo = tourDetail ? { tourName: tourDetail.tourName, startDate: tourDetail.startDate } : { tourName: '', startDate: '' };
+  const receiptTourInfo = tourDetail ? {
+    tourName: tourDetail.tourName,
+    startDate: tourDetail.startDate,
+    stopStartDate: selectedStop?.scheduledStartTime,
+    stopEndDate: selectedStop?.scheduledEndTime,
+  } : { tourName: '', startDate: '' };
 
   const handlePrint = useCallback(() => {
     handleReceiptPrint(printRef, receiptTemplate);
