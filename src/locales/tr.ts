@@ -1496,6 +1496,7 @@ export const tr = {
     noChoices: 'Henüz müşteri seçimi yapılmamış',
     resource: 'Kaynak',
     rowNo: 'Sıra No',
+    tableNo: 'Masa',
     lastName: 'SOYADI',
     firstName: 'ADI',
     uncategorized: 'Diğer',
