@@ -589,6 +589,11 @@ export const en = {
     subCategories: 'Subcategories',
     preview: 'Preview',
     menuPreview: 'Menu Preview',
+    dailyStock: 'Daily Stock',
+    dailyStockPlaceholder: 'Leave empty for unlimited',
+    stockUnlimited: 'Unlimited',
+    stockOut: 'Out of Stock',
+    stockUnit: 'pcs',
     minutes: 'min',
   },
   customer: {

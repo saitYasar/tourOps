@@ -589,6 +589,11 @@ export const de = {
     subCategories: 'Unterkategorien',
     preview: 'Vorschau',
     menuPreview: 'Menuvorschau',
+    dailyStock: 'Tagesbestand',
+    dailyStockPlaceholder: 'Leer lassen für unbegrenzt',
+    stockUnlimited: 'Unbegrenzt',
+    stockOut: 'Nicht vorrätig',
+    stockUnit: 'Stk.',
     minutes: 'Min.',
   },
   customer: {

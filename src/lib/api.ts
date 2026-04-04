@@ -579,6 +579,7 @@ export interface ServiceDto {
   priceType: PriceType;
   currency?: string;
   estimatedDurationMinutes?: number | null;
+  dailyStock?: number | null;
   active: boolean;
   metadata?: unknown;
   createdAt?: string;
@@ -594,6 +595,7 @@ export interface CreateServiceDto {
   description?: string;
   contentsDescription?: string;
   estimatedDurationMinutes?: number;
+  dailyStock?: number | null;
 }
 
 export interface UpdateServiceDto {
@@ -605,6 +607,7 @@ export interface UpdateServiceDto {
   priceType?: PriceType;
   estimatedDurationMinutes?: number;
   serviceCategoryId?: number;
+  dailyStock?: number | null;
 }
 
 // ============================================
@@ -983,6 +986,7 @@ export interface ClientStopMenuServiceDto {
   estimatedDurationMinutes?: number | null;
   serviceCategoryId?: number;
   serviceCategoryName?: string;
+  dailyStock?: number | null;
   active?: boolean;
 }
 

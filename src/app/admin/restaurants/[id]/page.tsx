@@ -1428,10 +1428,11 @@ interface AdminServiceFormData {
   basePrice: number;
   priceType: PriceType;
   serviceCategoryId: number;
+  dailyStock: number | null;
 }
 
 const adminInitialCategoryForm: AdminCategoryFormData = { name: '', displayOrder: 0 };
-const adminInitialServiceForm: AdminServiceFormData = { title: '', description: '', basePrice: 0, priceType: 'fixed', serviceCategoryId: 0 };
+const adminInitialServiceForm: AdminServiceFormData = { title: '', description: '', basePrice: 0, priceType: 'fixed', serviceCategoryId: 0, dailyStock: null };
 
 const ADMIN_PRICE_TYPE_OPTIONS: { value: PriceType; labelKey: 'fixed' | 'perPerson' | 'perHour' | 'perDay' }[] = [
   { value: 'fixed', labelKey: 'fixed' },
@@ -1535,6 +1536,7 @@ function MenuTab({ orgId }: { orgId: number }) {
           priceType: s.priceType,
           imageUrl: (s as ServiceDto & { imageUrl?: string }).imageUrl || null,
           serviceCategoryId: s.serviceCategoryId,
+          dailyStock: s.dailyStock ?? null,
         })),
       child_service_categories: cat.child_service_categories
         ? buildMenuTree(cat.child_service_categories, svcs)
@@ -1712,6 +1714,7 @@ function MenuTab({ orgId }: { orgId: number }) {
       basePrice: Number(service.basePrice),
       priceType: service.priceType as PriceType,
       serviceCategoryId: service.serviceCategoryId || selectedCategory?.id || 0,
+      dailyStock: service.dailyStock ?? null,
     });
     setServiceImageFile(null);
     setServiceImagePreview(service.imageUrl || null);
@@ -1745,6 +1748,7 @@ function MenuTab({ orgId }: { orgId: number }) {
           basePrice: serviceForm.basePrice,
           priceType: serviceForm.priceType,
           serviceCategoryId: serviceForm.serviceCategoryId,
+          dailyStock: serviceForm.dailyStock,
         },
         image: serviceImageFile || undefined,
       });
@@ -1756,6 +1760,7 @@ function MenuTab({ orgId }: { orgId: number }) {
           basePrice: serviceForm.basePrice,
           priceType: serviceForm.priceType,
           serviceCategoryId: serviceForm.serviceCategoryId,
+          dailyStock: serviceForm.dailyStock,
         },
         image: serviceImageFile || undefined,
       });
@@ -2014,6 +2019,20 @@ function MenuTab({ orgId }: { orgId: number }) {
                                     {Number(service.basePrice).toFixed(2)} {getCurrencySymbol(service.currency)}
                                   </span>
                                   <AdminPriceTypeBadge priceType={service.priceType as PriceType} t={t} />
+                                  <span className={`inline-flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full ${
+                                    service.dailyStock === 0
+                                      ? 'bg-red-100 text-red-700'
+                                      : service.dailyStock != null
+                                      ? 'bg-blue-100 text-blue-700'
+                                      : 'bg-green-100 text-green-700'
+                                  }`}>
+                                    <Box className="h-3 w-3" />
+                                    {service.dailyStock == null
+                                      ? t.menu.stockUnlimited
+                                      : service.dailyStock === 0
+                                      ? t.menu.stockOut
+                                      : `${service.dailyStock} ${t.menu.stockUnit}`}
+                                  </span>
                                 </div>
                               </div>
                               <div className="flex gap-1 flex-shrink-0">
@@ -2210,6 +2229,25 @@ function MenuTab({ orgId }: { orgId: number }) {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="dailyStock">{t.menu.dailyStock}</Label>
+                <Input
+                  id="dailyStock"
+                  type="number"
+                  min={0}
+                  step="1"
+                  value={serviceForm.dailyStock ?? ''}
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) =>
+                    setServiceForm((prev) => ({
+                      ...prev,
+                      dailyStock: e.target.value === '' ? null : parseInt(e.target.value) || 0,
+                    }))
+                  }
+                  placeholder={t.menu.dailyStockPlaceholder}
+                />
               </div>
 
               {/* Image Upload */}

@@ -589,6 +589,11 @@ export const tr = {
     subCategories: 'Alt Kategoriler',
     preview: 'Ön İzleme',
     menuPreview: 'Menü Ön İzleme',
+    dailyStock: 'Günlük Stok',
+    dailyStockPlaceholder: 'Boş bırakılırsa sınırsız',
+    stockUnlimited: 'Sınırsız',
+    stockOut: 'Stok Yok',
+    stockUnit: 'adet',
     minutes: 'dk',
   },
   customer: {
