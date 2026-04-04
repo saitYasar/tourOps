@@ -63,6 +63,16 @@ function sortChoicesBySeat(choices: AgencyStopChoicesDto[]): AgencyStopChoicesDt
   return [...choices].sort((a, b) => getSeatSortKey(a) - getSeatSortKey(b));
 }
 
+/** Extract short table label: "Masa-1" / "masa 1" / "Masa-1" → "1", otherwise return full label */
+function getShortTableLabel(choice: AgencyStopChoicesDto): string {
+  if (!choice.resourceChoice || !Array.isArray(choice.resourceChoice)) return '';
+  const table = choice.resourceChoice.find((item: ClientResourceChoiceItemDto) => item.resourceTypeCode === 'table');
+  if (!table) return '';
+  const name = table.resourceName || '';
+  const match = name.match(/^masa[\s\-_]*(\d+)$/i);
+  return match ? match[1] : name;
+}
+
 // ============================================
 // Compact Receipt (80mm thermal)
 // ============================================
@@ -145,6 +155,7 @@ export function DetailedListReceipt({
   const rows = sortedChoices.map((choice, idx) => {
     const firstName = (choice.client?.firstName || '').toUpperCase();
     const lastName = (choice.client?.lastName || '').toUpperCase();
+    const tableLabel = getShortTableLabel(choice);
     const categoryMap = new Map<string, string>();
     const categoryTitles = new Map<string, string[]>();
     const notes: string[] = [];
@@ -159,7 +170,7 @@ export function DetailedListReceipt({
       categoryTitles.set(catName, titles);
       if (sc.note) notes.push(`${sc.service?.title || `#${sc.serviceId}`}: ${sc.note}`);
     }
-    return { idx: idx + 1, firstName, lastName, categoryMap, categoryTitles, notes };
+    return { idx: idx + 1, firstName, lastName, tableLabel, categoryMap, categoryTitles, notes };
   });
 
   const globalFoodColorMap = new Map<string, string>();
@@ -200,6 +211,7 @@ export function DetailedListReceipt({
         <thead>
           <tr>
             <th style={{ border: '1px solid #999', padding: '6px 8px', textAlign: 'center', backgroundColor: '#e2e8f0', minWidth: 36, fontWeight: 'bold' }}>{t.guests.rowNo}</th>
+            <th style={{ border: '1px solid #999', padding: '6px 8px', textAlign: 'center', backgroundColor: '#e2e8f0', minWidth: 36, fontWeight: 'bold' }}>{t.guests.tableNo}</th>
             <th style={{ border: '1px solid #999', padding: '6px 8px', textAlign: 'left', backgroundColor: '#e2e8f0', minWidth: 80, fontWeight: 'bold' }}>{t.guests.lastName}</th>
             <th style={{ border: '1px solid #999', padding: '6px 8px', textAlign: 'left', backgroundColor: '#e2e8f0', minWidth: 80, fontWeight: 'bold' }}>{t.guests.firstName}</th>
             {categoryNames.map((cat) => (
@@ -214,6 +226,7 @@ export function DetailedListReceipt({
           {rows.map((row) => (
             <tr key={row.idx}>
               <td style={{ border: '1px solid #ccc', padding: '5px 8px', textAlign: 'center' }}>{row.idx}</td>
+              <td style={{ border: '1px solid #ccc', padding: '5px 8px', textAlign: 'center', fontWeight: 500 }}>{row.tableLabel}</td>
               <td style={{ border: '1px solid #ccc', padding: '5px 8px', fontWeight: 600 }}>{row.lastName}</td>
               <td style={{ border: '1px solid #ccc', padding: '5px 8px' }}>{row.firstName}</td>
               {categoryNames.map((cat) => {
@@ -408,7 +421,9 @@ export function ReceiptTableServices({
   return (
     <div style={{ marginTop: '1.5rem', borderTop: '2px solid #334155', paddingTop: '1rem' }}>
       <h3 style={{ fontWeight: 'bold', fontSize: '0.95rem', marginBottom: '0.5rem' }}>{t.guests.tableBasedServices}</h3>
-      {Array.from(tableMap.entries()).map(([tableLabel, serviceMap]) => (
+      {Array.from(tableMap.entries())
+        .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
+        .map(([tableLabel, serviceMap]) => (
         <div key={tableLabel} style={{ marginBottom: '0.75rem', padding: '8px 12px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '4px' }}>
           <p style={{ fontWeight: 'bold', fontSize: '0.85rem', marginBottom: '4px' }}>{tableLabel}</p>
           {Array.from(serviceMap.entries()).map(([title, qty]) => (
@@ -615,13 +630,14 @@ export function exportReceiptExcel(
     }
   }
   const categoryNames = Array.from(categoryOrderMap.keys());
-  const detailHeaders = [t.guests.rowNo, t.guests.lastName, t.guests.firstName, ...categoryNames, t.guests.note];
+  const detailHeaders = [t.guests.rowNo, t.guests.tableNo, t.guests.lastName, t.guests.firstName, ...categoryNames, t.guests.note];
 
   type CellInfo = { v: string | number; colors?: string[] };
   const detailData: CellInfo[][] = [];
   sortedChoices.forEach((choice, idx) => {
     const row: CellInfo[] = [
       { v: idx + 1 },
+      { v: getShortTableLabel(choice) },
       { v: (choice.client?.lastName || '').toUpperCase() },
       { v: (choice.client?.firstName || '').toUpperCase() },
     ];
@@ -664,13 +680,13 @@ export function exportReceiptExcel(
       const bgColor = cellColors && cellColors.length === 1 ? cellColors[0] : undefined;
       ws1[addr].s = {
         border: cellBorder,
-        alignment: c === 0 ? { horizontal: 'center' as const } : undefined,
-        font: { bold: c === 1 },
+        alignment: c <= 1 ? { horizontal: 'center' as const } : undefined,
+        font: { bold: c === 2 },
         ...(bgColor ? { fill: { fgColor: { rgb: toArgb(bgColor) } } } : {}),
       };
     }
   }
-  ws1['!cols'] = detailHeaders.map((_, i) => ({ wch: i === 0 ? 6 : i === detailHeaders.length - 1 ? 30 : 18 }));
+  ws1['!cols'] = detailHeaders.map((_, i) => ({ wch: i === 0 ? 6 : i === 1 ? 8 : i === detailHeaders.length - 1 ? 30 : 18 }));
   XLSX.utils.book_append_sheet(wb, ws1, t.guests.detailedList);
 
   // --- Sheet 2: Mutfak Özeti ---

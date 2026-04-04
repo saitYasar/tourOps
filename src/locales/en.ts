@@ -1488,6 +1488,7 @@ export const en = {
     noChoices: 'No customer choices yet',
     resource: 'Resource',
     rowNo: 'No',
+    tableNo: 'Table',
     lastName: 'LAST NAME',
     firstName: 'FIRST NAME',
     uncategorized: 'Other',
