@@ -2027,6 +2027,7 @@ function MenuTab({ orgId }: { orgId: number }) {
                                       : 'bg-green-100 text-green-700'
                                   }`}>
                                     <Box className="h-3 w-3" />
+                                    {t.menu.stockLabel}{' '}
                                     {service.dailyStock == null
                                       ? t.menu.stockUnlimited
                                       : service.dailyStock === 0
@@ -2233,6 +2234,26 @@ function MenuTab({ orgId }: { orgId: number }) {
 
               <div className="space-y-2">
                 <Label htmlFor="dailyStock">{t.menu.dailyStock}</Label>
+                <div className="flex gap-2 mb-1.5">
+                  <Button
+                    type="button"
+                    variant={serviceForm.dailyStock == null ? 'default' : 'outline'}
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => setServiceForm((prev) => ({ ...prev, dailyStock: null }))}
+                  >
+                    {t.menu.stockUnlimited}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={serviceForm.dailyStock === 0 ? 'destructive' : 'outline'}
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => setServiceForm((prev) => ({ ...prev, dailyStock: 0 }))}
+                  >
+                    {t.menu.stockOut}
+                  </Button>
+                </div>
                 <Input
                   id="dailyStock"
                   type="number"
@@ -2246,7 +2267,7 @@ function MenuTab({ orgId }: { orgId: number }) {
                       dailyStock: e.target.value === '' ? null : parseInt(e.target.value) || 0,
                     }))
                   }
-                  placeholder={t.menu.dailyStockPlaceholder}
+                  placeholder={t.menu.stockUnlimited}
                 />
               </div>
 
