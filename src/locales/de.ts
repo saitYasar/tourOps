@@ -1070,6 +1070,10 @@ export const de = {
     statusDeleted: 'Gelöscht',
     // Tours page
     allStatuses: 'Alle Status',
+    tourTimeFilterAll: 'Alle',
+    tourTimeFilterActive: 'Aktive Touren',
+    tourTimeFilterUpcoming: 'Kommende Touren',
+    tourTimeFilterPast: 'Vergangene Touren',
     tourSearchPlaceholder: 'Tourname oder Code suchen...',
     tourAgency: 'Agentur',
     tourParticipants: 'Teilnehmer',

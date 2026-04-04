@@ -1079,6 +1079,10 @@ export const tr = {
     statusDeleted: 'Silinmiş',
     // Tours page
     allStatuses: 'Tüm Durumlar',
+    tourTimeFilterAll: 'Tümü',
+    tourTimeFilterActive: 'Aktif Turlar',
+    tourTimeFilterUpcoming: 'Gelecek Turlar',
+    tourTimeFilterPast: 'Geçmiş Turlar',
     tourSearchPlaceholder: 'Tur adı veya kodu ara...',
     tourAgency: 'Acente',
     tourParticipants: 'Katılımcı',

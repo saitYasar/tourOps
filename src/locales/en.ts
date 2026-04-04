@@ -1070,6 +1070,10 @@ export const en = {
     statusDeleted: 'Deleted',
     // Tours page
     allStatuses: 'All Statuses',
+    tourTimeFilterAll: 'All',
+    tourTimeFilterActive: 'Active Tours',
+    tourTimeFilterUpcoming: 'Upcoming Tours',
+    tourTimeFilterPast: 'Past Tours',
     tourSearchPlaceholder: 'Search tour name or code...',
     tourAgency: 'Agency',
     tourParticipants: 'Participants',

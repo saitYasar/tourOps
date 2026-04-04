@@ -93,6 +93,7 @@ export default function AdminToursPage() {
   const debouncedSearch = useDebounce(searchTerm, 500);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [agencyFilter, setAgencyFilter] = useState<string>('all');
+  const [timeFilter, setTimeFilter] = useState<string>('active');
   const [sortBy, setSortBy] = useState('');
   const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC' | ''>('');
   const [page, setPage] = useState(1);
@@ -125,20 +126,21 @@ export default function AdminToursPage() {
   const [rejectReason, setRejectReason] = useState('');
 
   // Reset page on filter change
-  const prevFilters = useRef({ debouncedSearch, statusFilter, agencyFilter, sortBy, sortOrder });
+  const prevFilters = useRef({ debouncedSearch, statusFilter, agencyFilter, timeFilter, sortBy, sortOrder });
   useEffect(() => {
     const prev = prevFilters.current;
     if (
       prev.debouncedSearch !== debouncedSearch ||
       prev.statusFilter !== statusFilter ||
       prev.agencyFilter !== agencyFilter ||
+      prev.timeFilter !== timeFilter ||
       prev.sortBy !== sortBy ||
       prev.sortOrder !== sortOrder
     ) {
       setPage(1);
-      prevFilters.current = { debouncedSearch, statusFilter, agencyFilter, sortBy, sortOrder };
+      prevFilters.current = { debouncedSearch, statusFilter, agencyFilter, timeFilter, sortBy, sortOrder };
     }
-  }, [debouncedSearch, statusFilter, agencyFilter, sortBy, sortOrder]);
+  }, [debouncedSearch, statusFilter, agencyFilter, timeFilter, sortBy, sortOrder]);
 
   // Fetch agencies for filter
   const { data: agenciesResult } = useQuery({
@@ -166,8 +168,22 @@ export default function AdminToursPage() {
     },
   });
 
-  const tours = toursResponse?.data || [];
+  const allTours = toursResponse?.data || [];
   const meta = toursResponse?.meta;
+
+  // Filter tours by time period (Turkey timezone UTC+3)
+  const tours = allTours.filter((tour) => {
+    if (timeFilter === 'all') return true;
+    const nowTurkey = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
+    const start = new Date(tour.startDate);
+    const end = new Date(tour.endDate);
+    switch (timeFilter) {
+      case 'active': return start <= nowTurkey && end >= nowTurkey;
+      case 'upcoming': return start > nowTurkey;
+      case 'past': return end < nowTurkey;
+      default: return true;
+    }
+  });
 
   // Tour detail query
   const { data: tourDetail, isLoading: isDetailLoading } = useQuery({
@@ -422,6 +438,17 @@ export default function AdminToursPage() {
                 {agencies.map((a) => (
                   <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+            <Select value={timeFilter} onValueChange={(v) => { setTimeFilter(v); setPage(1); }}>
+              <SelectTrigger className="w-full sm:w-[180px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">{t.admin.tourTimeFilterActive}</SelectItem>
+                <SelectItem value="upcoming">{t.admin.tourTimeFilterUpcoming}</SelectItem>
+                <SelectItem value="past">{t.admin.tourTimeFilterPast}</SelectItem>
+                <SelectItem value="all">{t.admin.tourTimeFilterAll}</SelectItem>
               </SelectContent>
             </Select>
             <Select value={currentSortValue} onValueChange={handleSortChange}>
