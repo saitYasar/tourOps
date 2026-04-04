@@ -2018,7 +2018,8 @@ function MenuTab({ orgId }: { orgId: number }) {
                                   <span className="text-sm font-semibold text-primary">
                                     {Number(service.basePrice).toFixed(2)} {getCurrencySymbol(service.currency)}
                                   </span>
-                                  <AdminPriceTypeBadge priceType={service.priceType as PriceType} t={t} />
+                                </div>
+                                <div className="mt-1">
                                   <span className={`inline-flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full ${
                                     service.dailyStock === 0
                                       ? 'bg-red-100 text-red-700'
