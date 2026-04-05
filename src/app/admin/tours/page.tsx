@@ -45,6 +45,7 @@ import { formatDate, formatShortDateTime } from '@/lib/dateUtils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DateTimeInput } from '@/components/ui/datetime-input';
 import { Badge } from '@/components/ui/badge';
 import {
   Select,
@@ -1495,8 +1496,7 @@ export default function AdminToursPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>{t.admin.scheduledStartTime}</Label>
-                <Input
-                  type="datetime-local"
+                <DateTimeInput
                   value={stopStartTime}
                   min={tourDetail?.startDate ? `${tourDetail.startDate.split('T')[0]}T00:00` : undefined}
                   max={tourDetail?.endDate ? `${tourDetail.endDate.split('T')[0]}T23:59` : undefined}
@@ -1505,8 +1505,7 @@ export default function AdminToursPage() {
               </div>
               <div className="space-y-2">
                 <Label>{t.admin.scheduledEndTime}</Label>
-                <Input
-                  type="datetime-local"
+                <DateTimeInput
                   value={stopEndTime}
                   min={tourDetail?.startDate ? `${tourDetail.startDate.split('T')[0]}T00:00` : undefined}
                   max={tourDetail?.endDate ? `${tourDetail.endDate.split('T')[0]}T23:59` : undefined}

@@ -81,6 +81,7 @@ const TourStopsMap = dynamic(
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DateTimeInput } from '@/components/ui/datetime-input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -1995,16 +1996,14 @@ export default function TourDetailPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>{t.tours.startDate}</Label>
-                  <Input
-                    type="datetime-local"
+                  <DateTimeInput
                     value={editForm.startDate}
                     onChange={(e) => setEditForm((prev) => ({ ...prev, startDate: e.target.value }))}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label>{t.tours.endDate}</Label>
-                  <Input
-                    type="datetime-local"
+                  <DateTimeInput
                     value={editForm.endDate}
                     onChange={(e) => setEditForm((prev) => ({ ...prev, endDate: e.target.value }))}
                   />
@@ -2352,8 +2351,7 @@ export default function TourDetailPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>{t.tours.startDate}</Label>
-                  <Input
-                    type="datetime-local"
+                  <DateTimeInput
                     value={stopForm.scheduledStartTime}
                     min={tour?.startDate ? `${tour.startDate.split('T')[0]}T00:00` : undefined}
                     max={tour?.endDate ? `${tour.endDate.split('T')[0]}T23:59` : undefined}
@@ -2362,8 +2360,7 @@ export default function TourDetailPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>{t.tours.endDate}</Label>
-                  <Input
-                    type="datetime-local"
+                  <DateTimeInput
                     value={stopForm.scheduledEndTime}
                     min={tour?.startDate ? `${tour.startDate.split('T')[0]}T00:00` : undefined}
                     max={tour?.endDate ? `${tour.endDate.split('T')[0]}T23:59` : undefined}

@@ -20,6 +20,7 @@ import {
   X,
   Save,
   Loader2,
+  Search,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -426,6 +427,15 @@ function DashboardView({
     cancelled: { color: 'bg-red-50 text-red-700', label: t.customer.participantCancelled },
   };
 
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+
+  const filteredTours = tours.filter((item) => {
+    const matchesSearch = !searchQuery || item.tour.tourName.toLowerCase().includes(searchQuery.toLowerCase()) || (item.tour.tourCode || '').toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStatus = !statusFilter || item.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
   return (
     <div className="space-y-6">
       {/* Welcome Card */}
@@ -478,6 +488,32 @@ function DashboardView({
           <h3 className="text-lg font-bold text-slate-800">{t.customer.myTours}</h3>
         </div>
 
+        {/* Filters */}
+        {tours.length > 0 && (
+          <div className="flex flex-col sm:flex-row gap-3 mb-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder={t.customer.searchTours}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full h-9 pl-9 pr-3 rounded-md border border-input bg-transparent text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+              />
+            </div>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="h-9 px-3 rounded-md border border-input bg-transparent text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] min-w-[160px]"
+            >
+              <option value="">{t.customer.allStatuses}</option>
+              <option value="confirmed">{t.customer.participantConfirmed}</option>
+              <option value="pending">{t.customer.participantPending}</option>
+              <option value="cancelled">{t.customer.participantCancelled}</option>
+            </select>
+          </div>
+        )}
+
         {toursLoading ? (
           <LoadingState message={t.common.loading} />
         ) : !tours.length ? (
@@ -496,25 +532,31 @@ function DashboardView({
               </div>
             </CardContent>
           </Card>
+        ) : !filteredTours.length ? (
+          <Card className="bg-white border-dashed border-2 border-slate-200">
+            <CardContent className="p-8">
+              <p className="text-center text-slate-500 text-sm">{t.customer.noTours}</p>
+            </CardContent>
+          </Card>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2">
-            {tours.map((item, index) => {
+          <div className="flex flex-col gap-4">
+            {filteredTours.map((item, index) => {
               const tour = item.tour;
               const statusCfg = participantStatusConfig[item.status] || participantStatusConfig.pending;
               const isConfirmed = item.status === 'confirmed';
 
               const cardContent = (
-                <Card className={`overflow-hidden border-0 shadow-md transition-all bg-white h-full flex flex-col ${isConfirmed ? 'hover:shadow-lg cursor-pointer' : 'opacity-75 cursor-not-allowed'}`}>
+                <Card className={`overflow-hidden border-0 shadow-md transition-all bg-white flex flex-row ${isConfirmed ? 'hover:shadow-lg cursor-pointer' : 'opacity-75 cursor-not-allowed'}`}>
                   {tour.coverImageUrl ? (
-                    <div className="h-28 sm:h-32 bg-slate-100 overflow-hidden">
+                    <div className="w-28 sm:w-40 shrink-0 bg-slate-100 overflow-hidden">
                       <img src={tour.coverImageUrl} alt={tour.tourName} className="w-full h-full object-cover" />
                     </div>
                   ) : (
-                    <div className={`h-2 bg-gradient-to-r ${
+                    <div className={`w-2 shrink-0 bg-gradient-to-b ${
                       ['from-sky-400 to-blue-500', 'from-orange-400 to-amber-500', 'from-emerald-400 to-teal-500', 'from-rose-400 to-pink-500'][index % 4]
                     }`} />
                   )}
-                  <CardContent className="p-3 sm:p-4 flex-1 flex flex-col">
+                  <CardContent className="p-3 sm:p-4 flex-1 flex flex-col min-w-0">
                     <div className="flex items-start justify-between gap-2 mb-1.5 sm:mb-2">
                       <h4 className="font-bold text-slate-800 text-sm sm:text-base min-w-0 truncate">{tour.tourName}</h4>
                       <span
@@ -524,7 +566,7 @@ function DashboardView({
                         {statusCfg.label}
                       </span>
                     </div>
-                    <p className="text-xs sm:text-sm text-slate-500 line-clamp-2 mb-2 sm:mb-3 min-h-[2.5em]">{tour.description || '\u00A0'}</p>
+                    <p className="text-xs sm:text-sm text-slate-500 line-clamp-2 mb-2 sm:mb-3">{tour.description || '\u00A0'}</p>
                     <div className="flex flex-wrap gap-1.5 sm:gap-2 text-[10px] sm:text-xs mt-auto">
                       {tour.tourCode && (
                         <span className="flex items-center gap-1 bg-violet-50 text-violet-700 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full">
