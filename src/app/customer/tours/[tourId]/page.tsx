@@ -411,7 +411,7 @@ export default function CustomerTourDetailPage() {
     if (existingChoiceId) {
       // Update existing choice (quantity 0 = remove)
       try {
-        await apiClient.updateServiceChoice(existingChoiceId, { quantity: Math.max(0, qty) });
+        await apiClient.updateServiceChoice(existingChoiceId, { quantity: Math.max(0, qty) }, apiLang);
         setSelectedMenuItems(prev => {
           const stopItems = { ...(prev[stopId] || {}) };
           if (qty <= 0) {
@@ -445,7 +445,7 @@ export default function CustomerTourDetailPage() {
       // Create new choice
       try {
         const note = menuNotes[stopId]?.[serviceId];
-        const result = await apiClient.createServiceChoice(stopId, { serviceId, ...(note ? { note } : {}) });
+        const result = await apiClient.createServiceChoice(stopId, { serviceId, ...(note ? { note } : {}) }, apiLang);
         setSelectedMenuItems(prev => {
           const stopItems = { ...(prev[stopId] || {}) };
           stopItems[serviceId] = qty;
@@ -494,7 +494,7 @@ export default function CustomerTourDetailPage() {
       const choiceId = serviceChoiceIds[stopId]?.[serviceId];
       if (choiceId) {
         try {
-          await apiClient.updateServiceChoice(choiceId, { note });
+          await apiClient.updateServiceChoice(choiceId, { note }, apiLang);
         } catch (err) {
           toast.error(err instanceof Error ? err.message : t.customer.noteSaveError);
         }
