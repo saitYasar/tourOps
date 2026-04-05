@@ -97,6 +97,16 @@ export default function CustomerTourDetailPage() {
   const [menuItemTitles, setMenuItemTitles] = useState<Record<number, Record<number, string>>>({});
   // Debounce timers for note API calls
   const noteTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  // Track initial quantities at page load to calculate stock limits
+  const initialQtyRef = useRef<Record<number, Record<number, number>>>({});
+  // Center toast state
+  const [centerToast, setCenterToast] = useState<string | null>(null);
+  const centerToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showCenterToast = useCallback((msg: string) => {
+    setCenterToast(msg);
+    if (centerToastTimer.current) clearTimeout(centerToastTimer.current);
+    centerToastTimer.current = setTimeout(() => setCenterToast(null), 3000);
+  }, []);
 
   // Children cache for layout hierarchy (floor -> rooms, room -> tables, table -> chairs)
   const [childrenCache, setChildrenCache] = useState<Record<number, ResourceDto[]>>({});
@@ -206,6 +216,7 @@ export default function CustomerTourDetailPage() {
         setSelectedMenuItems(prev => ({ ...prev, [stopId]: menuItems }));
         setServiceChoiceIds(prev => ({ ...prev, [stopId]: choiceIdMap }));
         setMenuItemTitles(prev => ({ ...prev, [stopId]: titleMap }));
+        initialQtyRef.current[stopId] = { ...menuItems };
         if (Object.keys(noteMap).length > 0) {
           setMenuNotes(prev => ({ ...prev, [stopId]: noteMap }));
         }
@@ -352,7 +363,7 @@ export default function CustomerTourDetailPage() {
         setMenuStopId(currentStopId);
       });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t.customer.tableSaveError);
+      showCenterToast(err instanceof Error ? err.message : t.customer.tableSaveError);
     } finally {
       setSavingTable(false);
     }
@@ -385,9 +396,31 @@ export default function CustomerTourDetailPage() {
         if (currentTotal + addedAmount > limit) {
           const firstCurrency = menuCategories.flatMap(c => c.services).find(s => s?.currency)?.currency;
           const currSymbol = getCurrencySymbol(firstCurrency);
-          toast.error(t.customer.spendLimitExceeded);
+          showCenterToast(t.customer.spendLimitExceeded);
           return;
         }
+      }
+    }
+
+    // Stock limit check
+    if (qty > currentQty) {
+      const findService = (cats: ClientStopMenuCategoryDto[]): ClientStopMenuServiceDto | undefined => {
+        for (const cat of cats) {
+          const found = cat.services?.find(s => s.id === serviceId);
+          if (found) return found;
+          if (cat.child_service_categories) {
+            const deep = findService(cat.child_service_categories);
+            if (deep) return deep;
+          }
+        }
+        return undefined;
+      };
+      const svc = findService(menuCategories);
+      const initQty = initialQtyRef.current[stopId]?.[serviceId] ?? 0;
+      const maxAvailable = svc?.remainingStock != null ? svc.remainingStock + initQty : null;
+      if (maxAvailable != null && qty > maxAvailable) {
+        showCenterToast(t.customer.stockLimitReached);
+        return;
       }
     }
 
@@ -411,7 +444,7 @@ export default function CustomerTourDetailPage() {
     if (existingChoiceId) {
       // Update existing choice (quantity 0 = remove)
       try {
-        await apiClient.updateServiceChoice(existingChoiceId, { quantity: Math.max(0, qty) });
+        await apiClient.updateServiceChoice(existingChoiceId, { quantity: Math.max(0, qty) }, apiLang);
         setSelectedMenuItems(prev => {
           const stopItems = { ...(prev[stopId] || {}) };
           if (qty <= 0) {
@@ -439,13 +472,13 @@ export default function CustomerTourDetailPage() {
           });
         }
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : t.customer.menuUpdateError);
+        showCenterToast(err instanceof Error ? err.message : t.customer.menuUpdateError);
       }
     } else if (qty > 0) {
       // Create new choice
       try {
         const note = menuNotes[stopId]?.[serviceId];
-        const result = await apiClient.createServiceChoice(stopId, { serviceId, ...(note ? { note } : {}) });
+        const result = await apiClient.createServiceChoice(stopId, { serviceId, ...(note ? { note } : {}) }, apiLang);
         setSelectedMenuItems(prev => {
           const stopItems = { ...(prev[stopId] || {}) };
           stopItems[serviceId] = qty;
@@ -469,7 +502,7 @@ export default function CustomerTourDetailPage() {
           }
         }
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : t.customer.menuSaveError);
+        showCenterToast(err instanceof Error ? err.message : t.customer.menuSaveError);
       }
     }
   };
@@ -494,9 +527,9 @@ export default function CustomerTourDetailPage() {
       const choiceId = serviceChoiceIds[stopId]?.[serviceId];
       if (choiceId) {
         try {
-          await apiClient.updateServiceChoice(choiceId, { note });
+          await apiClient.updateServiceChoice(choiceId, { note }, apiLang);
         } catch (err) {
-          toast.error(err instanceof Error ? err.message : t.customer.noteSaveError);
+          showCenterToast(err instanceof Error ? err.message : t.customer.noteSaveError);
         }
       }
     }, 800);
@@ -528,6 +561,15 @@ export default function CustomerTourDetailPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-50 via-orange-50 to-amber-50">
+      {/* Center toast */}
+      {centerToast && (
+        <div className="fixed inset-0 flex items-center justify-center z-[9999] pointer-events-none">
+          <div className="bg-red-600 text-white px-5 py-3 rounded-xl shadow-2xl text-sm font-medium flex items-center gap-2 pointer-events-auto animate-in fade-in zoom-in-95 duration-200">
+            <svg className="h-4 w-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+            {centerToast}
+          </div>
+        </div>
+      )}
       {/* Top bar */}
       <nav className="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-2 sm:px-6">
@@ -1029,6 +1071,7 @@ export default function CustomerTourDetailPage() {
                     setItemNote={setItemNote}
                     onServiceClick={setDetailService}
                     readOnly={tour.stops?.find(s => s.id === menuStopId)?.choicesStatus === 'approved'}
+                    getInitialQty={(sid, svcId) => initialQtyRef.current[sid]?.[svcId] ?? 0}
                   />
                 ))}
               </div>
@@ -1093,6 +1136,7 @@ function InteractiveMenuCategory({
   setItemNote,
   onServiceClick,
   readOnly = false,
+  getInitialQty,
 }: {
   category: ClientStopMenuCategoryDto;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1106,6 +1150,7 @@ function InteractiveMenuCategory({
   setItemNote: (stopId: number, serviceId: number, note: string) => void;
   onServiceClick?: (svc: ClientStopMenuServiceDto) => void;
   readOnly?: boolean;
+  getInitialQty?: (stopId: number, serviceId: number) => number;
 }) {
   const priceLabel = (type: string) => {
     if (type === 'fixed') return '';
@@ -1146,10 +1191,14 @@ function InteractiveMenuCategory({
           {category.services.map((svc) => {
             const qty = getItemQty(stopId, svc.id);
             const note = getItemNote(stopId, svc.id);
+            const initQty = getInitialQty?.(stopId, svc.id) ?? 0;
+            const maxAvailable = svc.remainingStock != null ? svc.remainingStock + initQty : null;
+            const isOutOfStock = maxAvailable === 0;
+            const isStockLimitReached = maxAvailable != null && qty >= maxAvailable;
             return (
-              <div key={svc.id} className={`rounded-lg transition-colors cursor-pointer ${qty > 0 ? 'bg-orange-50/80 ring-1 ring-orange-200' : 'hover:bg-white/60'}`} onClick={() => onServiceClick?.(svc)}>
+              <div key={svc.id} className={`rounded-lg transition-colors ${isOutOfStock && qty === 0 ? 'opacity-50' : 'cursor-pointer'} ${qty > 0 ? 'bg-orange-50/80 ring-1 ring-orange-200' : 'hover:bg-white/60'}`} onClick={() => !isOutOfStock && onServiceClick?.(svc)}>
                 <div className="flex gap-2 sm:gap-3 p-2">
-                  <div className="flex-shrink-0">
+                  <div className="flex-shrink-0 relative">
                     {svc.imageUrl ? (
                       <img src={svc.imageUrl} alt={svc.title} className="w-10 h-10 sm:w-14 sm:h-14 rounded-md object-cover shadow-sm" />
                     ) : (
@@ -1162,7 +1211,13 @@ function InteractiveMenuCategory({
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-stone-800 leading-tight">{svc.title}</p>
-                        {svc.subTitle && (
+                        {isOutOfStock && qty === 0 && (
+                          <p className="text-[11px] font-medium text-red-500 mt-0.5">{svc.dailyStock === 0 ? t.menu.stockOut : t.customer.stockDepleted}</p>
+                        )}
+                        {isStockLimitReached && qty > 0 && (
+                          <p className="text-[11px] font-medium text-red-500 mt-0.5">{t.customer.stockLimitReached}</p>
+                        )}
+                        {svc.subTitle && !isOutOfStock && (
                           <p className="text-xs text-stone-500 mt-0.5 leading-tight">{svc.subTitle}</p>
                         )}
                       </div>
@@ -1200,16 +1255,16 @@ function InteractiveMenuCategory({
                       </div>
                     )
                   ) : (
-                    <div className="shrink-0 flex items-center gap-0.5 sm:gap-1 self-center" onClick={(e) => e.stopPropagation()}>
+                    <div className="shrink-0 flex items-center gap-1 sm:gap-1.5 self-center" onClick={(e) => e.stopPropagation()}>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <span tabIndex={0}>
                             <button
-                              className="w-6 h-6 sm:w-7 sm:h-7 rounded-full border border-stone-300 flex items-center justify-center hover:bg-stone-100 disabled:opacity-30 transition-colors"
+                              className="w-8 h-8 sm:w-9 sm:h-9 rounded-full border border-stone-300 flex items-center justify-center hover:bg-stone-100 disabled:opacity-30 transition-colors"
                               onClick={() => setItemQty(stopId, svc.id, qty - 1)}
                               disabled={qty === 0}
                             >
-                              <Minus className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                              <Minus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                             </button>
                           </span>
                         </TooltipTrigger>
@@ -1219,14 +1274,15 @@ function InteractiveMenuCategory({
                           </TooltipContent>
                         )}
                       </Tooltip>
-                      <span className={`w-5 sm:w-6 text-center text-xs sm:text-sm font-bold ${qty > 0 ? 'text-orange-600' : 'text-stone-400'}`}>
+                      <span className={`w-6 sm:w-7 text-center text-sm sm:text-base font-bold ${qty > 0 ? 'text-orange-600' : 'text-stone-400'}`}>
                         {qty}
                       </span>
                       <button
-                        className="w-6 h-6 sm:w-7 sm:h-7 rounded-full border border-orange-300 bg-orange-50 flex items-center justify-center hover:bg-orange-100 transition-colors"
+                        className="w-8 h-8 sm:w-9 sm:h-9 rounded-full border border-orange-300 bg-orange-50 flex items-center justify-center hover:bg-orange-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                         onClick={() => setItemQty(stopId, svc.id, qty + 1)}
+                        disabled={isOutOfStock || isStockLimitReached}
                       >
-                        <Plus className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-orange-600" />
+                        <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-orange-600" />
                       </button>
                     </div>
                   )}
@@ -1270,6 +1326,7 @@ function InteractiveMenuCategory({
               setItemNote={setItemNote}
               onServiceClick={onServiceClick}
               readOnly={readOnly}
+              getInitialQty={getInitialQty}
             />
           ))}
         </div>

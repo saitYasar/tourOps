@@ -14,6 +14,7 @@ import {
   GripVertical,
   ChevronRight,
   ChevronDown,
+  Box,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -74,6 +75,7 @@ interface ServiceFormData {
   basePrice: number;
   priceType: PriceType;
   serviceCategoryId: number;
+  dailyStock: number | null;
 }
 
 const initialCategoryForm: CategoryFormData = {
@@ -87,6 +89,7 @@ const initialServiceForm: ServiceFormData = {
   basePrice: 0,
   priceType: 'fixed',
   serviceCategoryId: 0,
+  dailyStock: null,
 };
 
 const PRICE_TYPE_OPTIONS: { value: PriceType; labelKey: 'fixed' | 'perPerson' | 'perHour' | 'perDay' }[] = [
@@ -161,6 +164,36 @@ function PreviewServiceList({
             {s.description && (
               <p className="text-[11px] text-stone-400 mt-1 line-clamp-2 leading-snug">{s.description}</p>
             )}
+            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+              <span className={`inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full ${
+                s.dailyStock === 0
+                  ? 'bg-red-100 text-red-600'
+                  : s.dailyStock != null
+                  ? 'bg-blue-50 text-blue-600'
+                  : 'bg-emerald-50 text-emerald-600'
+              }`}>
+                {t.menu.stockLabel}{' '}
+                {s.dailyStock == null
+                  ? t.menu.stockUnlimited
+                  : s.dailyStock === 0
+                  ? t.menu.stockOut
+                  : `${s.dailyStock} ${t.menu.stockUnit}`}
+              </span>
+              <span className={`inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full ${
+                s.remainingStock === 0
+                  ? 'bg-red-100 text-red-600'
+                  : s.remainingStock != null
+                  ? 'bg-amber-100 text-amber-700'
+                  : 'bg-emerald-50 text-emerald-600'
+              }`}>
+                {t.menu.remainingStockLabel}{' '}
+                {s.remainingStock == null
+                  ? t.menu.stockUnlimited
+                  : s.remainingStock === 0
+                  ? t.menu.stockOut
+                  : `${s.remainingStock} ${t.menu.stockUnit}`}
+              </span>
+            </div>
           </div>
         </div>
       ))}
@@ -635,6 +668,7 @@ export default function MenuPage() {
       basePrice: Number(service.basePrice),
       priceType: service.priceType as PriceType,
       serviceCategoryId: service.serviceCategoryId || selectedCategory?.id || 0,
+      dailyStock: service.dailyStock ?? null,
     });
     setServiceImageFile(null);
     setServiceImagePreview(service.imageUrl || null);
@@ -669,6 +703,7 @@ export default function MenuPage() {
           basePrice: serviceForm.basePrice,
           priceType: serviceForm.priceType,
           serviceCategoryId: serviceForm.serviceCategoryId,
+          dailyStock: serviceForm.dailyStock,
         },
         image: serviceImageFile || undefined,
       });
@@ -680,6 +715,7 @@ export default function MenuPage() {
           basePrice: serviceForm.basePrice,
           priceType: serviceForm.priceType,
           serviceCategoryId: serviceForm.serviceCategoryId,
+          dailyStock: serviceForm.dailyStock,
         },
         image: serviceImageFile || undefined,
       });
@@ -963,7 +999,37 @@ export default function MenuPage() {
                                     <span className="text-sm font-semibold text-primary">
                                       {Number(service.basePrice).toFixed(2)} {getCurrencySymbol(service.currency)}
                                     </span>
-                                    <PriceTypeBadge priceType={service.priceType as PriceType} t={t} />
+                                  </div>
+                                  <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                                    <span className={`inline-flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full ${
+                                      service.dailyStock === 0
+                                        ? 'bg-red-100 text-red-700'
+                                        : service.dailyStock != null
+                                        ? 'bg-blue-100 text-blue-700'
+                                        : 'bg-green-100 text-green-700'
+                                    }`}>
+                                      <Box className="h-3 w-3" />
+                                      {t.menu.stockLabel}{' '}
+                                      {service.dailyStock == null
+                                        ? t.menu.stockUnlimited
+                                        : service.dailyStock === 0
+                                        ? t.menu.stockOut
+                                        : `${service.dailyStock} ${t.menu.stockUnit}`}
+                                    </span>
+                                    <span className={`inline-flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full ${
+                                      service.remainingStock === 0
+                                        ? 'bg-red-100 text-red-700'
+                                        : service.remainingStock != null
+                                        ? 'bg-amber-100 text-amber-700'
+                                        : 'bg-green-100 text-green-700'
+                                    }`}>
+                                      {t.menu.remainingStockLabel}{' '}
+                                      {service.remainingStock == null
+                                        ? t.menu.stockUnlimited
+                                        : service.remainingStock === 0
+                                        ? t.menu.stockOut
+                                        : `${service.remainingStock} ${t.menu.stockUnit}`}
+                                    </span>
                                   </div>
                                 </div>
                                 <div className="flex gap-1 flex-shrink-0">
@@ -1165,6 +1231,45 @@ export default function MenuPage() {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="dailyStock">{t.menu.dailyStock}</Label>
+                <div className="flex gap-2 mb-1.5">
+                  <Button
+                    type="button"
+                    variant={serviceForm.dailyStock == null ? 'default' : 'outline'}
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => setServiceForm((prev) => ({ ...prev, dailyStock: null }))}
+                  >
+                    {t.menu.stockUnlimited}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={serviceForm.dailyStock === 0 ? 'destructive' : 'outline'}
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => setServiceForm((prev) => ({ ...prev, dailyStock: 0 }))}
+                  >
+                    {t.menu.stockOut}
+                  </Button>
+                </div>
+                <Input
+                  id="dailyStock"
+                  type="number"
+                  min={0}
+                  step="1"
+                  value={serviceForm.dailyStock ?? ''}
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) =>
+                    setServiceForm((prev) => ({
+                      ...prev,
+                      dailyStock: e.target.value === '' ? null : parseInt(e.target.value) || 0,
+                    }))
+                  }
+                  placeholder={t.menu.stockUnlimited}
+                />
               </div>
 
               {/* Image Upload */}
