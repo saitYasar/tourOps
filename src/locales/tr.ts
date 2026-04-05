@@ -126,7 +126,7 @@ export const tr = {
     comingSoonDesc: 'Müşteri giriş sistemi üzerinde çalışıyoruz. Çok yakın bir zamanda sizlerle olacağız.',
     comingSoonInfo: 'Acente veya işletme olarak giriş yapmak için aşağıdaki butonu kullanın.',
     backToMainLogin: 'Ana Girişe Dön',
-    adventureAwaits: 'Macera seni bekliyor!',
+    adventureAwaits: 'Avustur Tatile Doyurur!',
     // Client login (agency customer)
     clientLogin: 'Müşteri Girişi',
     username: 'Kullanıcı Adı',
@@ -624,7 +624,7 @@ export const tr = {
     allergens: 'Alerjenler',
     noDescription: 'Açıklama mevcut değil',
     welcome: 'Hoş Geldin',
-    readyForAdventure: 'Macera seni bekliyor!',
+    readyForAdventure: 'Avustur Tatile Doyurur!',
     activeTours: 'Aktif Tur',
     enjoyTrip: 'Keşfet',
     myTours: 'Turlarım',
