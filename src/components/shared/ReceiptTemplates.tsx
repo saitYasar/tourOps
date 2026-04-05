@@ -73,6 +73,16 @@ function getShortTableLabel(choice: AgencyStopChoicesDto): string {
   return match ? match[1] : name;
 }
 
+/** Extract short seat label: "Sandalye-3" / "sandalye 3" → "3", otherwise return full label */
+function getShortSeatLabel(choice: AgencyStopChoicesDto): string {
+  if (!choice.resourceChoice || !Array.isArray(choice.resourceChoice)) return '';
+  const seat = choice.resourceChoice.find((item: ClientResourceChoiceItemDto) => item.resourceTypeCode === 'seat');
+  if (!seat) return '';
+  const name = seat.resourceName || '';
+  const match = name.match(/(\d+)/);
+  return match ? match[1] : name;
+}
+
 // ============================================
 // Compact Receipt (80mm thermal)
 // ============================================
@@ -156,6 +166,7 @@ export function DetailedListReceipt({
     const firstName = (choice.client?.firstName || '').toUpperCase();
     const lastName = (choice.client?.lastName || '').toUpperCase();
     const tableLabel = getShortTableLabel(choice);
+    const seatLabel = getShortSeatLabel(choice);
     const categoryMap = new Map<string, string>();
     const categoryTitles = new Map<string, string[]>();
     const notes: string[] = [];
@@ -170,7 +181,7 @@ export function DetailedListReceipt({
       categoryTitles.set(catName, titles);
       if (sc.note) notes.push(`${sc.service?.title || `#${sc.serviceId}`}: ${sc.note}`);
     }
-    return { idx: idx + 1, firstName, lastName, tableLabel, categoryMap, categoryTitles, notes };
+    return { idx: idx + 1, firstName, lastName, tableLabel, seatLabel, categoryMap, categoryTitles, notes };
   });
 
   const globalFoodColorMap = new Map<string, string>();
@@ -210,8 +221,8 @@ export function DetailedListReceipt({
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
         <thead>
           <tr>
-            <th style={{ border: '1px solid #999', padding: '6px 8px', textAlign: 'center', backgroundColor: '#e2e8f0', minWidth: 36, fontWeight: 'bold' }}>{t.guests.rowNo}</th>
             <th style={{ border: '1px solid #999', padding: '6px 8px', textAlign: 'center', backgroundColor: '#e2e8f0', minWidth: 36, fontWeight: 'bold' }}>{t.guests.tableNo}</th>
+            <th style={{ border: '1px solid #999', padding: '6px 8px', textAlign: 'center', backgroundColor: '#e2e8f0', minWidth: 36, fontWeight: 'bold' }}>{t.guests.seatNo}</th>
             <th style={{ border: '1px solid #999', padding: '6px 8px', textAlign: 'left', backgroundColor: '#e2e8f0', minWidth: 80, fontWeight: 'bold' }}>{t.guests.lastName}</th>
             <th style={{ border: '1px solid #999', padding: '6px 8px', textAlign: 'left', backgroundColor: '#e2e8f0', minWidth: 80, fontWeight: 'bold' }}>{t.guests.firstName}</th>
             {categoryNames.map((cat) => (
@@ -225,8 +236,8 @@ export function DetailedListReceipt({
         <tbody>
           {rows.map((row) => (
             <tr key={row.idx}>
-              <td style={{ border: '1px solid #ccc', padding: '5px 8px', textAlign: 'center' }}>{row.idx}</td>
               <td style={{ border: '1px solid #ccc', padding: '5px 8px', textAlign: 'center', fontWeight: 500 }}>{row.tableLabel}</td>
+              <td style={{ border: '1px solid #ccc', padding: '5px 8px', textAlign: 'center' }}>{row.seatLabel}</td>
               <td style={{ border: '1px solid #ccc', padding: '5px 8px', fontWeight: 600 }}>{row.lastName}</td>
               <td style={{ border: '1px solid #ccc', padding: '5px 8px' }}>{row.firstName}</td>
               {categoryNames.map((cat) => {
@@ -630,14 +641,14 @@ export function exportReceiptExcel(
     }
   }
   const categoryNames = Array.from(categoryOrderMap.keys());
-  const detailHeaders = [t.guests.rowNo, t.guests.tableNo, t.guests.lastName, t.guests.firstName, ...categoryNames, t.guests.note];
+  const detailHeaders = [t.guests.tableNo, t.guests.seatNo, t.guests.lastName, t.guests.firstName, ...categoryNames, t.guests.note];
 
   type CellInfo = { v: string | number; colors?: string[] };
   const detailData: CellInfo[][] = [];
   sortedChoices.forEach((choice, idx) => {
     const row: CellInfo[] = [
-      { v: idx + 1 },
       { v: getShortTableLabel(choice) },
+      { v: getShortSeatLabel(choice) },
       { v: (choice.client?.lastName || '').toUpperCase() },
       { v: (choice.client?.firstName || '').toUpperCase() },
     ];

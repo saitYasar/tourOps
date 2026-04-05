@@ -18,6 +18,7 @@ function resolveImageUrl(url?: string | null): string | null {
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DateTimeInput } from '@/components/ui/datetime-input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
@@ -555,9 +556,8 @@ export default function ToursPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="startDate">{t.tours.startDate} *</Label>
-                  <Input
+                  <DateTimeInput
                     id="startDate"
-                    type="datetime-local"
                     value={formData.startDate}
                     onChange={(e) => {
                       setFormData((prev) => ({ ...prev, startDate: e.target.value }));
@@ -569,9 +569,8 @@ export default function ToursPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="endDate">{t.tours.endDate} *</Label>
-                  <Input
+                  <DateTimeInput
                     id="endDate"
-                    type="datetime-local"
                     value={formData.endDate}
                     onChange={(e) => {
                       setFormData((prev) => ({ ...prev, endDate: e.target.value }));
