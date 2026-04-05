@@ -700,6 +700,8 @@ export const tr = {
     menuSaveError: 'Menü seçimi kaydedilemedi',
     spendLimitExceeded: 'Sadece 1 adet seçim yapabilirsiniz',
     spendLimit: 'Üst Limit',
+    stockLimitReached: 'Bu hizmet için stok limiti doldu',
+    stockDepleted: 'Stok Tükendi',
     noteSaveError: 'Not kaydedilemedi',
     changeTable: 'Yer Değiştir',
     viewSeat: 'Yerimi Gör',

@@ -700,6 +700,8 @@ export const en = {
     menuSaveError: 'Failed to save menu selection',
     spendLimitExceeded: 'You can only select 1 item',
     spendLimit: 'Spend Limit',
+    stockLimitReached: 'Stock limit reached for this service',
+    stockDepleted: 'Out of Stock',
     noteSaveError: 'Failed to save note',
     changeTable:'Change Seat',
     viewSeat: 'View My Seat',

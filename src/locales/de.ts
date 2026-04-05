@@ -700,6 +700,8 @@ export const de = {
     menuSaveError: 'Menüauswahl konnte nicht gespeichert werden',
     spendLimitExceeded: 'Sie können nur 1 Auswahl treffen',
     spendLimit: 'Ausgabenlimit',
+    stockLimitReached: 'Bestandslimit für diesen Service erreicht',
+    stockDepleted: 'Ausverkauft',
     noteSaveError: 'Notiz konnte nicht gespeichert werden',
     changeTable: 'Platz ändern',
     viewSeat: 'Meinen Platz ansehen',
