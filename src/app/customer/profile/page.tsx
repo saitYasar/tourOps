@@ -32,6 +32,8 @@ export default function CustomerProfilePage() {
   const [phoneCountryCode, setPhoneCountryCode] = useState('');
   const [phone, setPhone] = useState('');
   const [gender, setGender] = useState<'m' | 'f'>('m');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [profilePhoto, setProfilePhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
@@ -49,14 +51,29 @@ export default function CustomerProfilePage() {
     setPhoneCountryCode(profile.phoneCountryCode ? String(profile.phoneCountryCode) : '90');
     setPhone(profile.phone || '');
     setGender(profile.gender === 'f' ? 'f' : 'm');
+    setUsername(profile.username || '');
     if (profile.profilePhoto) {
       setPhotoPreview(profile.profilePhoto);
     }
     setInitialized(true);
   }
 
+  const validateForm = (): string | null => {
+    if (username.length < 3 || username.length > 50) {
+      return t.invitations.usernameMinLength;
+    }
+    if (password && (password.length < 6 || password.length > 100)) {
+      return t.invitations.passwordMinLength;
+    }
+    return null;
+  };
+
   const updateMutation = useMutation({
     mutationFn: async () => {
+      const validationError = validateForm();
+      if (validationError) {
+        throw new Error(validationError);
+      }
       const data: UpdateClientProfileDto = {};
       if (firstName !== profile?.firstName) data.firstName = firstName;
       if (lastName !== profile?.lastName) data.lastName = lastName;
@@ -69,10 +86,17 @@ export default function CustomerProfilePage() {
       if (gender !== (profile?.gender || 'm')) {
         data.gender = gender;
       }
-      return apiClient.updateClientProfile(data, profilePhoto || undefined);
+      if (username !== profile?.username) {
+        data.username = username;
+      }
+      if (password) {
+        data.password = password;
+      }
+      return apiClient.updateClientProfile(data, profilePhoto || undefined, apiLang);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['client-profile'] });
+      setPassword('');
       setSuccessMsg(t.common.success);
       setTimeout(() => setSuccessMsg(''), 3000);
     },
@@ -265,15 +289,36 @@ export default function CustomerProfilePage() {
                 </div>
               </div>
 
-              {/* Username (read only) */}
+              {/* Username */}
               <div className="space-y-2">
-                <Label className="text-sm font-medium text-slate-700">
+                <Label htmlFor="username" className="text-sm font-medium text-slate-700">
                   {t.auth.username}
                 </Label>
                 <Input
-                  value={profile.username}
-                  disabled
-                  className="h-11 rounded-xl bg-slate-50"
+                  id="username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder={t.auth.username}
+                  className="h-11 rounded-xl"
+                  minLength={3}
+                  maxLength={50}
+                />
+              </div>
+
+              {/* Password */}
+              <div className="space-y-2">
+                <Label htmlFor="password" className="text-sm font-medium text-slate-700">
+                  {t.auth.password}
+                </Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••"
+                  className="h-11 rounded-xl"
+                  minLength={6}
+                  maxLength={100}
                 />
               </div>
 

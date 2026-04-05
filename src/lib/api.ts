@@ -874,6 +874,8 @@ export interface UpdateClientProfileDto {
   phoneCountryCode?: number;
   phone?: number;
   gender?: 'm' | 'f';
+  username?: string;
+  password?: string;
 }
 
 export interface ClientTourDto {
