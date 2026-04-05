@@ -164,6 +164,36 @@ function PreviewServiceList({
             {s.description && (
               <p className="text-[11px] text-stone-400 mt-1 line-clamp-2 leading-snug">{s.description}</p>
             )}
+            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+              <span className={`inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full ${
+                s.dailyStock === 0
+                  ? 'bg-red-100 text-red-600'
+                  : s.dailyStock != null
+                  ? 'bg-blue-50 text-blue-600'
+                  : 'bg-emerald-50 text-emerald-600'
+              }`}>
+                {t.menu.stockLabel}{' '}
+                {s.dailyStock == null
+                  ? t.menu.stockUnlimited
+                  : s.dailyStock === 0
+                  ? t.menu.stockOut
+                  : `${s.dailyStock} ${t.menu.stockUnit}`}
+              </span>
+              <span className={`inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full ${
+                s.remainingStock === 0
+                  ? 'bg-red-100 text-red-600'
+                  : s.remainingStock != null
+                  ? 'bg-amber-100 text-amber-700'
+                  : 'bg-emerald-50 text-emerald-600'
+              }`}>
+                {t.menu.remainingStockLabel}{' '}
+                {s.remainingStock == null
+                  ? t.menu.stockUnlimited
+                  : s.remainingStock === 0
+                  ? t.menu.stockOut
+                  : `${s.remainingStock} ${t.menu.stockUnit}`}
+              </span>
+            </div>
           </div>
         </div>
       ))}
@@ -970,7 +1000,7 @@ export default function MenuPage() {
                                       {Number(service.basePrice).toFixed(2)} {getCurrencySymbol(service.currency)}
                                     </span>
                                   </div>
-                                  <div className="mt-1">
+                                  <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                                     <span className={`inline-flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full ${
                                       service.dailyStock === 0
                                         ? 'bg-red-100 text-red-700'
@@ -985,6 +1015,20 @@ export default function MenuPage() {
                                         : service.dailyStock === 0
                                         ? t.menu.stockOut
                                         : `${service.dailyStock} ${t.menu.stockUnit}`}
+                                    </span>
+                                    <span className={`inline-flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full ${
+                                      service.remainingStock === 0
+                                        ? 'bg-red-100 text-red-700'
+                                        : service.remainingStock != null
+                                        ? 'bg-amber-100 text-amber-700'
+                                        : 'bg-green-100 text-green-700'
+                                    }`}>
+                                      {t.menu.remainingStockLabel}{' '}
+                                      {service.remainingStock == null
+                                        ? t.menu.stockUnlimited
+                                        : service.remainingStock === 0
+                                        ? t.menu.stockOut
+                                        : `${service.remainingStock} ${t.menu.stockUnit}`}
                                     </span>
                                   </div>
                                 </div>

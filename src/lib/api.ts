@@ -580,6 +580,7 @@ export interface ServiceDto {
   currency?: string;
   estimatedDurationMinutes?: number | null;
   dailyStock?: number | null;
+  remainingStock?: number | null;
   active: boolean;
   metadata?: unknown;
   createdAt?: string;
@@ -987,6 +988,7 @@ export interface ClientStopMenuServiceDto {
   serviceCategoryId?: number;
   serviceCategoryName?: string;
   dailyStock?: number | null;
+  remainingStock?: number | null;
   active?: boolean;
 }
 
@@ -2967,6 +2969,9 @@ class ApiClient {
     if (data.estimatedDurationMinutes !== undefined) {
       formData.append('estimatedDurationMinutes', String(data.estimatedDurationMinutes));
     }
+    if (data.dailyStock !== undefined) {
+      formData.append('dailyStock', data.dailyStock === null ? 'null' : String(data.dailyStock));
+    }
     if (image) formData.append('image', image);
 
     const url = `${this.baseUrl}/services`;
@@ -2999,6 +3004,9 @@ class ApiClient {
     }
     if (data.serviceCategoryId !== undefined) {
       formData.append('serviceCategoryId', String(data.serviceCategoryId));
+    }
+    if (data.dailyStock !== undefined) {
+      formData.append('dailyStock', data.dailyStock === null ? 'null' : String(data.dailyStock));
     }
     if (image) formData.append('image', image);
 
@@ -3295,6 +3303,9 @@ class ApiClient {
     if (data.estimatedDurationMinutes !== undefined) {
       formData.append('estimatedDurationMinutes', String(data.estimatedDurationMinutes));
     }
+    if (data.dailyStock !== undefined) {
+      formData.append('dailyStock', data.dailyStock === null ? 'null' : String(data.dailyStock));
+    }
     if (image) formData.append('image', image);
 
     const url = `${this.baseUrl}/admin/organizations/${orgId}/services`;
@@ -3334,6 +3345,9 @@ class ApiClient {
     }
     if (data.serviceCategoryId !== undefined) {
       formData.append('serviceCategoryId', String(data.serviceCategoryId));
+    }
+    if (data.dailyStock !== undefined) {
+      formData.append('dailyStock', data.dailyStock === null ? 'null' : String(data.dailyStock));
     }
     if (image) formData.append('image', image);
 

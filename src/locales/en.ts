@@ -593,6 +593,7 @@ export const en = {
     stockUnlimited: 'Unlimited',
     stockOut: 'Out of Stock',
     stockLabel: 'Stock:',
+    remainingStockLabel: 'Remaining:',
     stockUnit: 'pcs',
     minutes: 'min',
   },

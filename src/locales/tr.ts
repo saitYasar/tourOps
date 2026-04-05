@@ -593,6 +593,7 @@ export const tr = {
     stockUnlimited: 'Sınırsız',
     stockOut: 'Stok Yok',
     stockLabel: 'Stok:',
+    remainingStockLabel: 'Kalan:',
     stockUnit: 'adet',
     minutes: 'dk',
   },
