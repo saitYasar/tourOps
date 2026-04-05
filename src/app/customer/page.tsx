@@ -708,11 +708,27 @@ function ProfileView({
   );
   const [phone, setPhone] = useState(profile.phone || '');
   const [gender, setGender] = useState<'m' | 'f'>(profile.gender === 'f' ? 'f' : 'm');
+  const [username, setUsername] = useState(profile.username || '');
+  const [password, setPassword] = useState('');
   const [profilePhoto, setProfilePhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(profile.profilePhoto || null);
 
+  const validateForm = (): string | null => {
+    if (username.length < 3 || username.length > 50) {
+      return t.invitations.usernameMinLength;
+    }
+    if (password && (password.length < 6 || password.length > 100)) {
+      return t.invitations.passwordMinLength;
+    }
+    return null;
+  };
+
   const updateMutation = useMutation({
     mutationFn: async () => {
+      const validationError = validateForm();
+      if (validationError) {
+        throw new Error(validationError);
+      }
       const data: UpdateClientProfileDto = {};
       if (firstName !== profile.firstName) data.firstName = firstName;
       if (lastName !== profile.lastName) data.lastName = lastName;
@@ -725,10 +741,17 @@ function ProfileView({
       if (gender !== (profile.gender || 'm')) {
         data.gender = gender;
       }
+      if (username !== profile.username) {
+        data.username = username;
+      }
+      if (password) {
+        data.password = password;
+      }
       return apiClient.updateClientProfile(data, profilePhoto || undefined, apiLang);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['client-profile'] });
+      setPassword('');
       toast.success(t.customer.profileUpdated);
     },
     onError: (error: Error) => {
@@ -879,15 +902,36 @@ function ProfileView({
               </div>
             </div>
 
-            {/* Username (read only) */}
+            {/* Username */}
             <div className="space-y-2">
-              <Label className="text-sm font-medium text-slate-700">
+              <Label htmlFor="profileUsername" className="text-sm font-medium text-slate-700">
                 {t.auth.username}
               </Label>
               <Input
-                value={profile.username}
-                disabled
-                className="h-11 rounded-xl bg-slate-50"
+                id="profileUsername"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder={t.auth.username}
+                className="h-11 rounded-xl"
+                minLength={3}
+                maxLength={50}
+              />
+            </div>
+
+            {/* Password */}
+            <div className="space-y-2">
+              <Label htmlFor="profilePassword" className="text-sm font-medium text-slate-700">
+                {t.auth.password}
+              </Label>
+              <Input
+                id="profilePassword"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••"
+                className="h-11 rounded-xl"
+                minLength={6}
+                maxLength={100}
               />
             </div>
 
