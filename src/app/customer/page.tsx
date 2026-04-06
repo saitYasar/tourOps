@@ -37,6 +37,7 @@ import {
   type UpdateClientProfileDto,
 } from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { LanguageSwitcher } from '@/components/shared';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -50,6 +51,7 @@ const customerKeys = getAuthStorageKeys('customer');
 
 export default function CustomerDashboard() {
   const { t, locale } = useLanguage();
+  const { logout } = useAuth();
   const apiLang = locale as 'tr' | 'en' | 'de';
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'dashboard' | 'serviceRequests' | 'profile'>('dashboard');
@@ -174,8 +176,7 @@ export default function CustomerDashboard() {
   const handleLogout = () => {
     localStorage.removeItem(customerKeys.token);
     localStorage.removeItem(customerKeys.userData);
-    apiClient.logout();
-    router.replace('/login/customer');
+    logout();
   };
 
   if (profileLoading) {
