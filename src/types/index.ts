@@ -146,7 +146,7 @@ export interface MenuItem extends BaseEntity {
 }
 
 // ============================================
-// Customer (Müşteri)
+// Customer (Misafir)
 // ============================================
 export interface Customer extends BaseEntity {
   name: string;
@@ -163,7 +163,7 @@ export interface TourAssignment extends BaseEntity {
 }
 
 // ============================================
-// CustomerSelection (Müşteri Seçimi)
+// CustomerSelection (Misafir Seçimi)
 // ============================================
 export interface OrderItem {
   menuItemId: string;

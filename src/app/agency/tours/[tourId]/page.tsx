@@ -509,18 +509,18 @@ export default function TourDetailPage() {
     mutationFn: (data: CreateAgencyClientDto) => agencyApi.createClient(data),
     onSuccess: (result) => {
       if (result.success) {
-        toast.success(t.invitations?.clientCreated || 'Müşteri oluşturuldu');
+        toast.success(t.invitations?.clientCreated || 'Misafir oluşturuldu');
         queryClient.invalidateQueries({ queryKey: ['agency-clients'] });
         setIsCreateClientOpen(false);
         setCreateClientForm({ firstName: '', lastName: '', username: '', password: '' });
         setCreateClientErrors({});
         setShowCreateClientPassword(false);
       } else {
-        toast.error(result.error || t.invitations?.clientCreateFailed || 'Müşteri oluşturulamadı');
+        toast.error(result.error || t.invitations?.clientCreateFailed || 'Misafir oluşturulamadı');
       }
     },
     onError: () => {
-      toast.error(t.invitations?.clientCreateFailed || 'Müşteri oluşturulamadı');
+      toast.error(t.invitations?.clientCreateFailed || 'Misafir oluşturulamadı');
     },
   });
 
@@ -1121,7 +1121,7 @@ export default function TourDetailPage() {
                   {t.tours.registrationLinks || 'Kayıt Linkleri'}
                 </CardTitle>
                 <CardDescription>
-                  {t.tours.registrationLinksDesc || 'Müşterilerin tura veya acenteye kayıt olması için paylaşılabilir linkler'}
+                  {t.tours.registrationLinksDesc || 'Misafirlerin tura veya acenteye kayıt olması için paylaşılabilir linkler'}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -1129,7 +1129,7 @@ export default function TourDetailPage() {
                 {tour.uuid && (
                   <div className="space-y-2">
                     <Label className="text-sm font-medium">{t.tours.tourRegistrationLink || 'Tur Kayıt Linki'}</Label>
-                    <p className="text-xs text-slate-500">{t.tours.tourRegistrationLinkDesc || 'Bu linki paylaştığınızda müşteri kayıt olunca otomatik tura eklenir'}</p>
+                    <p className="text-xs text-slate-500">{t.tours.tourRegistrationLinkDesc || 'Bu linki paylaştığınızda misafir kayıt olunca otomatik tura eklenir'}</p>
                     <div className="flex items-center gap-2">
                       <Input
                         readOnly
@@ -1167,7 +1167,7 @@ export default function TourDetailPage() {
                 {agencyResult?.data?.uuid && (
                   <div className="space-y-2">
                     <Label className="text-sm font-medium">{t.tours.agencyRegistrationLink || 'Acente Kayıt Linki'}</Label>
-                    <p className="text-xs text-slate-500">{t.tours.agencyRegistrationLinkDesc || 'Bu linki paylaştığınızda müşteri kayıt olunca acentenize bağlanır'}</p>
+                    <p className="text-xs text-slate-500">{t.tours.agencyRegistrationLinkDesc || 'Bu linki paylaştığınızda misafir kayıt olunca acentenize bağlanır'}</p>
                     <div className="flex items-center gap-2">
                       <Input
                         readOnly
@@ -2374,7 +2374,7 @@ export default function TourDetailPage() {
                 <Textarea
                   value={stopForm.description}
                   onChange={(e) => setStopForm((prev) => ({ ...prev, description: e.target.value }))}
-                  placeholder="Müşterilerinizin göreceği durak açıklaması"
+                  placeholder="Misafirlerinizin göreceği durak açıklaması"
                   rows={2}
                 />
               </div>
@@ -2506,7 +2506,7 @@ export default function TourDetailPage() {
                 className="shrink-0"
               >
                 <UserPlus className="h-4 w-4 mr-1" />
-                Yeni Müşteri
+                Yeni Misafir
               </Button>
             </div>
 
@@ -2592,7 +2592,7 @@ export default function TourDetailPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <UserIcon className="h-5 w-5 text-blue-600" />
-              Yeni Müşteri Ekle
+              Yeni Misafir Ekle
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={(e) => {

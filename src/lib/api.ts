@@ -430,7 +430,7 @@ export interface ResourceDto {
   parentId: number | null;         // Üst kaynak (null = kök seviye)
   parent?: ResourceDto;            // Join ile gelen üst kaynak
   children?: ResourceDto[];        // Alt kaynaklar
-  client?: ResourceClientDto | null; // Sandalyede oturan müşteri bilgisi
+  client?: ResourceClientDto | null; // Sandalyede oturan misafir bilgisi
 
   name: string;                    // "Kat 1", "Salon A", "Masa 5"
   capacity: number;                // Kapasite (kişi sayısı)
@@ -848,7 +848,7 @@ export interface UpdateAdminUserDto {
 }
 
 // ============================================
-// Client (Müşteri) Types
+// Client (Misafir) Types
 // ============================================
 
 export interface ClientProfileDto {
@@ -1732,7 +1732,7 @@ class ApiClient {
   }
 
   // ============================================
-  // Auth - Client (Acente Müşterisi) - Username/Password Login
+  // Auth - Client (Acente Misafiri) - Username/Password Login
   // ============================================
 
   async clientLoginUsername(username: string, password: string, lang: 'tr' | 'en' | 'de' = 'tr') {
@@ -4466,7 +4466,7 @@ export const realAuthApi = {
   },
 
   // ============================================
-  // Client (Acente Müşterisi) - Username/Password Login
+  // Client (Acente Misafiri) - Username/Password Login
   // ============================================
 
   async clientLogin(username: string, password: string, lang: 'tr' | 'en' | 'de' = 'tr') {

@@ -4,7 +4,7 @@ import { HomePageContent } from '@/components/landing/HomePageContent';
 export const metadata: Metadata = {
   title: 'HerHafta - Tur Yönetiminin Dijital Merkezi',
   description:
-    'Acenteler, işletmeler ve gezginler için hepsi bir arada tur yönetim platformu. Turları planlayın, işletmelerle bağlantı kurun, müşterilerinize unutulmaz deneyimler sunun.',
+    'Acenteler, işletmeler ve gezginler için hepsi bir arada tur yönetim platformu. Turları planlayın, işletmelerle bağlantı kurun, misafirlerinize unutulmaz deneyimler sunun.',
   keywords: [
     'tur yönetimi',
     'seyahat acentesi',

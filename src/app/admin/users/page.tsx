@@ -177,7 +177,7 @@ export default function AdminUsersPage() {
                 <SelectItem value="system_admin">{(t.admin as Record<string, string>).roleSystemAdmin || 'Sistem Yöneticisi'}</SelectItem>
                 <SelectItem value="agency_user">{(t.admin as Record<string, string>).roleAgencyUser || 'Acente Kullanıcısı'}</SelectItem>
                 <SelectItem value="org_user">{(t.admin as Record<string, string>).roleOrgUser || 'İşletme Kullanıcısı'}</SelectItem>
-                <SelectItem value="client">{(t.admin as Record<string, string>).roleClient || 'Müşteri'}</SelectItem>
+                <SelectItem value="client">{(t.admin as Record<string, string>).roleClient || 'Misafir'}</SelectItem>
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v === 'all' ? '' : v); setPage(1); }}>

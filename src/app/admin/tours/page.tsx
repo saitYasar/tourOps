@@ -934,7 +934,7 @@ export default function AdminToursPage() {
                   )}
                 </TabsContent>
 
-                {/* ===== TAB: Müşteri Seçimleri ===== */}
+                {/* ===== TAB: Misafir Seçimleri ===== */}
                 <TabsContent value="choices" className="flex-1 overflow-y-auto mt-4">
                   {!tourDetail.stops?.length ? (
                     <EmptyState icon={ClipboardList} title={t.tours.customerChoices} description={t.tours.noStops} />

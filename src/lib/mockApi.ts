@@ -699,7 +699,7 @@ export const customerSelectionApi = {
       updatedAt: now,
     };
     db.customerSelections.push(selection);
-    addAuditLog(db, 'CREATE', 'customerSelection', selection.id, `Müşteri seçimi kaydedildi`);
+    addAuditLog(db, 'CREATE', 'customerSelection', selection.id, `Misafir seçimi kaydedildi`);
     saveDatabase(db);
     return simulateNetwork(selection);
   },

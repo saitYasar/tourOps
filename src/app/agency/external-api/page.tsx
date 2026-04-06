@@ -195,17 +195,17 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
                   <BookOpen className="h-5 w-5 text-slate-600" />
                 </div>
                 <div>
-                  <CardTitle>External Müşteri Kayıt API&apos;si</CardTitle>
+                  <CardTitle>External Misafir Kayıt API&apos;si</CardTitle>
                   <CardDescription>
-                    Kendi web sitenizden veya uygulamanızdan müşteri kaydı oluşturun
+                    Kendi web sitenizden veya uygulamanızdan misafir kaydı oluşturun
                   </CardDescription>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-slate-600 leading-relaxed">
-                Bu API, kendi web sitenize veya uygulamanıza entegre edebileceğiniz bir müşteri kayıt servisidir.
-                Müşterileriniz sizin platformunuz üzerinden kayıt olduğunda, otomatik olarak sistemimize kaydedilir.
+                Bu API, kendi web sitenize veya uygulamanıza entegre edebileceğiniz bir misafir kayıt servisidir.
+                Misafirleriniz sizin platformunuz üzerinden kayıt olduğunda, otomatik olarak sistemimize kaydedilir.
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -264,19 +264,19 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
                         <td className="px-4 py-2.5"><code className="text-sm bg-slate-100 px-1.5 py-0.5 rounded">firstName</code></td>
                         <td className="px-4 py-2.5 text-slate-600">string</td>
                         <td className="px-4 py-2.5"><Badge variant="destructive" className="text-xs">Evet</Badge></td>
-                        <td className="px-4 py-2.5 text-slate-600">Müşteri adı</td>
+                        <td className="px-4 py-2.5 text-slate-600">Misafir adı</td>
                       </tr>
                       <tr className="border-b">
                         <td className="px-4 py-2.5"><code className="text-sm bg-slate-100 px-1.5 py-0.5 rounded">lastName</code></td>
                         <td className="px-4 py-2.5 text-slate-600">string</td>
                         <td className="px-4 py-2.5"><Badge variant="destructive" className="text-xs">Evet</Badge></td>
-                        <td className="px-4 py-2.5 text-slate-600">Müşteri soyadı</td>
+                        <td className="px-4 py-2.5 text-slate-600">Misafir soyadı</td>
                       </tr>
                       <tr>
                         <td className="px-4 py-2.5"><code className="text-sm bg-slate-100 px-1.5 py-0.5 rounded">email</code></td>
                         <td className="px-4 py-2.5 text-slate-600">string</td>
                         <td className="px-4 py-2.5"><Badge variant="destructive" className="text-xs">Evet</Badge></td>
-                        <td className="px-4 py-2.5 text-slate-600">Müşteri e-posta adresi</td>
+                        <td className="px-4 py-2.5 text-slate-600">Misafir e-posta adresi</td>
                       </tr>
                     </tbody>
                   </table>
@@ -312,7 +312,7 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
                 <div className="mt-1 space-y-2">
                   <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-lg">
                     <Badge className="bg-green-600 shrink-0">201</Badge>
-                    <span className="text-sm text-green-700">Müşteri başarıyla kaydedildi</span>
+                    <span className="text-sm text-green-700">Misafir başarıyla kaydedildi</span>
                   </div>
                   <div className="flex items-center gap-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                     <Badge className="bg-yellow-600 shrink-0">400</Badge>
@@ -377,7 +377,7 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
                   <ul className="text-sm text-amber-800 space-y-1.5 list-disc list-inside">
                     <li>UUID&apos;nizi gizli tutun; yalnızca kendi web sitenizde kullanın.</li>
                     <li>{t.agency.agencyNotActiveWarning}</li>
-                    <li>Aynı e-posta ile tekrar kayıt denendiğinde mevcut müşteri döndürülür.</li>
+                    <li>Aynı e-posta ile tekrar kayıt denendiğinde mevcut misafir döndürülür.</li>
                     <li>Tüm alanlar (<code>firstName</code>, <code>lastName</code>, <code>email</code>) zorunludur.</li>
                   </ul>
                 </div>

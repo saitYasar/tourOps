@@ -398,7 +398,7 @@ function generateSeedData(): Database {
   });
 
   // ============================================
-  // Customers (15 müşteri)
+  // Customers (15 misafir)
   // ============================================
   const customerNames = [
     'Ahmet Yilmaz', 'Mehmet Demir', 'Ayse Kaya', 'Fatma Celik', 'Ali Ozturk',
@@ -416,7 +416,7 @@ function generateSeedData(): Database {
   }));
 
   // ============================================
-  // TourAssignments (her tura 3-5 müşteri)
+  // TourAssignments (her tura 3-5 misafir)
   // ============================================
   const tourAssignments: TourAssignment[] = [];
   tours.forEach((tour) => {

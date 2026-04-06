@@ -977,8 +977,8 @@ export default function AgencyClientsPage() {
                     ws['!cols'] = [{ wch: 8 }, { wch: 20 }, { wch: 20 }];
                     ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 2 } }];
                     const wb = XLSX.utils.book_new();
-                    XLSX.utils.book_append_sheet(wb, ws, 'Müşteriler');
-                    XLSX.writeFile(wb, 'musteri_sablonu.xlsx');
+                    XLSX.utils.book_append_sheet(wb, ws, 'Misafirler');
+                    XLSX.writeFile(wb, 'misafir_sablonu.xlsx');
                   }}
                   className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium"
                 >

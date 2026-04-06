@@ -20,7 +20,7 @@ Tüm kullanıcıya görünen metinlerde (UI, metadata, SEO, placeholder, açıkl
 - `ucretsiz` → `ücretsiz`
 - `dijitallestirin` → `dijitalleştirin`
 - `giris` → `giriş`
-- `musteri` → `müşteri`
+- `musteri` → `misafir` (UI'da her yerde "misafir" kullanılmaktadır, "müşteri" kullanılmaz)
 
 Bu kural metadata, SEO title/description, hardcoded string ve locale dosyaları dahil tüm Türkçe metinler için geçerlidir.
 
