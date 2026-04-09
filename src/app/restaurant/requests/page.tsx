@@ -28,9 +28,9 @@ import {
   DialogFooter,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { DateTimeInput } from '@/components/ui/datetime-input';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { LoadingState, EmptyState, ErrorState, RequestStatusBadge } from '@/components/shared';
 
@@ -70,8 +70,8 @@ export default function RestaurantRequestsPage() {
 
   // Mutation: Approve
   const approveMutation = useMutation({
-    mutationFn: ({ id, choiceDeadline: deadline }: { id: number; choiceDeadline?: number }) =>
-      preReservationOrgApi.approve(id, deadline, apiLang),
+    mutationFn: ({ id, choiceDeadlineTime: cdt }: { id: number; choiceDeadlineTime?: string }) =>
+      preReservationOrgApi.approve(id, cdt, apiLang),
     onSuccess: (result) => {
       if (!result.success) {
         toast.error(result.error || t.common.error);
@@ -129,8 +129,8 @@ export default function RestaurantRequestsPage() {
     if (!selectedRequest || !actionType) return;
 
     if (actionType === 'approve') {
-      const deadline = choiceDeadline ? Number(choiceDeadline) : undefined;
-      approveMutation.mutate({ id: selectedRequest.id, choiceDeadline: deadline });
+      const cdt = choiceDeadline || undefined;
+      approveMutation.mutate({ id: selectedRequest.id, choiceDeadlineTime: cdt });
     } else {
       if (!responseNote.trim()) {
         toast.error(t.requests.rejectionReasonRequired);
@@ -403,22 +403,14 @@ export default function RestaurantRequestsPage() {
               {/* Choice Deadline - only for approve */}
               {actionType === 'approve' && (
                 <div className="space-y-2">
-                  <Label htmlFor="choiceDeadline" className="flex items-center gap-1.5">
+                  <Label className="flex items-center gap-1.5">
                     <Timer className="h-3.5 w-3.5" />
                     {t.requests.choiceDeadline}
                   </Label>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      id="choiceDeadline"
-                      type="number"
-                      min={1}
-                      value={choiceDeadline}
-                      onChange={(e) => setChoiceDeadline(e.target.value)}
-                      placeholder="24"
-                      className="w-24"
-                    />
-                    <span className="text-sm text-slate-500">{t.requests.choiceDeadlineUnit}</span>
-                  </div>
+                  <DateTimeInput
+                    value={choiceDeadline}
+                    onChange={(e) => setChoiceDeadline(e.target.value)}
+                  />
                   <p className="text-xs text-slate-400">{t.requests.choiceDeadlineDesc}</p>
                 </div>
               )}

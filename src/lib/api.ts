@@ -953,6 +953,7 @@ export interface ClientTourStopDto {
   preReservationStatus: string | null;
   showPriceToCustomer: boolean;
   choiceDeadline?: number | null;
+  choiceDeadlineTime?: string | null;
   choicesStatus?: string | null;
   maxSpendLimit?: number | null;
   organization: {
@@ -1294,6 +1295,7 @@ export interface ApiTourStopDto {
   showPriceToCustomer?: boolean;
   maxSpendLimit?: number | null;
   choiceDeadline?: number | null;
+  choiceDeadlineTime?: string | null;
   preReservationStatus?: 'pending' | 'approved' | 'rejected' | null;
   choicesStatus?: 'in_progress' | 'submitted' | 'approved' | 'rejected' | 'revision_requested' | null;
   createdAt?: string;
@@ -1321,6 +1323,7 @@ export interface AdminTourStopDto {
   showPriceToCustomer: boolean;
   maxSpendLimit: number | null;
   choiceDeadline: number | null;
+  choiceDeadlineTime: string | null;
   agencyCommissionRate: number;
   choicesStatus: 'in_progress' | 'submitted' | 'approved' | 'rejected';
   organizationChoicesNote: string | null;
@@ -1424,12 +1427,18 @@ export interface AdminTourStopsFilters {
 export interface ChoiceDeadlineRemainingDto {
   tourStopId: number;
   scheduledEndTime: string;
-  choiceDeadline: number;
-  deadlineTime: string;
+  choiceDeadline?: number;
+  deadlineTime?: string;
+  choiceDeadlineTime?: string;
   remainingDays: number;
   remainingHours: number;
   remainingMinutes: number;
   isExpired: boolean;
+  timeFromDeadlineToEnd?: {
+    days: number;
+    hours: number;
+    minutes: number;
+  };
 }
 
 export interface CreateTourStopPayload {
@@ -1440,6 +1449,7 @@ export interface CreateTourStopPayload {
   scheduledEndTime: string;
   showPriceToCustomer?: boolean;
   maxSpendLimit?: number | null;
+  choiceDeadlineTime?: string;
 }
 
 export interface UpdateTourStopPayload {
@@ -3067,10 +3077,10 @@ class ApiClient {
     return this.request<any>(`/organization/pre-reservations/${id}`, { method: 'GET' }, lang);
   }
 
-  async approveOrgPreReservation(id: number, choiceDeadline?: number, lang: 'tr' | 'en' | 'de' = 'tr') {
+  async approveOrgPreReservation(id: number, choiceDeadlineTime?: string, lang: 'tr' | 'en' | 'de' = 'tr') {
     const body: Record<string, unknown> = {};
-    if (choiceDeadline !== undefined && choiceDeadline !== null) {
-      body.choiceDeadline = choiceDeadline;
+    if (choiceDeadlineTime) {
+      body.choiceDeadlineTime = choiceDeadlineTime;
     }
     return this.request<any>(`/organization/pre-reservations/${id}/approve`, {
       method: 'PUT',
@@ -3937,9 +3947,14 @@ class ApiClient {
     }, lang);
   }
 
-  async approveAdminTourStop(stopId: number, lang: 'tr' | 'en' | 'de' = 'tr') {
+  async approveAdminTourStop(stopId: number, choiceDeadlineTime?: string, lang: 'tr' | 'en' | 'de' = 'tr') {
+    const body: Record<string, unknown> = {};
+    if (choiceDeadlineTime) {
+      body.choiceDeadlineTime = choiceDeadlineTime;
+    }
     return this.request<{ message: string }>(`/admin/tour-stops/${stopId}/approve`, {
       method: 'PUT',
+      ...(Object.keys(body).length > 0 ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}),
     }, lang);
   }
 
@@ -6117,9 +6132,9 @@ export const adminApi = {
     }
   },
 
-  async approveTourStop(stopId: number, lang: 'tr' | 'en' | 'de' = 'tr') {
+  async approveTourStop(stopId: number, choiceDeadlineTime?: string, lang: 'tr' | 'en' | 'de' = 'tr') {
     try {
-      const response = await apiClient.approveAdminTourStop(stopId, lang);
+      const response = await apiClient.approveAdminTourStop(stopId, choiceDeadlineTime, lang);
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
@@ -6613,6 +6628,7 @@ export interface PreReservationDto {
   scheduledStartTime?: string | null;
   scheduledEndTime?: string | null;
   choiceDeadline?: number | null;
+  choiceDeadlineTime?: string | null;
   agencyCommissionRate?: number | null;
   createdAt: string;
   updatedAt: string;
@@ -6652,9 +6668,9 @@ export const preReservationOrgApi = {
     }
   },
 
-  async approve(id: number, choiceDeadline?: number, lang: 'tr' | 'en' | 'de' = 'tr'): Promise<{ success: boolean; error?: string }> {
+  async approve(id: number, choiceDeadlineTime?: string, lang: 'tr' | 'en' | 'de' = 'tr'): Promise<{ success: boolean; error?: string }> {
     try {
-      await apiClient.approveOrgPreReservation(id, choiceDeadline, lang);
+      await apiClient.approveOrgPreReservation(id, choiceDeadlineTime, lang);
       return { success: true };
     } catch (error) {
       return { success: false, error: (error as Error).message };

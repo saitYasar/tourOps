@@ -1338,6 +1338,13 @@ export default function TourDetailPage() {
                                   </p>
                                 );
                               })()}
+                              <ChoiceDeadlineCountdown
+                                tourStopId={stop.id}
+                                compact
+                                choiceDeadlineTime={stop.choiceDeadlineTime}
+                                scheduledEndTime={stop.scheduledEndTime}
+                                choiceDeadlineHours={stop.choiceDeadline}
+                              />
                             </div>
                             <div className="flex items-center gap-0.5 flex-shrink-0">
                               <Tooltip>
@@ -1611,6 +1618,7 @@ export default function TourDetailPage() {
                               <ChoiceDeadlineCountdown
                                 tourStopId={stop.id}
                                 compact
+                                choiceDeadlineTime={stop.choiceDeadlineTime}
                                 scheduledEndTime={stop.scheduledEndTime}
                                 choiceDeadlineHours={stop.choiceDeadline}
                               />

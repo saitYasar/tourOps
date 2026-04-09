@@ -1100,7 +1100,7 @@ export default function AgencyClientsPage() {
 
       {/* Add to Tour Dialog */}
       <Dialog open={!!addToTourTarget} onOpenChange={(open) => { if (!open) { setAddToTourTarget(null); setSelectedTourId(null); setTourSearch(''); } }}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Navigation className="h-5 w-5 text-blue-600" />
@@ -1137,7 +1137,7 @@ export default function AgencyClientsPage() {
                 <p className="text-sm text-slate-400">{t.invitations.noToursYet}</p>
               </div>
             ) : (
-              <div className="space-y-1.5 max-h-[280px] overflow-y-auto pr-1 -mr-1">
+              <div className="space-y-1.5 max-h-[40vh] sm:max-h-[280px] overflow-y-auto pr-1 -mr-1">
                 {toursList
                   .filter((tour) => !tourSearch || tour.tourName.toLowerCase().includes(tourSearch.toLowerCase()) || tour.tourCode.toLowerCase().includes(tourSearch.toLowerCase()))
                   .map((tour) => {

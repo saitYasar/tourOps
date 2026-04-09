@@ -653,6 +653,10 @@ export default function CustomerTourDetailPage() {
             );
 
             const isStopExpired = (stop: ClientTourStopDto) => {
+              if (stop.choiceDeadlineTime) {
+                const stripped = stop.choiceDeadlineTime.replace(/[Zz]$/, '').replace(/[+-]\d{2}:\d{2}$/, '');
+                return Date.now() > new Date(stripped).getTime();
+              }
               if (!stop.scheduledEndTime) return false;
               const stripped = stop.scheduledEndTime.replace(/[Zz]$/, '').replace(/[+-]\d{2}:\d{2}$/, '');
               const hours = stop.choiceDeadline ?? 0;
@@ -786,6 +790,7 @@ export default function CustomerTourDetailPage() {
                             <ChoiceDeadlineCountdown
                               tourStopId={stop.id}
                               compact
+                              choiceDeadlineTime={stop.choiceDeadlineTime}
                               scheduledEndTime={stop.scheduledEndTime}
                               choiceDeadlineHours={stop.choiceDeadline}
                             />

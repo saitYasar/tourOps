@@ -736,7 +736,7 @@ export default function AdminRequestsPage() {
                           )}
                           <DetailRow label={t.admin.showPriceToCustomer} value={stop.showPriceToCustomer ? t.admin.yes : t.admin.no} />
                           <DetailRow label={t.admin.maxSpendLimit} value={stop.maxSpendLimit != null ? formatCurrency(stop.maxSpendLimit, fs.currency) : t.admin.notSpecified} icon={DollarSign} />
-                          <DetailRow label={t.admin.choiceDeadlineLabel} value={stop.choiceDeadline != null ? `${stop.choiceDeadline} ${t.requests.choiceDeadlineUnit}` : t.admin.notSpecified} icon={Clock} />
+                          <DetailRow label={t.admin.choiceDeadlineLabel} value={stop.choiceDeadlineTime ? formatDateTime(stop.choiceDeadlineTime) : stop.choiceDeadline != null ? `${stop.choiceDeadline} ${t.requests.choiceDeadlineUnit}` : t.admin.notSpecified} icon={Clock} />
                           <DetailRow label={t.admin.commissionRate} value={`%${stop.agencyCommissionRate}`} icon={DollarSign} />
                           {stop.choicesSubmittedAt && (
                             <DetailRow label={t.admin.choicesSubmittedAt} value={formatDateTime(stop.choicesSubmittedAt)} icon={Calendar} />

@@ -9,7 +9,9 @@ interface ChoiceDeadlineCountdownProps {
   tourStopId: number | null | undefined;
   enabled?: boolean;
   compact?: boolean;
-  /** Provide stop data directly — skips API call, computes deadline client-side */
+  /** Direct deadline datetime — skips API call, computes countdown client-side */
+  choiceDeadlineTime?: string | null;
+  /** Legacy: provide stop data directly — skips API call, computes deadline client-side */
   scheduledEndTime?: string | null;
   choiceDeadlineHours?: number | null;
 }
@@ -48,6 +50,7 @@ export function ChoiceDeadlineCountdown({
   tourStopId,
   enabled = true,
   compact = false,
+  choiceDeadlineTime,
   scheduledEndTime,
   choiceDeadlineHours,
 }: ChoiceDeadlineCountdownProps) {
@@ -55,14 +58,17 @@ export function ChoiceDeadlineCountdown({
   const tours = t.tours as Record<string, string>;
   const label = tours.lastSelectionTime || 'Son seçim saati';
 
-  // Compute deadline from props if provided (default: scheduledEndTime itself)
-  // Strip timezone suffix so the DB value is treated as local time
+  // Compute deadline: prefer choiceDeadlineTime, fall back to legacy hours-based calculation
   const localDeadlineMs = useMemo(() => {
+    if (choiceDeadlineTime) {
+      const stripped = choiceDeadlineTime.replace(/[Zz]$/, '').replace(/[+-]\d{2}:\d{2}$/, '');
+      return new Date(stripped).getTime();
+    }
     if (!scheduledEndTime) return null;
     const stripped = scheduledEndTime.replace(/[Zz]$/, '').replace(/[+-]\d{2}:\d{2}$/, '');
     const hours = choiceDeadlineHours ?? 0;
     return new Date(stripped).getTime() - hours * 3600000;
-  }, [scheduledEndTime, choiceDeadlineHours]);
+  }, [choiceDeadlineTime, scheduledEndTime, choiceDeadlineHours]);
 
   // Use API hook only when no local data available
   const useApi = localDeadlineMs === null;

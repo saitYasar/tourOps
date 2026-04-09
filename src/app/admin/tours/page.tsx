@@ -1134,7 +1134,7 @@ export default function AdminToursPage() {
                                     );
                                   })()}
                                   {stop.preReservationStatus === 'approved' && stop.choicesStatus !== 'approved' && (
-                                    <ChoiceDeadlineCountdown tourStopId={stop.id} compact />
+                                    <ChoiceDeadlineCountdown tourStopId={stop.id} compact choiceDeadlineTime={stop.choiceDeadlineTime} scheduledEndTime={stop.scheduledEndTime} choiceDeadlineHours={stop.choiceDeadline} />
                                   )}
                                 </div>
                               </button>
@@ -1273,6 +1273,7 @@ export default function AdminToursPage() {
                                   {selectedStop?.preReservationStatus === 'approved' && selectedStop?.choicesStatus !== 'approved' && (
                                     <ChoiceDeadlineCountdown
                                       tourStopId={choicesStopId}
+                                      choiceDeadlineTime={selectedStop.choiceDeadlineTime}
                                       scheduledEndTime={selectedStop.scheduledEndTime}
                                       choiceDeadlineHours={selectedStop.choiceDeadline}
                                     />

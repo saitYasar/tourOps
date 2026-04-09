@@ -266,6 +266,7 @@ export default function RestaurantGuestsPage() {
                           <ChoiceDeadlineCountdown
                             tourStopId={res.tourStopId}
                             compact
+                            choiceDeadlineTime={res.choiceDeadlineTime}
                             scheduledEndTime={res.scheduledEndTime}
                             choiceDeadlineHours={res.choiceDeadline}
                           />
@@ -360,6 +361,7 @@ export default function RestaurantGuestsPage() {
                             <ChoiceDeadlineCountdown
                               tourStopId={selectedReservation.tourStopId}
                               compact
+                              choiceDeadlineTime={selectedReservation.choiceDeadlineTime}
                               scheduledEndTime={selectedReservation.scheduledEndTime}
                               choiceDeadlineHours={selectedReservation.choiceDeadline}
                             />
@@ -375,6 +377,7 @@ export default function RestaurantGuestsPage() {
                       <div className="mt-3 pt-3 border-t">
                         <ChoiceDeadlineCountdown
                           tourStopId={selectedReservation.tourStopId}
+                          choiceDeadlineTime={selectedReservation.choiceDeadlineTime}
                           scheduledEndTime={selectedReservation.scheduledEndTime}
                           choiceDeadlineHours={selectedReservation.choiceDeadline}
                         />

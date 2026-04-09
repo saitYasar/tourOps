@@ -202,6 +202,7 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
   const [stopDescription, setStopDescription] = useState('');
   const [stopShowPrice, setStopShowPrice] = useState(false);
   const [stopMaxSpend, setStopMaxSpend] = useState('');
+  const [stopChoiceDeadline, setStopChoiceDeadline] = useState('');
   const [deleteStopId, setDeleteStopId] = useState<number | null>(null);
   const [rejectStopId, setRejectStopId] = useState<number | null>(null);
   const [rejectReason, setRejectReason] = useState('');
@@ -404,6 +405,7 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
       setStopDescription('');
       setStopShowPrice(false);
       setStopMaxSpend('');
+      setStopChoiceDeadline('');
     },
     onError: (error) => toast.error((error as Error).message || t.admin.tourStopError),
   });
@@ -963,6 +965,13 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
                                   <Clock className="h-3 w-3" />
                                   {formatShortDateTime(stop.scheduledStartTime)} - {formatShortDateTime(stop.scheduledEndTime)}
                                 </p>
+                                <ChoiceDeadlineCountdown
+                                  tourStopId={stop.id}
+                                  compact
+                                  choiceDeadlineTime={stop.choiceDeadlineTime}
+                                  scheduledEndTime={stop.scheduledEndTime}
+                                  choiceDeadlineHours={stop.choiceDeadline}
+                                />
                                 {stop.description && (
                                   <p className="text-slate-500 text-xs mt-1">{stop.description}</p>
                                 )}
@@ -1187,7 +1196,7 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
                                     );
                                   })()}
                                   {stop.preReservationStatus === 'approved' && stop.choicesStatus !== 'approved' && (
-                                    <ChoiceDeadlineCountdown tourStopId={stop.id} compact />
+                                    <ChoiceDeadlineCountdown tourStopId={stop.id} compact choiceDeadlineTime={stop.choiceDeadlineTime} scheduledEndTime={stop.scheduledEndTime} choiceDeadlineHours={stop.choiceDeadline} />
                                   )}
                                 </div>
                               </button>
@@ -1326,6 +1335,7 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
                                   {selectedStop?.preReservationStatus === 'approved' && selectedStop?.choicesStatus !== 'approved' && (
                                     <ChoiceDeadlineCountdown
                                       tourStopId={choicesStopId}
+                                      choiceDeadlineTime={selectedStop.choiceDeadlineTime}
                                       scheduledEndTime={selectedStop.scheduledEndTime}
                                       choiceDeadlineHours={selectedStop.choiceDeadline}
                                     />
@@ -1498,7 +1508,7 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
       </Dialog>
 
       {/* Add Stop Dialog */}
-      <Dialog open={addStopOpen} onOpenChange={(open) => { if (!open) { setAddStopOpen(false); setSelectedOrgDetail(null); setAddStopOrgSearch(''); setStopStartTime(''); setStopEndTime(''); setStopDescription(''); setStopShowPrice(false); setStopMaxSpend(''); } }}>
+      <Dialog open={addStopOpen} onOpenChange={(open) => { if (!open) { setAddStopOpen(false); setSelectedOrgDetail(null); setAddStopOrgSearch(''); setStopStartTime(''); setStopEndTime(''); setStopDescription(''); setStopShowPrice(false); setStopMaxSpend(''); setStopChoiceDeadline(''); } }}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>{t.admin.addTourStop}</DialogTitle>
@@ -1655,6 +1665,19 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
                 onChange={(e) => setStopMaxSpend(e.target.value)}
               />
             </div>
+
+            {/* Choice deadline */}
+            <Separator />
+            <div className="space-y-2">
+              <Label className="font-semibold">{t.requests.choiceDeadline}</Label>
+              <p className="text-xs text-slate-500">{t.requests.choiceDeadlineDesc}</p>
+              <DateTimeInput
+                value={stopChoiceDeadline}
+                min={stopStartTime || undefined}
+                max={stopEndTime || undefined}
+                onChange={(e) => setStopChoiceDeadline(e.target.value)}
+              />
+            </div>
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
@@ -1672,6 +1695,7 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
                   scheduledEndTime: new Date(stopEndTime).toISOString(),
                   showPriceToCustomer: stopShowPrice,
                   maxSpendLimit: stopMaxSpend ? Number(stopMaxSpend) : undefined,
+                  choiceDeadlineTime: stopChoiceDeadline ? new Date(stopChoiceDeadline).toISOString() : undefined,
                 });
               }}
             >
