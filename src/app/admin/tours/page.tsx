@@ -360,8 +360,8 @@ export default function AdminToursPage() {
     addStopMutation.mutate({
       tourId: selectedTourId,
       organizationId: selectedOrgDetail.id,
-      scheduledStartTime: new Date(stopStartTime).toISOString(),
-      scheduledEndTime: new Date(stopEndTime).toISOString(),
+      scheduledStartTime: stopStartTime,
+      scheduledEndTime: stopEndTime,
       showPriceToCustomer: stopShowPrice,
       maxSpendLimit: stopMaxSpend ? Number(stopMaxSpend) : null,
     });

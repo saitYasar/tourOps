@@ -1691,11 +1691,11 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
                   tourId: selectedTourId!,
                   organizationId: selectedOrgDetail!.id,
                   description: stopDescription || undefined,
-                  scheduledStartTime: new Date(stopStartTime).toISOString(),
-                  scheduledEndTime: new Date(stopEndTime).toISOString(),
+                  scheduledStartTime: stopStartTime,
+                  scheduledEndTime: stopEndTime,
                   showPriceToCustomer: stopShowPrice,
                   maxSpendLimit: stopMaxSpend ? Number(stopMaxSpend) : undefined,
-                  choiceDeadlineTime: stopChoiceDeadline ? new Date(stopChoiceDeadline).toISOString() : undefined,
+                  choiceDeadlineTime: stopChoiceDeadline || undefined,
                 });
               }}
             >
