@@ -1459,6 +1459,7 @@ export interface UpdateTourStopPayload {
   scheduledEndTime?: string;
   showPriceToCustomer?: boolean;
   maxSpendLimit?: number | null;
+  choiceDeadlineTime?: string;
 }
 
 // ============================================

@@ -43,6 +43,7 @@ import {
   Lock,
   Unlock,
   Upload,
+  Pencil,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -57,6 +58,7 @@ import {
   type AgencyStopChoicesDto,
   type AgencyStopServiceSummaryDto,
   type CreateTourStopPayload,
+  type UpdateTourStopPayload,
   type CreateTourPayload,
 } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -206,6 +208,15 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
   const [deleteStopId, setDeleteStopId] = useState<number | null>(null);
   const [rejectStopId, setRejectStopId] = useState<number | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+
+  // Edit stop state
+  const [editingStopId, setEditingStopId] = useState<number | null>(null);
+  const [editStopDescription, setEditStopDescription] = useState('');
+  const [editStopStartTime, setEditStopStartTime] = useState('');
+  const [editStopEndTime, setEditStopEndTime] = useState('');
+  const [editStopShowPrice, setEditStopShowPrice] = useState(true);
+  const [editStopMaxSpend, setEditStopMaxSpend] = useState('');
+  const [editStopChoiceDeadline, setEditStopChoiceDeadline] = useState('');
 
   // Map UI time filter to backend timeStatus param
   const timeStatusMap: Record<string, string | undefined> = {
@@ -445,6 +456,20 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
       invalidateTourDetail();
       setRejectStopId(null);
       setRejectReason('');
+    },
+    onError: (error) => toast.error((error as Error).message || t.admin.tourStopError),
+  });
+
+  const updateStopMutation = useMutation({
+    mutationFn: async ({ stopId, data }: { stopId: number; data: UpdateTourStopPayload }) => {
+      const result = await adminApi.updateTourStop(stopId, data, lang);
+      if (!result.success) throw new Error(result.error);
+      return result.data;
+    },
+    onSuccess: () => {
+      toast.success(t.admin.tourStopUpdated);
+      invalidateTourDetail();
+      setEditingStopId(null);
     },
     onError: (error) => toast.error((error as Error).message || t.admin.tourStopError),
   });
@@ -920,7 +945,9 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
                     <EmptyState icon={MapPin} title={t.admin.tourStops} description={t.tours.noStops} />
                   ) : (
                     <div className="space-y-2">
-                      {tourDetail.stops.map((stop, index) => (
+                      {tourDetail.stops.map((stop, index) => {
+                        const isEditing = editingStopId === stop.id;
+                        return (
                         <Card key={stop.id} className="border shadow-sm">
                           <CardContent className="p-3 sm:p-4">
                             <div className="flex items-start gap-2 sm:gap-3">
@@ -972,7 +999,7 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
                                   scheduledEndTime={stop.scheduledEndTime}
                                   choiceDeadlineHours={stop.choiceDeadline}
                                 />
-                                {stop.description && (
+                                {!isEditing && stop.description && (
                                   <p className="text-slate-500 text-xs mt-1">{stop.description}</p>
                                 )}
                               </div>
@@ -1013,6 +1040,32 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
                                     <Button
                                       variant="ghost"
                                       size="sm"
+                                      className={`h-8 w-8 p-0 ${isEditing ? 'text-violet-600 bg-violet-50' : 'text-slate-400 hover:text-violet-600 hover:bg-violet-50'}`}
+                                      onClick={() => {
+                                        if (isEditing) {
+                                          setEditingStopId(null);
+                                        } else {
+                                          const toLocalInput = (iso: string) => iso ? iso.replace(/[Zz]$/, '').replace(/[+-]\d{2}:\d{2}$/, '').slice(0, 16) : '';
+                                          setEditingStopId(stop.id);
+                                          setEditStopDescription(stop.description || '');
+                                          setEditStopStartTime(toLocalInput(stop.scheduledStartTime));
+                                          setEditStopEndTime(toLocalInput(stop.scheduledEndTime));
+                                          setEditStopShowPrice(stop.showPriceToCustomer ?? true);
+                                          setEditStopMaxSpend(stop.maxSpendLimit != null ? String(stop.maxSpendLimit) : '');
+                                          setEditStopChoiceDeadline(stop.choiceDeadlineTime ? toLocalInput(stop.choiceDeadlineTime) : '');
+                                        }
+                                      }}
+                                    >
+                                      <Pencil className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>{isEditing ? t.common.cancel : t.common.edit}</TooltipContent>
+                                </Tooltip>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
                                       className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
                                       onClick={() => setDeleteStopId(stop.id)}
                                     >
@@ -1023,9 +1076,102 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
                                 </Tooltip>
                               </div>
                             </div>
+
+                            {/* Inline edit form */}
+                            {isEditing && (
+                              <div className="mt-3 pt-3 border-t space-y-3">
+                                <div className="space-y-1.5">
+                                  <Label className="text-xs">{t.admin.descriptionLabel}</Label>
+                                  <Textarea
+                                    value={editStopDescription}
+                                    onChange={(e) => setEditStopDescription(e.target.value)}
+                                    rows={2}
+                                    className="text-sm"
+                                  />
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                  <div className="space-y-1.5">
+                                    <Label className="text-xs">{t.admin.scheduledStartTime}</Label>
+                                    <DateTimeInput
+                                      value={editStopStartTime}
+                                      min={tourDetail?.startDate ? `${tourDetail.startDate.split('T')[0]}T00:00` : undefined}
+                                      max={tourDetail?.endDate ? `${tourDetail.endDate.split('T')[0]}T23:59` : undefined}
+                                      onChange={(e) => setEditStopStartTime(e.target.value)}
+                                    />
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <Label className="text-xs">{t.admin.scheduledEndTime}</Label>
+                                    <DateTimeInput
+                                      value={editStopEndTime}
+                                      min={tourDetail?.startDate ? `${tourDetail.startDate.split('T')[0]}T00:00` : undefined}
+                                      max={tourDetail?.endDate ? `${tourDetail.endDate.split('T')[0]}T23:59` : undefined}
+                                      onChange={(e) => setEditStopEndTime(e.target.value)}
+                                    />
+                                  </div>
+                                </div>
+                                <div className="space-y-1.5">
+                                  <Label className="text-xs">{t.requests.choiceDeadline}</Label>
+                                  <DateTimeInput
+                                    value={editStopChoiceDeadline}
+                                    min={editStopStartTime || undefined}
+                                    max={editStopEndTime || undefined}
+                                    onChange={(e) => setEditStopChoiceDeadline(e.target.value)}
+                                  />
+                                  <p className="text-[11px] text-slate-400">{t.requests.choiceDeadlineDesc}</p>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <Switch
+                                    checked={editStopShowPrice}
+                                    onCheckedChange={setEditStopShowPrice}
+                                  />
+                                  <Label className="text-xs">{t.tours.showPriceToCustomer}</Label>
+                                </div>
+                                <div className="space-y-1.5">
+                                  <Label className="text-xs">{t.tours.maxSpendLimit}</Label>
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    step="0.01"
+                                    placeholder={t.tours.maxSpendLimitPlaceholder}
+                                    value={editStopMaxSpend}
+                                    onChange={(e) => setEditStopMaxSpend(e.target.value)}
+                                    className="text-sm"
+                                  />
+                                </div>
+                                <div className="flex justify-end gap-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setEditingStopId(null)}
+                                  >
+                                    {t.common.cancel}
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    className="gap-1.5"
+                                    disabled={!editStopStartTime || !editStopEndTime || updateStopMutation.isPending}
+                                    onClick={() => {
+                                      const data: UpdateTourStopPayload = {
+                                        description: editStopDescription,
+                                        scheduledStartTime: editStopStartTime,
+                                        scheduledEndTime: editStopEndTime,
+                                        showPriceToCustomer: editStopShowPrice,
+                                        maxSpendLimit: editStopMaxSpend ? Number(editStopMaxSpend) : null,
+                                        choiceDeadlineTime: editStopChoiceDeadline || undefined,
+                                      };
+                                      updateStopMutation.mutate({ stopId: stop.id, data });
+                                    }}
+                                  >
+                                    {updateStopMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                                    {t.common.save}
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
                           </CardContent>
                         </Card>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </TabsContent>

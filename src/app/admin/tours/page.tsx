@@ -149,6 +149,7 @@ export default function AdminToursPage() {
   const [stopEndTime, setStopEndTime] = useState('');
   const [stopShowPrice, setStopShowPrice] = useState(true);
   const [stopMaxSpend, setStopMaxSpend] = useState('');
+  const [stopChoiceDeadline, setStopChoiceDeadline] = useState('');
   const [deleteStopId, setDeleteStopId] = useState<number | null>(null);
   const [rejectStopId, setRejectStopId] = useState<number | null>(null);
   const [rejectReason, setRejectReason] = useState('');
@@ -160,6 +161,7 @@ export default function AdminToursPage() {
   const [editStopEndTime, setEditStopEndTime] = useState('');
   const [editStopShowPrice, setEditStopShowPrice] = useState(true);
   const [editStopMaxSpend, setEditStopMaxSpend] = useState('');
+  const [editStopChoiceDeadline, setEditStopChoiceDeadline] = useState('');
 
   // Reset page on filter change
   const prevFilters = useRef({ debouncedSearch, statusFilter, agencyFilter, timeFilter, sortBy, sortOrder });
@@ -294,6 +296,7 @@ export default function AdminToursPage() {
       setStopEndTime('');
       setStopShowPrice(true);
       setStopMaxSpend('');
+      setStopChoiceDeadline('');
       setAddStopOrgSearch('');
     },
     onError: (err: Error) => toast.error(err.message || t.admin.tourStopError),
@@ -389,6 +392,7 @@ export default function AdminToursPage() {
       scheduledEndTime: stopEndTime,
       showPriceToCustomer: stopShowPrice,
       maxSpendLimit: stopMaxSpend ? Number(stopMaxSpend) : null,
+      choiceDeadlineTime: stopChoiceDeadline || undefined,
     });
   };
 
@@ -1082,6 +1086,7 @@ export default function AdminToursPage() {
                                           setEditStopEndTime(toLocalInput(stop.scheduledEndTime));
                                           setEditStopShowPrice(stop.showPriceToCustomer ?? true);
                                           setEditStopMaxSpend(stop.maxSpendLimit != null ? String(stop.maxSpendLimit) : '');
+                                          setEditStopChoiceDeadline(stop.choiceDeadlineTime ? toLocalInput(stop.choiceDeadlineTime) : '');
                                         }
                                       }}
                                     >
@@ -1138,6 +1143,16 @@ export default function AdminToursPage() {
                                     />
                                   </div>
                                 </div>
+                                <div className="space-y-1.5">
+                                  <Label className="text-xs">{t.requests.choiceDeadline}</Label>
+                                  <DateTimeInput
+                                    value={editStopChoiceDeadline}
+                                    min={editStopStartTime || undefined}
+                                    max={editStopEndTime || undefined}
+                                    onChange={(e) => setEditStopChoiceDeadline(e.target.value)}
+                                  />
+                                  <p className="text-[11px] text-slate-400">{t.requests.choiceDeadlineDesc}</p>
+                                </div>
                                 <div className="flex items-center gap-3">
                                   <Switch
                                     checked={editStopShowPrice}
@@ -1176,6 +1191,7 @@ export default function AdminToursPage() {
                                         scheduledEndTime: editStopEndTime,
                                         showPriceToCustomer: editStopShowPrice,
                                         maxSpendLimit: editStopMaxSpend ? Number(editStopMaxSpend) : null,
+                                        choiceDeadlineTime: editStopChoiceDeadline || undefined,
                                       };
                                       updateStopMutation.mutate({ stopId: stop.id, data });
                                     }}
@@ -1648,6 +1664,7 @@ export default function AdminToursPage() {
           setStopEndTime('');
           setStopShowPrice(true);
           setStopMaxSpend('');
+          setStopChoiceDeadline('');
           setAddStopOrgSearch('');
         }
       }}>
@@ -1795,6 +1812,18 @@ export default function AdminToursPage() {
                 value={stopMaxSpend}
                 onChange={(e) => setStopMaxSpend(e.target.value)}
               />
+            </div>
+
+            {/* Choice deadline */}
+            <div className="space-y-2">
+              <Label>{t.requests.choiceDeadline}</Label>
+              <DateTimeInput
+                value={stopChoiceDeadline}
+                min={stopStartTime || undefined}
+                max={stopEndTime || undefined}
+                onChange={(e) => setStopChoiceDeadline(e.target.value)}
+              />
+              <p className="text-xs text-slate-500">{t.requests.choiceDeadlineDesc}</p>
             </div>
           </div>
 
