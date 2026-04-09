@@ -21,6 +21,8 @@ import {
   Save,
   Loader2,
   Search,
+  ChevronsLeft,
+  ChevronsRight,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -35,6 +37,7 @@ import {
   type ClientTourStopDto,
   type PanelNotificationDto,
   type UpdateClientProfileDto,
+  type PaginatedResponse,
 } from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -58,7 +61,9 @@ export default function CustomerDashboard() {
   const queryClient = useQueryClient();
   const [notifOpen, setNotifOpen] = useState(false);
   const [selectedNotif, setSelectedNotif] = useState<PanelNotificationDto | null>(null);
-  const [toursPage, setToursPage] = useState(1);
+  const [toursTab, setToursTab] = useState<'active' | 'past'>('active');
+  const [activeToursPage, setActiveToursPage] = useState(1);
+  const [pastToursPage, setPastToursPage] = useState(1);
 
   const PAGE_SIZE = 10;
   const notifRef = useRef<HTMLDivElement>(null);
@@ -106,25 +111,38 @@ export default function CustomerDashboard() {
     queryFn: () => apiClient.getClientProfile(apiLang),
   });
 
-  // Tours - new client API
-  const { data: toursData, isLoading: toursLoading } = useQuery({
-    queryKey: ['client-my-tours', apiLang, toursPage],
-    queryFn: () => apiClient.getMyTours(toursPage, PAGE_SIZE, apiLang),
+  // Tours - active
+  const { data: activeToursData, isLoading: activeToursLoading } = useQuery({
+    queryKey: ['client-my-tours', apiLang, activeToursPage, 'active'],
+    queryFn: () => apiClient.getMyTours(activeToursPage, PAGE_SIZE, apiLang, 'active'),
     enabled: !!profile,
   });
 
-  // Derive tours early so hooks can depend on it
-  const toursResponse = toursData as unknown as { data?: ClientParticipantTourDto[]; total?: number; meta?: { total?: number } };
-  const tours: ClientParticipantTourDto[] = toursResponse?.data ?? (Array.isArray(toursData) ? toursData as ClientParticipantTourDto[] : []);
-  const toursTotalCount = toursResponse?.total ?? toursResponse?.meta?.total ?? tours.length;
-  const toursTotalPages = Math.ceil(toursTotalCount / PAGE_SIZE);
+  // Tours - past
+  const { data: pastToursData, isLoading: pastToursLoading } = useQuery({
+    queryKey: ['client-my-tours', apiLang, pastToursPage, 'past'],
+    queryFn: () => apiClient.getMyTours(pastToursPage, PAGE_SIZE, apiLang, 'past'),
+    enabled: !!profile,
+  });
+
+  // Derive tours
+  const activeToursResponse = activeToursData as unknown as PaginatedResponse<ClientParticipantTourDto>;
+  const activeTours: ClientParticipantTourDto[] = activeToursResponse?.data ?? [];
+  const activeToursTotalPages = activeToursResponse?.meta?.totalPages ?? Math.ceil((activeToursResponse?.meta?.total ?? activeTours.length) / PAGE_SIZE);
+
+  const pastToursResponse = pastToursData as unknown as PaginatedResponse<ClientParticipantTourDto>;
+  const pastTours: ClientParticipantTourDto[] = pastToursResponse?.data ?? [];
+  const pastToursTotalPages = pastToursResponse?.meta?.totalPages ?? Math.ceil((pastToursResponse?.meta?.total ?? pastTours.length) / PAGE_SIZE);
+
+  // All tours for service choices tab
+  const allTours = [...activeTours, ...pastTours];
 
   // Service Choices (loaded from tour stops via /client/tours/stops/{stopId}/choices)
   const [stopChoices, setStopChoices] = useState<{ stop: ClientTourStopDto; tourName: string; choices: ClientStopChoicesDto }[]>([]);
   const [choicesLoading, setChoicesLoading] = useState(false);
 
   useEffect(() => {
-    if (!tours.length || activeTab !== 'serviceRequests') return;
+    if (!allTours.length || activeTab !== 'serviceRequests') return;
     let cancelled = false;
     setChoicesLoading(true);
     (async () => {
@@ -132,7 +150,7 @@ export default function CustomerDashboard() {
 
       // Fetch all tour details in parallel instead of sequentially (N+1 fix)
       const detailResults = await Promise.allSettled(
-        tours.map(tourItem => apiClient.getMyTourDetail(tourItem.tour.id, apiLang))
+        allTours.map(tourItem => apiClient.getMyTourDetail(tourItem.tour.id, apiLang))
       );
 
       // Collect all approved stops with their tour names
@@ -145,7 +163,7 @@ export default function CustomerDashboard() {
           : detailData;
         const stops = detail?.tour?.stops || [];
         const approvedStops = stops.filter((s: ClientTourStopDto) => s.preReservationStatus === 'approved');
-        const tourName = tours[index].tour?.tourName || '';
+        const tourName = allTours[index].tour?.tourName || '';
         approvedStops.forEach(stop => allStopRequests.push({ stop, tourName }));
       });
 
@@ -171,7 +189,7 @@ export default function CustomerDashboard() {
       }
     })();
     return () => { cancelled = true; };
-  }, [tours.length, apiLang, activeTab]);
+  }, [allTours.length, apiLang, activeTab]);
 
   const handleLogout = () => {
     localStorage.removeItem(customerKeys.token);
@@ -333,13 +351,19 @@ export default function CustomerDashboard() {
         {activeTab === 'dashboard' && (
           <DashboardView
             profile={profile}
-            tours={tours}
-            toursLoading={toursLoading}
+            activeTours={activeTours}
+            pastTours={pastTours}
+            activeToursLoading={activeToursLoading}
+            pastToursLoading={pastToursLoading}
             t={t}
-            locale={locale}
-            toursPage={toursPage}
-            toursTotalPages={toursTotalPages}
-            onToursPageChange={setToursPage}
+            toursTab={toursTab}
+            onToursTabChange={setToursTab}
+            activeToursPage={activeToursPage}
+            activeToursTotalPages={activeToursTotalPages}
+            onActiveToursPageChange={setActiveToursPage}
+            pastToursPage={pastToursPage}
+            pastToursTotalPages={pastToursTotalPages}
+            onPastToursPageChange={setPastToursPage}
           />
         )}
         {activeTab === 'serviceRequests' && (
@@ -404,29 +428,47 @@ export default function CustomerDashboard() {
 // ============================================
 function DashboardView({
   profile,
-  tours,
-  toursLoading,
+  activeTours,
+  pastTours,
+  activeToursLoading,
+  pastToursLoading,
   t,
-  locale,
-  toursPage,
-  toursTotalPages,
-  onToursPageChange,
+  toursTab,
+  onToursTabChange,
+  activeToursPage,
+  activeToursTotalPages,
+  onActiveToursPageChange,
+  pastToursPage,
+  pastToursTotalPages,
+  onPastToursPageChange,
 }: {
   profile: ClientProfileDto;
-  tours: ClientParticipantTourDto[];
-  toursLoading: boolean;
+  activeTours: ClientParticipantTourDto[];
+  pastTours: ClientParticipantTourDto[];
+  activeToursLoading: boolean;
+  pastToursLoading: boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   t: any;
-  locale: string;
-  toursPage: number;
-  toursTotalPages: number;
-  onToursPageChange: (page: number) => void;
+  toursTab: 'active' | 'past';
+  onToursTabChange: (tab: 'active' | 'past') => void;
+  activeToursPage: number;
+  activeToursTotalPages: number;
+  onActiveToursPageChange: (page: number) => void;
+  pastToursPage: number;
+  pastToursTotalPages: number;
+  onPastToursPageChange: (page: number) => void;
 }) {
   const participantStatusConfig: Record<string, { color: string; label: string }> = {
     confirmed: { color: 'bg-emerald-50 text-emerald-700', label: t.customer.participantConfirmed },
     pending: { color: 'bg-amber-50 text-amber-700', label: t.customer.participantPending },
     cancelled: { color: 'bg-red-50 text-red-700', label: t.customer.participantCancelled },
   };
+
+  const tours = toursTab === 'active' ? activeTours : pastTours;
+  const toursLoading = toursTab === 'active' ? activeToursLoading : pastToursLoading;
+  const toursPage = toursTab === 'active' ? activeToursPage : pastToursPage;
+  const toursTotalPages = toursTab === 'active' ? activeToursTotalPages : pastToursTotalPages;
+  const onToursPageChange = toursTab === 'active' ? onActiveToursPageChange : onPastToursPageChange;
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -472,7 +514,7 @@ function DashboardView({
           <div className="flex flex-wrap gap-2 sm:gap-3 mt-3 sm:mt-4">
             <div className="flex items-center gap-1.5 sm:gap-2 bg-white/20 backdrop-blur-sm rounded-full px-2.5 sm:px-4 py-1.5 sm:py-2">
               <Plane className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <span className="text-xs sm:text-sm font-medium">{tours.length} {t.customer.tourCount}</span>
+              <span className="text-xs sm:text-sm font-medium">{activeTours.length + pastTours.length} {t.customer.tourCount}</span>
             </div>
             <div className="flex items-center gap-1.5 sm:gap-2 bg-white/20 backdrop-blur-sm rounded-full px-2.5 sm:px-4 py-1.5 sm:py-2">
               <Camera className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
@@ -487,6 +529,32 @@ function DashboardView({
         <div className="flex items-center gap-2 mb-4">
           <Compass className="h-5 w-5 text-orange-500" />
           <h3 className="text-lg font-bold text-slate-800">{t.customer.myTours}</h3>
+        </div>
+
+        {/* Active / Past Tabs */}
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          <button
+            type="button"
+            onClick={() => onToursTabChange('active')}
+            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+              toursTab === 'active'
+                ? 'bg-orange-500 text-white shadow-sm'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            {t.customer.activeTours}
+          </button>
+          <button
+            type="button"
+            onClick={() => onToursTabChange('past')}
+            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+              toursTab === 'past'
+                ? 'bg-orange-500 text-white shadow-sm'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            {t.customer.pastTours}
+          </button>
         </div>
 
         {/* Filters */}
@@ -1033,7 +1101,16 @@ function Pagination({ page, totalPages, onPageChange, t }: {
   t: any;
 }) {
   return (
-    <div className="flex items-center justify-center gap-2 mt-4">
+    <div className="flex items-center justify-center gap-1.5 mt-4">
+      <Button
+        variant="outline"
+        size="icon"
+        onClick={() => onPageChange(1)}
+        disabled={page <= 1}
+        className="h-8 w-8"
+      >
+        <ChevronsLeft className="h-4 w-4" />
+      </Button>
       <Button
         variant="outline"
         size="sm"
@@ -1043,7 +1120,7 @@ function Pagination({ page, totalPages, onPageChange, t }: {
       >
         {t.common.back}
       </Button>
-      <span className="text-sm text-slate-600">
+      <span className="text-sm text-slate-600 mx-1">
         {page} / {totalPages}
       </span>
       <Button
@@ -1054,6 +1131,15 @@ function Pagination({ page, totalPages, onPageChange, t }: {
         className="text-xs"
       >
         {t.common.next}
+      </Button>
+      <Button
+        variant="outline"
+        size="icon"
+        onClick={() => onPageChange(totalPages)}
+        disabled={page >= totalPages}
+        className="h-8 w-8"
+      >
+        <ChevronsRight className="h-4 w-4" />
       </Button>
     </div>
   );

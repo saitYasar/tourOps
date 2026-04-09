@@ -4243,8 +4243,10 @@ class ApiClient {
   // Client Panel - New Endpoints
   // ============================================
 
-  async getMyTours(page = 1, limit = 50, lang: 'tr' | 'en' | 'de' = 'tr') {
-    return this.request<PaginatedResponse<ClientParticipantTourDto>>(`/client/tours?page=${page}&limit=${limit}`, {
+  async getMyTours(page = 1, limit = 50, lang: 'tr' | 'en' | 'de' = 'tr', timeStatus?: string) {
+    const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+    if (timeStatus) params.set('timeStatus', timeStatus);
+    return this.request<PaginatedResponse<ClientParticipantTourDto>>(`/client/tours?${params}`, {
       method: 'GET',
     }, lang);
   }
