@@ -3939,6 +3939,14 @@ class ApiClient {
     }, lang);
   }
 
+  async updateAdminTourStop(id: number, data: UpdateTourStopPayload, lang: 'tr' | 'en' | 'de' = 'tr') {
+    return this.request<ApiTourStopDto>(`/admin/tour-stops/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }, lang);
+  }
+
   async createAdminTourStop(data: CreateTourStopPayload, lang: 'tr' | 'en' | 'de' = 'tr') {
     return this.request<ApiTourStopDto>('/admin/tour-stops', {
       method: 'POST',
@@ -6117,6 +6125,15 @@ export const adminApi = {
   async createTourStop(data: CreateTourStopPayload, lang: 'tr' | 'en' | 'de' = 'tr') {
     try {
       const response = await apiClient.createAdminTourStop(data, lang);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async updateTourStop(id: number, data: UpdateTourStopPayload, lang: 'tr' | 'en' | 'de' = 'tr') {
+    try {
+      const response = await apiClient.updateAdminTourStop(id, data, lang);
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };

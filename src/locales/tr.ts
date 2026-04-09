@@ -1105,6 +1105,7 @@ export const tr = {
     removeTourStop: 'Durağı Kaldır',
     removeTourStopConfirm: 'Bu durağı kaldırmak istediğinize emin misiniz?',
     tourStopAdded: 'Durak başarıyla eklendi',
+    tourStopUpdated: 'Durak başarıyla güncellendi',
     tourStopRemoved: 'Durak başarıyla kaldırıldı',
     tourStopApproved: 'Ön rezervasyon onaylandı',
     tourStopRejected: 'Ön rezervasyon reddedildi',

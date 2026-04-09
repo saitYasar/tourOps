@@ -1096,6 +1096,7 @@ export const en = {
     removeTourStop: 'Remove Stop',
     removeTourStopConfirm: 'Are you sure you want to remove this stop?',
     tourStopAdded: 'Stop added successfully',
+    tourStopUpdated: 'Stop updated successfully',
     tourStopRemoved: 'Stop removed successfully',
     tourStopApproved: 'Pre-reservation approved',
     tourStopRejected: 'Pre-reservation rejected',

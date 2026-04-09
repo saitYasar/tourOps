@@ -1096,6 +1096,7 @@ export const de = {
     removeTourStop: 'Haltestelle entfernen',
     removeTourStopConfirm: 'Möchten Sie diese Haltestelle wirklich entfernen?',
     tourStopAdded: 'Haltestelle erfolgreich hinzugefügt',
+    tourStopUpdated: 'Haltestelle erfolgreich aktualisiert',
     tourStopRemoved: 'Haltestelle erfolgreich entfernt',
     tourStopApproved: 'Vorreservierung genehmigt',
     tourStopRejected: 'Vorreservierung abgelehnt',
