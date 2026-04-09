@@ -700,7 +700,7 @@ export const de = {
     tableSaveError: 'Tischauswahl konnte nicht gespeichert werden',
     menuUpdateError: 'Menüauswahl konnte nicht aktualisiert werden',
     menuSaveError: 'Menüauswahl konnte nicht gespeichert werden',
-    spendLimitExceeded: 'Sie können nur 1 Auswahl treffen',
+    spendLimitExceeded: 'Sie haben das maximale Auswahllimit erreicht. Sie können nur Änderungen innerhalb Ihrer aktuellen Auswahl vornehmen.',
     spendLimit: 'Ausgabenlimit',
     stockLimitReached: 'Bestandslimit für diesen Service erreicht',
     stockDepleted: 'Ausverkauft',

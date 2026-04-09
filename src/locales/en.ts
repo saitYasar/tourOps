@@ -700,7 +700,7 @@ export const en = {
     tableSaveError: 'Failed to save table selection',
     menuUpdateError: 'Failed to update menu selection',
     menuSaveError: 'Failed to save menu selection',
-    spendLimitExceeded: 'You can only select 1 item',
+    spendLimitExceeded: 'You have reached the maximum selection limit. You can only make changes among your current selections.',
     spendLimit: 'Spend Limit',
     stockLimitReached: 'Stock limit reached for this service',
     stockDepleted: 'Out of Stock',
