@@ -1223,7 +1223,7 @@ export const de = {
     deleteError: 'Löschen fehlgeschlagen',
     deleteButton: 'Löschen',
     deleting: 'Löschen...',
-    backToList: 'Zurück zur Liste',
+    backToList: 'Zurück',
     notFound: 'Eintrag nicht gefunden',
     loadError: 'Daten konnten nicht geladen werden',
     generalInfo: 'Allgemeine Informationen',
@@ -1289,9 +1289,14 @@ export const de = {
     quickCreateError: 'Organisation konnte nicht erstellt werden',
     // Detail Page Tabs
     tabGeneral: 'Allgemein',
+    tabTours: 'Touren',
     tabServiceCategories: 'Servicekategorien',
     tabServices: 'Dienstleistungen',
     tabResources: 'Layout / Ressourcen',
+    noAgencyTours: 'Keine Touren für diese Agentur gefunden.',
+    createTour: 'Tour erstellen',
+    adminTourCreated: 'Tour erfolgreich erstellt.',
+    adminTourCreateError: 'Beim Erstellen der Tour ist ein Fehler aufgetreten.',
     // Service Categories CRUD
     serviceCategoriesTitle: 'Servicekategorien',
     serviceCategoriesDesc: 'Servicekategorien der Organisation verwalten',

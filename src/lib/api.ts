@@ -3818,6 +3818,7 @@ class ApiClient {
     agencyId?: number;
     sortBy?: string;
     sortOrder?: 'ASC' | 'DESC';
+    timeStatus?: string;
   } = {}) {
     const params = new URLSearchParams();
     params.set('page', String(filters.page || 1));
@@ -3827,7 +3828,62 @@ class ApiClient {
     if (filters.agencyId) params.set('agencyId', String(filters.agencyId));
     if (filters.sortBy) params.set('sortBy', filters.sortBy);
     if (filters.sortOrder) params.set('sortOrder', filters.sortOrder);
+    if (filters.timeStatus) params.set('timeStatus', filters.timeStatus);
     return this.request<PaginatedResponse<ApiTourDto>>(`/admin/tours?${params.toString()}`, {}, filters.lang || 'tr');
+  }
+
+  async createAdminTour(
+    data: CreateTourPayload & { agencyId: number },
+    coverImage?: File,
+    galleryImages?: File[],
+    lang: 'tr' | 'en' | 'de' = 'tr'
+  ) {
+    const formData = new FormData();
+    Object.entries(data).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        formData.append(key, String(value));
+      }
+    });
+    if (coverImage) {
+      formData.append('coverImage', coverImage);
+    }
+    if (galleryImages && galleryImages.length > 0) {
+      galleryImages.forEach((img) => {
+        formData.append('galleryImages', img);
+      });
+    }
+
+    const url = `${this.baseUrl}/admin/tours?lang=${lang}`;
+    const headers: HeadersInit = {};
+    const token = this.resolveToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    const jsonResponse = await response.json().catch(() => ({
+      message: 'Bir hata oluştu',
+      statusCode: response.status,
+    }));
+
+    if (!response.ok) {
+      if (this.checkUnauthorized(response.status)) {
+        throw new Error('Oturum süresi doldu');
+      }
+      const errorMessage =
+        jsonResponse.errorMessage?.client ||
+        jsonResponse.errorMessage?.system ||
+        jsonResponse.message ||
+        'API isteği başarısız';
+      throw new Error(errorMessage);
+    }
+
+    return jsonResponse.data as ApiTourDto;
   }
 
   async getAdminTourById(id: number, lang: 'tr' | 'en' | 'de' = 'tr') {
@@ -5875,6 +5931,20 @@ export const adminApi = {
   // Tours
   // ============================================
 
+  async createTour(
+    data: CreateTourPayload & { agencyId: number },
+    coverImage?: File,
+    galleryImages?: File[],
+    lang: 'tr' | 'en' | 'de' = 'tr'
+  ): Promise<{ success: boolean; data?: ApiTourDto; error?: string }> {
+    try {
+      const response = await apiClient.createAdminTour(data, coverImage, galleryImages, lang);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
   async getTours(filters: {
     page?: number;
     limit?: number;
@@ -5884,6 +5954,7 @@ export const adminApi = {
     agencyId?: number;
     sortBy?: string;
     sortOrder?: 'ASC' | 'DESC';
+    timeStatus?: string;
   } = {}) {
     try {
       const response = await apiClient.getAdminTours(filters);

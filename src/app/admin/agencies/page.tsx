@@ -88,10 +88,10 @@ function AgencyDetailCard({
     <Card className="border shadow-sm hover:shadow-md transition-shadow">
       <CardContent className="p-0">
         {/* Main Row */}
-        <div className="p-4">
-          <div className="flex items-start gap-4">
+        <div className="p-3 sm:p-4">
+          <div className="flex items-start gap-3 sm:gap-4">
             {/* Cover Image */}
-            <div className="h-20 w-20 rounded-xl bg-blue-50 border border-blue-100 flex-shrink-0 flex items-center justify-center overflow-hidden">
+            <div className="h-14 w-14 sm:h-20 sm:w-20 rounded-xl bg-blue-50 border border-blue-100 flex-shrink-0 flex items-center justify-center overflow-hidden">
               {coverUrl && !imgError ? (
                 <img
                   src={coverUrl}
@@ -100,63 +100,35 @@ function AgencyDetailCard({
                   onError={() => setImgError(true)}
                 />
               ) : (
-                <Briefcase className="h-8 w-8 text-blue-400" />
+                <Briefcase className="h-6 w-6 sm:h-8 sm:w-8 text-blue-400" />
               )}
             </div>
 
             {/* Main Info */}
             <div className="flex-1 min-w-0">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="font-semibold text-lg text-slate-900 truncate">
-                      {company.name}
-                    </h3>
-                    <Badge className={`${statusColors[company.status]} text-xs`}>
-                      <StatusIcon className="h-3 w-3 mr-1" />
-                      {(t.admin as Record<string, string>)[statusLabels[company.status]] || statusLabels[company.status]}
-                    </Badge>
-                    {company.category?.name && (
-                      <Badge variant="outline" className="text-xs">
-                        {company.category.name}
-                      </Badge>
-                    )}
-                  </div>
-                  {company.legalName && (
-                    <p className="text-sm text-slate-500 mt-0.5">
-                      <FileText className="h-3 w-3 inline mr-1" />
-                      {company.legalName}
-                    </p>
-                  )}
-                </div>
-
-                {/* Actions */}
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  <Link href={`/admin/agencies/${company.id}`}>
-                    <Button variant="outline" size="sm" className="text-blue-600 border-blue-200 hover:bg-blue-50">
-                      <ExternalLink className="h-4 w-4 mr-1" />
-                      {(t.admin as Record<string, string>).goToDetail}
-                    </Button>
-                  </Link>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setExpanded(!expanded)}
-                    className="text-slate-500"
-                  >
-                    <Eye className="h-4 w-4 mr-1" />
-                    Detay
-                    {expanded ? (
-                      <ChevronUp className="h-3 w-3 ml-1" />
-                    ) : (
-                      <ChevronDown className="h-3 w-3 ml-1" />
-                    )}
-                  </Button>
-                </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-semibold text-base sm:text-lg text-slate-900 break-words">
+                  {company.name}
+                </h3>
+                <Badge className={`${statusColors[company.status]} text-xs`}>
+                  <StatusIcon className="h-3 w-3 mr-1" />
+                  {(t.admin as Record<string, string>)[statusLabels[company.status]] || statusLabels[company.status]}
+                </Badge>
+                {company.category?.name && (
+                  <Badge variant="outline" className="text-xs">
+                    {company.category.name}
+                  </Badge>
+                )}
               </div>
+              {company.legalName && (
+                <p className="text-sm text-slate-500 mt-0.5 truncate">
+                  <FileText className="h-3 w-3 inline mr-1" />
+                  {company.legalName}
+                </p>
+              )}
 
-              {/* Summary Row */}
-              <div className="flex items-center gap-4 mt-2 flex-wrap text-sm text-slate-600">
+              {/* Summary Row - hidden on mobile, shown on sm+ */}
+              <div className="hidden sm:flex items-center gap-4 mt-2 flex-wrap text-sm text-slate-600">
                 {company.city?.name && (
                   <div className="flex items-center gap-1">
                     <MapPin className="h-3.5 w-3.5 text-slate-400" />
@@ -185,7 +157,47 @@ function AgencyDetailCard({
                   <span>{new Date(company.createdAt).toLocaleDateString('tr-TR')}</span>
                 </div>
               </div>
+
+              {/* Mobile compact summary */}
+              <div className="flex sm:hidden flex-col gap-1 mt-1.5 text-xs text-slate-500">
+                <div className="flex items-center gap-1">
+                  <Mail className="h-3 w-3 text-slate-400 shrink-0" />
+                  <span className="truncate">{company.email}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Phone className="h-3 w-3 text-slate-400 shrink-0" />
+                  <span>+{company.phoneCountryCode} {company.phone}</span>
+                </div>
+                <div className="flex items-center gap-1 text-slate-400">
+                  <Calendar className="h-3 w-3 shrink-0" />
+                  <span>{new Date(company.createdAt).toLocaleDateString('tr-TR')}</span>
+                </div>
+              </div>
             </div>
+          </div>
+
+          {/* Actions - separate row on mobile */}
+          <div className="flex items-center gap-1.5 mt-2 sm:mt-0 sm:justify-end">
+            <Link href={`/admin/agencies/${company.id}`}>
+              <Button variant="outline" size="sm" className="text-blue-600 border-blue-200 hover:bg-blue-50 text-xs sm:text-sm">
+                <ExternalLink className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1" />
+                {(t.admin as Record<string, string>).goToDetail}
+              </Button>
+            </Link>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setExpanded(!expanded)}
+              className="text-slate-500 text-xs sm:text-sm"
+            >
+              <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1" />
+              <span className="hidden sm:inline">Detay</span>
+              {expanded ? (
+                <ChevronUp className="h-3 w-3 ml-0.5" />
+              ) : (
+                <ChevronDown className="h-3 w-3 ml-0.5" />
+              )}
+            </Button>
           </div>
         </div>
 
@@ -193,8 +205,8 @@ function AgencyDetailCard({
         {expanded && (
           <>
             <Separator />
-            <div className="p-4 bg-slate-50/50">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="p-3 sm:p-4 bg-slate-50/50">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                 {/* Contact & Address */}
                 <div className="space-y-3">
                   <h4 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
@@ -207,7 +219,7 @@ function AgencyDetailCard({
                       <span className="text-slate-700">{fullAddress || '-'}</span>
                     </div>
                     {company.country?.name && (
-                      <div className="flex items-center gap-4">
+                      <div className="flex flex-wrap items-center gap-3 sm:gap-4">
                         <div>
                           <span className="text-slate-400 block text-xs mb-0.5">Ülke</span>
                           <span className="text-slate-700">{company.country.name}</span>
@@ -321,7 +333,7 @@ function AgencyDetailCard({
               </div>
 
               {/* Timestamps */}
-              <div className="mt-4 pt-4 border-t flex items-center gap-6 text-xs text-slate-400">
+              <div className="mt-4 pt-4 border-t flex flex-wrap items-center gap-3 sm:gap-6 text-xs text-slate-400">
                 <span>
                   Kayıt: {new Date(company.createdAt).toLocaleString('tr-TR')}
                 </span>
@@ -332,7 +344,7 @@ function AgencyDetailCard({
               </div>
 
               {/* Action Buttons */}
-              <div className="mt-4 pt-4 border-t flex gap-2 flex-wrap">
+              <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t flex gap-1.5 sm:gap-2 flex-wrap">
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <span tabIndex={0}>
@@ -510,24 +522,24 @@ export default function AdminAgenciesPage() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-blue-100 rounded-xl">
-            <Briefcase className="h-6 w-6 text-blue-600" />
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="p-2 sm:p-2.5 bg-blue-100 rounded-xl">
+            <Briefcase className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">
+            <h1 className="text-lg sm:text-2xl font-bold text-slate-900">
               {t.admin.agencyManagement}
             </h1>
-            <p className="text-slate-500 text-sm">{t.admin.agencyManageAndApprove}</p>
+            <p className="text-slate-500 text-xs sm:text-sm hidden sm:block">{t.admin.agencyManageAndApprove}</p>
           </div>
         </div>
       </div>
 
       {/* Status Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
         <Card
           className={`border cursor-pointer transition-all ${statusFilter === 'all' ? 'ring-2 ring-blue-500 border-blue-200' : 'hover:border-slate-300'}`}
           onClick={() => {
@@ -535,13 +547,13 @@ export default function AdminAgenciesPage() {
             setPage(1);
           }}
         >
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2 bg-slate-100 rounded-lg">
-              <Briefcase className="h-5 w-5 text-slate-600" />
+          <CardContent className="p-3 sm:p-4 flex items-center gap-2 sm:gap-3">
+            <div className="p-1.5 sm:p-2 bg-slate-100 rounded-lg">
+              <Briefcase className="h-4 w-4 sm:h-5 sm:w-5 text-slate-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-slate-900">{statusCounts.all}</p>
-              <p className="text-xs text-slate-500">{t.admin.agencyTotalLabel}</p>
+              <p className="text-xl sm:text-2xl font-bold text-slate-900">{statusCounts.all}</p>
+              <p className="text-[10px] sm:text-xs text-slate-500">{t.admin.agencyTotalLabel}</p>
             </div>
           </CardContent>
         </Card>
@@ -552,13 +564,13 @@ export default function AdminAgenciesPage() {
             setPage(1);
           }}
         >
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2 bg-yellow-100 rounded-lg">
-              <Clock className="h-5 w-5 text-yellow-600" />
+          <CardContent className="p-3 sm:p-4 flex items-center gap-2 sm:gap-3">
+            <div className="p-1.5 sm:p-2 bg-yellow-100 rounded-lg">
+              <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-yellow-600">{statusCounts.pending}</p>
-              <p className="text-xs text-slate-500">{t.admin.agencyPendingLabel}</p>
+              <p className="text-xl sm:text-2xl font-bold text-yellow-600">{statusCounts.pending}</p>
+              <p className="text-[10px] sm:text-xs text-slate-500">{t.admin.agencyPendingLabel}</p>
             </div>
           </CardContent>
         </Card>
@@ -569,13 +581,13 @@ export default function AdminAgenciesPage() {
             setPage(1);
           }}
         >
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <CheckCircle className="h-5 w-5 text-green-600" />
+          <CardContent className="p-3 sm:p-4 flex items-center gap-2 sm:gap-3">
+            <div className="p-1.5 sm:p-2 bg-green-100 rounded-lg">
+              <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-green-600">{statusCounts.active}</p>
-              <p className="text-xs text-slate-500">{t.admin.agencyActiveLabel}</p>
+              <p className="text-xl sm:text-2xl font-bold text-green-600">{statusCounts.active}</p>
+              <p className="text-[10px] sm:text-xs text-slate-500">{t.admin.agencyActiveLabel}</p>
             </div>
           </CardContent>
         </Card>
@@ -586,13 +598,13 @@ export default function AdminAgenciesPage() {
             setPage(1);
           }}
         >
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2 bg-red-100 rounded-lg">
-              <XCircle className="h-5 w-5 text-red-600" />
+          <CardContent className="p-3 sm:p-4 flex items-center gap-2 sm:gap-3">
+            <div className="p-1.5 sm:p-2 bg-red-100 rounded-lg">
+              <XCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-red-600">{statusCounts.suspended}</p>
-              <p className="text-xs text-slate-500">Askıda</p>
+              <p className="text-xl sm:text-2xl font-bold text-red-600">{statusCounts.suspended}</p>
+              <p className="text-[10px] sm:text-xs text-slate-500">Askıda</p>
             </div>
           </CardContent>
         </Card>

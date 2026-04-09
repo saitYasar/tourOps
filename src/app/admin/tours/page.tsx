@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback, Fragment } from 'react';
+import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Calendar,
@@ -110,6 +111,29 @@ export default function AdminToursPage() {
   const [receiptTemplate, setReceiptTemplate] = useState<ReceiptTemplate>('compact');
   const printRef = useRef<HTMLDivElement>(null);
 
+  // Lightbox state
+  const [lightboxImages, setLightboxImages] = useState<string[]>([]);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+
+  const openLightbox = useCallback((images: string[], index: number) => {
+    setLightboxImages(images);
+    setLightboxIndex(index);
+  }, []);
+
+  const closeLightbox = useCallback(() => {
+    setLightboxImages([]);
+    setLightboxIndex(0);
+  }, []);
+
+  useEffect(() => {
+    if (lightboxImages.length === 0) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeLightbox();
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [lightboxImages, closeLightbox]);
+
   const lang = locale as 'tr' | 'en' | 'de';
   const queryClient = useQueryClient();
 
@@ -150,9 +174,17 @@ export default function AdminToursPage() {
   });
   const agencies = agenciesResult?.success ? agenciesResult.data?.data || [] : [];
 
+  // Map UI time filter to backend timeStatus param
+  const timeStatusMap: Record<string, string | undefined> = {
+    active: 'active',
+    upcoming: 'future',
+    past: 'past',
+    all: undefined,
+  };
+
   // Fetch tours
   const { data: toursResponse, isLoading, error } = useQuery({
-    queryKey: ['admin-tours', page, limit, statusFilter, debouncedSearch, agencyFilter, sortBy, sortOrder, lang],
+    queryKey: ['admin-tours', page, limit, statusFilter, debouncedSearch, agencyFilter, timeFilter, sortBy, sortOrder, lang],
     queryFn: async () => {
       const result = await adminApi.getTours({
         page,
@@ -163,28 +195,15 @@ export default function AdminToursPage() {
         agencyId: agencyFilter !== 'all' ? Number(agencyFilter) : undefined,
         sortBy: sortBy || undefined,
         sortOrder: sortOrder || undefined,
+        timeStatus: timeStatusMap[timeFilter],
       });
       if (!result.success) throw new Error(result.error);
       return { data: result.data || [], meta: result.meta };
     },
   });
 
-  const allTours = toursResponse?.data || [];
+  const tours = toursResponse?.data || [];
   const meta = toursResponse?.meta;
-
-  // Filter tours by time period (Turkey timezone UTC+3)
-  const tours = allTours.filter((tour) => {
-    if (timeFilter === 'all') return true;
-    const nowTurkey = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
-    const start = new Date(tour.startDate);
-    const end = new Date(tour.endDate);
-    switch (timeFilter) {
-      case 'active': return start <= nowTurkey && end >= nowTurkey;
-      case 'upcoming': return start > nowTurkey;
-      case 'past': return end < nowTurkey;
-      default: return true;
-    }
-  });
 
   // Tour detail query
   const { data: tourDetail, isLoading: isDetailLoading } = useQuery({
@@ -596,6 +615,13 @@ export default function AdminToursPage() {
                       <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">{tourDetail.stops.length}</Badge>
                     )}
                   </TabsTrigger>
+                  <TabsTrigger value="clients" className="gap-1.5">
+                    <Users className="h-4 w-4" />
+                    {t.tours.clients}
+                    {tourDetail.participants && tourDetail.participants.length > 0 && (
+                      <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">{tourDetail.participants.length}</Badge>
+                    )}
+                  </TabsTrigger>
                   <TabsTrigger value="choices" className="gap-1.5">
                     <ClipboardList className="h-4 w-4" />
                     {t.tours.customerChoices}
@@ -732,7 +758,15 @@ export default function AdminToursPage() {
                                 >
                                   <div className="flex items-center gap-2.5">
                                     {client?.profilePhoto ? (
-                                      <img src={resolveImageUrl(client.profilePhoto) || ''} alt={name} className="h-7 w-7 rounded-full object-cover" />
+                                      <img
+                                        src={resolveImageUrl(client.profilePhoto) || ''}
+                                        alt={name}
+                                        className="h-7 w-7 rounded-full object-cover cursor-zoom-in"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          openLightbox([resolveImageUrl(client.profilePhoto)!], 0);
+                                        }}
+                                      />
                                     ) : (
                                       <div className="h-7 w-7 rounded-full bg-violet-100 text-violet-600 flex items-center justify-center text-xs font-bold">
                                         {name.charAt(0).toUpperCase()}
@@ -812,6 +846,98 @@ export default function AdminToursPage() {
                         </div>
                       </div>
                     </>
+                  )}
+                </TabsContent>
+
+                {/* ===== TAB: Misafirler ===== */}
+                <TabsContent value="clients" className="flex-1 overflow-y-auto mt-4 space-y-4">
+                  {!tourDetail.participants?.length ? (
+                    <EmptyState icon={Users} title={t.tours.clients} description={t.tours.noClients} />
+                  ) : (
+                    <div className="space-y-1">
+                      {tourDetail.participants.map((p) => {
+                        const client = p.client;
+                        const name = client
+                          ? `${client.firstName || ''} ${client.lastName || ''}`.trim() || `#${p.clientId}`
+                          : p.clientName || `#${p.clientId}`;
+                        const isExpanded = expandedParticipantId === p.id;
+                        const phoneDisplay = client?.phone
+                          ? `+${client.phoneCountryCode || '90'} ${client.phone}`
+                          : null;
+                        const genderLabel = client?.gender === 'm' ? t.common.male : client?.gender === 'f' ? t.common.female : null;
+                        return (
+                          <Fragment key={p.id}>
+                            <button
+                              className="w-full flex items-center justify-between p-2.5 bg-slate-50 hover:bg-slate-100 rounded-lg text-sm transition-colors cursor-pointer"
+                              onClick={() => setExpandedParticipantId(isExpanded ? null : p.id)}
+                            >
+                              <div className="flex items-center gap-2.5">
+                                {client?.profilePhoto ? (
+                                  <img
+                                    src={resolveImageUrl(client.profilePhoto) || ''}
+                                    alt={name}
+                                    className="h-7 w-7 rounded-full object-cover cursor-zoom-in"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openLightbox([resolveImageUrl(client.profilePhoto)!], 0);
+                                    }}
+                                  />
+                                ) : (
+                                  <div className="h-7 w-7 rounded-full bg-violet-100 text-violet-600 flex items-center justify-center text-xs font-bold">
+                                    {name.charAt(0).toUpperCase()}
+                                  </div>
+                                )}
+                                <div className="text-left">
+                                  <span className="font-medium">{name}</span>
+                                  {client?.email && (
+                                    <span className="text-xs text-slate-400 ml-2">{client.email}</span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {genderLabel && (
+                                  <Badge variant="outline" className="text-[10px] px-1.5">{genderLabel}</Badge>
+                                )}
+                                {p.status && (
+                                  <Badge variant="outline" className="text-xs">
+                                    {p.status}
+                                  </Badge>
+                                )}
+                                <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                              </div>
+                            </button>
+                            {isExpanded && (
+                              <div className="ml-9 p-3 bg-white border border-slate-200 rounded-lg text-xs space-y-1.5">
+                                {phoneDisplay && (
+                                  <div className="flex items-center gap-2 text-slate-600">
+                                    <Phone className="h-3 w-3 text-slate-400" />
+                                    <span className="font-medium text-slate-800">{phoneDisplay}</span>
+                                  </div>
+                                )}
+                                {client?.email && (
+                                  <div className="flex items-center gap-2 text-slate-600">
+                                    <Mail className="h-3 w-3 text-slate-400" />
+                                    <span className="font-medium text-slate-800">{client.email}</span>
+                                  </div>
+                                )}
+                                {p.pricePaid != null && (
+                                  <div className="flex items-center gap-2 text-slate-600">
+                                    <DollarSign className="h-3 w-3 text-slate-400" />
+                                    <span className="font-medium text-slate-800">{Number(p.pricePaid).toFixed(2)} {getCurrencySymbol()}</span>
+                                  </div>
+                                )}
+                                {p.paidAt && (
+                                  <div className="flex items-center gap-2 text-slate-600">
+                                    <Clock className="h-3 w-3 text-slate-400" />
+                                    <span className="font-medium text-slate-800">{formatDate(p.paidAt)}</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </Fragment>
+                        );
+                      })}
+                    </div>
                   )}
                 </TabsContent>
 
@@ -1390,7 +1516,7 @@ export default function AdminToursPage() {
           setAddStopOrgSearch('');
         }
       }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>{t.admin.addTourStop}</DialogTitle>
           </DialogHeader>
@@ -1493,7 +1619,7 @@ export default function AdminToursPage() {
             </div>
 
             {/* Time fields */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>{t.admin.scheduledStartTime}</Label>
                 <DateTimeInput
@@ -1591,6 +1717,28 @@ export default function AdminToursPage() {
           </div>
         </DialogContent>
       </Dialog>
+      {/* Lightbox */}
+      {lightboxImages.length > 0 && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80"
+          onClick={closeLightbox}
+        >
+          <button
+            type="button"
+            className="absolute top-4 right-4 text-white/70 hover:text-white z-10"
+            onClick={closeLightbox}
+          >
+            <X className="h-6 w-6" />
+          </button>
+          <img
+            src={lightboxImages[lightboxIndex]}
+            alt=""
+            className="max-h-[85vh] max-w-[90vw] object-contain rounded-lg"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

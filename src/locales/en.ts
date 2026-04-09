@@ -1223,7 +1223,7 @@ export const en = {
     deleteError: 'Failed to delete',
     deleteButton: 'Delete',
     deleting: 'Deleting...',
-    backToList: 'Back to List',
+    backToList: 'Back',
     notFound: 'Record not found',
     loadError: 'Failed to load data',
     generalInfo: 'General Information',
@@ -1289,9 +1289,14 @@ export const en = {
     quickCreateError: 'Failed to create organization',
     // Detail Page Tabs
     tabGeneral: 'General',
+    tabTours: 'Tours',
     tabServiceCategories: 'Service Categories',
     tabServices: 'Services',
     tabResources: 'Layout / Resources',
+    noAgencyTours: 'No tours found for this agency.',
+    createTour: 'Create Tour',
+    adminTourCreated: 'Tour created successfully.',
+    adminTourCreateError: 'An error occurred while creating the tour.',
     // Service Categories CRUD
     serviceCategoriesTitle: 'Service Categories',
     serviceCategoriesDesc: 'Manage organization service categories',

@@ -1235,7 +1235,7 @@ export const tr = {
     deleteError: 'Silinemedi',
     deleteButton: 'Sil',
     deleting: 'Siliniyor...',
-    backToList: 'Listeye Dön',
+    backToList: 'Geri',
     notFound: 'Kayıt bulunamadı',
     loadError: 'Veriler yüklenemedi',
     generalInfo: 'Genel Bilgiler',
@@ -1301,9 +1301,14 @@ export const tr = {
     quickCreateError: 'İşletme oluşturulamadı',
     // Detail Page Tabs
     tabGeneral: 'Genel',
+    tabTours: 'Turlar',
     tabServiceCategories: 'Hizmet Kategorileri',
     tabServices: 'Hizmetler',
     tabResources: 'Yerleşim / Kaynaklar',
+    noAgencyTours: 'Bu acenteye ait tur bulunamadı.',
+    createTour: 'Tur Oluştur',
+    adminTourCreated: 'Tur başarıyla oluşturuldu.',
+    adminTourCreateError: 'Tur oluşturulurken bir hata oluştu.',
     // Service Categories CRUD
     serviceCategoriesTitle: 'Hizmet Kategorileri',
     serviceCategoriesDesc: 'İşletmenin hizmet kategorilerini yönetin',
