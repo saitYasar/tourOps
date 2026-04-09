@@ -1147,8 +1147,6 @@ export default function AdminToursPage() {
                                   <Label className="text-xs">{t.requests.choiceDeadline}</Label>
                                   <DateTimeInput
                                     value={editStopChoiceDeadline}
-                                    min={editStopStartTime || undefined}
-                                    max={editStopEndTime || undefined}
                                     onChange={(e) => setEditStopChoiceDeadline(e.target.value)}
                                   />
                                   <p className="text-[11px] text-slate-400">{t.requests.choiceDeadlineDesc}</p>
@@ -1819,8 +1817,6 @@ export default function AdminToursPage() {
               <Label>{t.requests.choiceDeadline}</Label>
               <DateTimeInput
                 value={stopChoiceDeadline}
-                min={stopStartTime || undefined}
-                max={stopEndTime || undefined}
                 onChange={(e) => setStopChoiceDeadline(e.target.value)}
               />
               <p className="text-xs text-slate-500">{t.requests.choiceDeadlineDesc}</p>

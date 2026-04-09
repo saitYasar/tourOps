@@ -1113,8 +1113,6 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
                                   <Label className="text-xs">{t.requests.choiceDeadline}</Label>
                                   <DateTimeInput
                                     value={editStopChoiceDeadline}
-                                    min={editStopStartTime || undefined}
-                                    max={editStopEndTime || undefined}
                                     onChange={(e) => setEditStopChoiceDeadline(e.target.value)}
                                   />
                                   <p className="text-[11px] text-slate-400">{t.requests.choiceDeadlineDesc}</p>
@@ -1819,8 +1817,6 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
               <p className="text-xs text-slate-500">{t.requests.choiceDeadlineDesc}</p>
               <DateTimeInput
                 value={stopChoiceDeadline}
-                min={stopStartTime || undefined}
-                max={stopEndTime || undefined}
                 onChange={(e) => setStopChoiceDeadline(e.target.value)}
               />
             </div>
