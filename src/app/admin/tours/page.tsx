@@ -79,7 +79,7 @@ import {
 import {
   LoadingState, EmptyState, ErrorState, TourStatusBadge, AdminPagination,
   CompactReceipt, DetailedListReceipt, KitchenSummaryReceipt, ReceiptTableServices, ReceiptServiceSummary,
-  handleReceiptPrint, exportReceiptExcel, ChoiceDeadlineCountdown,
+  handleReceiptPrint, exportReceiptExcel, ChoiceDeadlineCountdown, OrgMenuPreviewDialog,
 } from '@/components/shared';
 import type { ReceiptTemplate } from '@/components/shared';
 import { AdminStopVenuePreview } from '@/components/admin/AdminStopVenuePreview';
@@ -150,6 +150,7 @@ export default function AdminToursPage() {
   const [stopShowPrice, setStopShowPrice] = useState(true);
   const [stopMaxSpend, setStopMaxSpend] = useState('');
   const [stopChoiceDeadline, setStopChoiceDeadline] = useState('');
+  const [menuPreviewOpen, setMenuPreviewOpen] = useState(false);
   const [deleteStopId, setDeleteStopId] = useState<number | null>(null);
   const [rejectStopId, setRejectStopId] = useState<number | null>(null);
   const [rejectReason, setRejectReason] = useState('');
@@ -1763,6 +1764,16 @@ export default function AdminToursPage() {
                         </div>
                       )}
                     </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full mt-2"
+                      onClick={() => setMenuPreviewOpen(true)}
+                    >
+                      <Eye className="h-3.5 w-3.5 mr-1.5" />
+                      {t.menu.menuPreview}
+                    </Button>
                   </CardContent>
                 </Card>
               )}
@@ -1877,6 +1888,15 @@ export default function AdminToursPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Menu Preview */}
+      <OrgMenuPreviewDialog
+        open={menuPreviewOpen}
+        onOpenChange={setMenuPreviewOpen}
+        organizationId={selectedOrgDetail?.id}
+        organizationName={selectedOrgDetail?.name}
+      />
+
       {/* Lightbox */}
       {lightboxImages.length > 0 && createPortal(
         <div

@@ -97,7 +97,7 @@ import {
   LoadingState, EmptyState, ConfirmDialog, TourStatusBadge, AdminPagination,
   ChoiceDeadlineCountdown,
   CompactReceipt, DetailedListReceipt, KitchenSummaryReceipt, ReceiptTableServices, ReceiptServiceSummary,
-  handleReceiptPrint, exportReceiptExcel,
+  handleReceiptPrint, exportReceiptExcel, OrgMenuPreviewDialog,
 } from '@/components/shared';
 import type { ReceiptTemplate } from '@/components/shared';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
@@ -205,6 +205,7 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
   const [stopShowPrice, setStopShowPrice] = useState(false);
   const [stopMaxSpend, setStopMaxSpend] = useState('');
   const [stopChoiceDeadline, setStopChoiceDeadline] = useState('');
+  const [menuPreviewOpen, setMenuPreviewOpen] = useState(false);
   const [deleteStopId, setDeleteStopId] = useState<number | null>(null);
   const [rejectStopId, setRejectStopId] = useState<number | null>(null);
   const [rejectReason, setRejectReason] = useState('');
@@ -1750,6 +1751,16 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
                         </div>
                       )}
                     </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full mt-2"
+                      onClick={() => setMenuPreviewOpen(true)}
+                    >
+                      <Eye className="h-3.5 w-3.5 mr-1.5" />
+                      {t.menu.menuPreview}
+                    </Button>
                   </CardContent>
                 </Card>
               )}
@@ -1931,6 +1942,14 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Menu Preview */}
+      <OrgMenuPreviewDialog
+        open={menuPreviewOpen}
+        onOpenChange={setMenuPreviewOpen}
+        organizationId={selectedOrgDetail?.id}
+        organizationName={selectedOrgDetail?.name}
+      />
 
       {/* Lightbox — portal ile body seviyesinde render, Dialog'un üstünde */}
       {lightboxImages.length > 0 && createPortal(

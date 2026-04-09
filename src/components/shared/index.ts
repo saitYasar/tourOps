@@ -13,4 +13,5 @@ export type { ReceiptTemplate, ReceiptTourInfo } from './ReceiptTemplates';
 export { ChoiceDeadlineCountdown } from './ChoiceDeadlineCountdown';
 export { ServiceDetailDialog } from './ServiceDetailDialog';
 export { VenueOccupancyViewer } from './VenueOccupancyViewer';
+export { OrgMenuPreviewDialog } from './OrgMenuPreviewDialog';
 // LocationPicker must be imported dynamically due to Leaflet SSR issues
