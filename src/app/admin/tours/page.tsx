@@ -33,6 +33,8 @@ import {
   Unlock,
   Pencil,
   Save,
+  Download,
+  Upload,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -108,6 +110,9 @@ export default function AdminToursPage() {
   const [selectedTourId, setSelectedTourId] = useState<number | null>(null);
   const [dialogTab, setDialogTab] = useState('info');
   const [expandedParticipantId, setExpandedParticipantId] = useState<number | null>(null);
+  const [batchImportOpen, setBatchImportOpen] = useState(false);
+  const [batchFile, setBatchFile] = useState<File | null>(null);
+  const batchFileRef = useRef<HTMLInputElement>(null);
   const [choicesStopId, setChoicesStopId] = useState<number | null>(null);
   const [expandedClientId, setExpandedClientId] = useState<number | null>(null);
   const [receiptOpen, setReceiptOpen] = useState(false);
@@ -286,6 +291,31 @@ export default function AdminToursPage() {
   const invalidateTourDetail = () => {
     queryClient.invalidateQueries({ queryKey: ['admin-tour-detail', selectedTourId, lang] });
   };
+
+  const closeBatchImport = () => {
+    setBatchImportOpen(false);
+    setBatchFile(null);
+  };
+
+  const batchImportMutation = useMutation({
+    mutationFn: async ({ file }: { file: File }) => {
+      if (!selectedTourId) throw new Error('No tour selected');
+      const result = await adminApi.batchImportTourClients(selectedTourId, file, lang);
+      if (!result.success) throw new Error(result.error);
+      return result.data;
+    },
+    onSuccess: (result) => {
+      const msg = t.invitations.batchImportSuccess
+        .replace('{successful}', String(result?.successful ?? 0))
+        .replace('{totalRows}', String(result?.totalRows ?? 0));
+      toast.success(msg);
+      invalidateTourDetail();
+      closeBatchImport();
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || t.invitations.batchImportFailed);
+    },
+  });
 
   const addStopMutation = useMutation({
     mutationFn: async (data: CreateTourStopPayload) => {
@@ -895,6 +925,15 @@ export default function AdminToursPage() {
 
                 {/* ===== TAB: Misafirler ===== */}
                 <TabsContent value="clients" className="flex-1 overflow-y-auto mt-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium text-slate-700">
+                      {t.tours.clients} ({tourDetail.participants?.length || 0})
+                    </p>
+                    <Button size="sm" variant="outline" onClick={() => setBatchImportOpen(true)} className="gap-1.5">
+                      <FileSpreadsheet className="h-4 w-4" />
+                      {t.invitations.batchImport}
+                    </Button>
+                  </div>
                   {!tourDetail.participants?.length ? (
                     <EmptyState icon={Users} title={t.tours.clients} description={t.tours.noClients} />
                   ) : (
@@ -1972,6 +2011,124 @@ export default function AdminToursPage() {
           });
         }}
       />
+
+      {/* Batch Import Dialog */}
+      <Dialog open={batchImportOpen} onOpenChange={(open) => !open && closeBatchImport()}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{t.invitations.batchImportTitle}</DialogTitle>
+            <DialogDescription className="sr-only">{t.invitations.batchImportTitle}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {/* File Select */}
+            <div className="space-y-2">
+              <Label>{t.invitations.selectExcelFile}</Label>
+              <div
+                className="border-2 border-dashed rounded-lg p-4 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition-colors"
+                onClick={() => batchFileRef.current?.click()}
+              >
+                {batchFile ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <FileSpreadsheet className="h-5 w-5 text-green-600" />
+                    <span className="text-sm font-medium">{batchFile.name}</span>
+                    <button
+                      type="button"
+                      className="text-slate-400 hover:text-red-500"
+                      onClick={(e) => { e.stopPropagation(); setBatchFile(null); }}
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-1">
+                    <Upload className="h-6 w-6 text-slate-400" />
+                    <p className="text-sm text-slate-500">{t.invitations.selectExcelFile}</p>
+                  </div>
+                )}
+              </div>
+              <input
+                ref={batchFileRef}
+                type="file"
+                className="hidden"
+                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) setBatchFile(file);
+                  e.target.value = '';
+                }}
+              />
+            </div>
+
+            {/* Excel Template */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>{t.invitations.excelTemplate}</Label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const XLSX = require('xlsx-js-style');
+                    const data = [
+                      [t.invitations.excelRowNo, t.invitations.excelLastName, t.invitations.excelFirstName, t.invitations.excelGender],
+                      [1, 'HILLEBRAND', 'INGE', 'MRS'],
+                      [2, 'SUPPAN-DANIA', 'BETTINA', 'MRS'],
+                      [3, 'SCHNEIDER', 'KARIN', 'MR'],
+                    ];
+                    const ws = XLSX.utils.aoa_to_sheet(data);
+                    ws['!cols'] = [{ wch: 8 }, { wch: 20 }, { wch: 20 }, { wch: 12 }];
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, 'Misafirler');
+                    XLSX.writeFile(wb, 'misafir_sablonu.xlsx');
+                  }}
+                  className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  {t.invitations.downloadTemplate}
+                </button>
+              </div>
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-slate-100 border-b">
+                      <th className="px-3 py-1.5 text-left font-semibold text-slate-700">{t.invitations.excelRowNo}</th>
+                      <th className="px-3 py-1.5 text-left font-semibold text-slate-700">{t.invitations.excelLastName}</th>
+                      <th className="px-3 py-1.5 text-left font-semibold text-slate-700">{t.invitations.excelFirstName}</th>
+                      <th className="px-3 py-1.5 text-left font-semibold text-slate-700">{t.invitations.excelGender}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    <tr><td className="px-3 py-1 text-slate-500">1</td><td className="px-3 py-1">HILLEBRAND</td><td className="px-3 py-1">INGE</td><td className="px-3 py-1">MRS</td></tr>
+                    <tr><td className="px-3 py-1 text-slate-500">2</td><td className="px-3 py-1">SUPPAN-DANIA</td><td className="px-3 py-1">BETTINA</td><td className="px-3 py-1">MRS</td></tr>
+                    <tr><td className="px-3 py-1 text-slate-500">3</td><td className="px-3 py-1">SCHNEIDER</td><td className="px-3 py-1">KARIN</td><td className="px-3 py-1">MR</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-[11px] text-amber-600 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-1.5">
+                ⚠ {t.invitations.excelTemplateDesc}
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="outline" onClick={closeBatchImport}>
+                {t.common.cancel}
+              </Button>
+              <Button
+                disabled={!batchFile || batchImportMutation.isPending}
+                onClick={() => {
+                  if (batchFile) {
+                    batchImportMutation.mutate({ file: batchFile });
+                  }
+                }}
+              >
+                {batchImportMutation.isPending ? (
+                  <><Loader2 className="h-4 w-4 animate-spin mr-1" />{t.common.loading}</>
+                ) : (
+                  <><Upload className="h-4 w-4 mr-1" />{t.invitations.batchImport}</>
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Lightbox */}
       {lightboxImages.length > 0 && createPortal(

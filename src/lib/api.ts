@@ -3916,6 +3916,35 @@ class ApiClient {
     return Array.isArray(response) ? response : (response.data || []);
   }
 
+  async adminBatchImportClients(tourId: number, file: File, lang: 'tr' | 'en' | 'de' = 'tr') {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const params = new URLSearchParams();
+    if (lang) params.set('lang', lang);
+    const qs = params.toString();
+    const url = `${this.baseUrl}/admin/tours/${tourId}/batch-import${qs ? `?${qs}` : ''}`;
+
+    const headers: HeadersInit = {};
+    const token = this.resolveToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.message || `HTTP ${res.status}`);
+    }
+
+    return res.json();
+  }
+
   async getAdminStopChoices(stopId: number, lang: 'tr' | 'en' | 'de' = 'tr') {
     return this.request<AgencyStopChoicesDto[]>(`/admin/tour-stops/${stopId}/choices`, {
       method: 'GET',
@@ -6111,6 +6140,15 @@ export const adminApi = {
         }
       }
       return { success: true, data: response as ApiTourDto };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async batchImportTourClients(tourId: number, file: File, lang: 'tr' | 'en' | 'de' = 'tr'): Promise<{ success: boolean; data?: any; error?: string }> {
+    try {
+      const response = await apiClient.adminBatchImportClients(tourId, file, lang);
+      return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
