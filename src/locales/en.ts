@@ -704,6 +704,7 @@ export const en = {
     spendLimitExceeded: 'You have reached the maximum selection limit. You can only make changes among your current selections.',
     spendLimit: 'Spend Limit',
     stockLimitReached: 'Stock limit reached for this service',
+    categoryLimitReached: 'You cannot select more from this category. You can continue selecting from another category.',
     stockDepleted: 'Out of Stock',
     noteSaveError: 'Failed to save note',
     changeTable:'Change Seat',

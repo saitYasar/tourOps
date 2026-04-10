@@ -704,6 +704,7 @@ export const de = {
     spendLimitExceeded: 'Sie haben das maximale Auswahllimit erreicht. Sie können nur Änderungen innerhalb Ihrer aktuellen Auswahl vornehmen.',
     spendLimit: 'Ausgabenlimit',
     stockLimitReached: 'Bestandslimit für diesen Service erreicht',
+    categoryLimitReached: 'Sie können aus dieser Kategorie keine weiteren Auswahlen treffen. Sie können aus einer anderen Kategorie weiter wählen.',
     stockDepleted: 'Ausverkauft',
     noteSaveError: 'Notiz konnte nicht gespeichert werden',
     changeTable: 'Platz ändern',

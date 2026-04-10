@@ -60,6 +60,7 @@ import {
   type CreateTourStopPayload,
   type UpdateTourStopPayload,
   type CreateTourPayload,
+  type SelectionLimit,
 } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -205,6 +206,7 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
   const [stopShowPrice, setStopShowPrice] = useState(false);
   const [stopMaxSpend, setStopMaxSpend] = useState('');
   const [stopChoiceDeadline, setStopChoiceDeadline] = useState('');
+  const [stopSelectionLimits, setStopSelectionLimits] = useState<Record<number, number>>({});
   const [menuPreviewOpen, setMenuPreviewOpen] = useState(false);
   const [deleteStopId, setDeleteStopId] = useState<number | null>(null);
   const [rejectStopId, setRejectStopId] = useState<number | null>(null);
@@ -218,6 +220,10 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
   const [editStopShowPrice, setEditStopShowPrice] = useState(true);
   const [editStopMaxSpend, setEditStopMaxSpend] = useState('');
   const [editStopChoiceDeadline, setEditStopChoiceDeadline] = useState('');
+  const [editStopSelectionLimits, setEditStopSelectionLimits] = useState<Record<number, number>>({});
+  const [editMenuPreviewOpen, setEditMenuPreviewOpen] = useState(false);
+  const [editMenuPreviewOrgId, setEditMenuPreviewOrgId] = useState<number | null>(null);
+  const [editMenuPreviewOrgName, setEditMenuPreviewOrgName] = useState('');
 
   // Map UI time filter to backend timeStatus param
   const timeStatusMap: Record<string, string | undefined> = {
@@ -418,6 +424,7 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
       setStopShowPrice(false);
       setStopMaxSpend('');
       setStopChoiceDeadline('');
+      setStopSelectionLimits({});
     },
     onError: (error) => toast.error((error as Error).message || t.admin.tourStopError),
   });
@@ -1054,6 +1061,18 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
                                           setEditStopShowPrice(stop.showPriceToCustomer ?? true);
                                           setEditStopMaxSpend(stop.maxSpendLimit != null ? String(stop.maxSpendLimit) : '');
                                           setEditStopChoiceDeadline(stop.choiceDeadlineTime ? toLocalInput(stop.choiceDeadlineTime) : '');
+                                          // Populate selectionLimits from stop data
+                                          if (stop.selectionLimits?.length) {
+                                            const limitsMap: Record<number, number> = {};
+                                            for (const sl of stop.selectionLimits) {
+                                              if (sl.type === 'service-category') limitsMap[sl.id] = sl.max;
+                                            }
+                                            setEditStopSelectionLimits(limitsMap);
+                                          } else {
+                                            setEditStopSelectionLimits({});
+                                          }
+                                          setEditMenuPreviewOrgId(stop.organizationId);
+                                          setEditMenuPreviewOrgName(stop.organization?.name || '');
                                         }
                                       }}
                                     >
@@ -1081,6 +1100,16 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
                             {/* Inline edit form */}
                             {isEditing && (
                               <div className="mt-3 pt-3 border-t space-y-3">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="w-full"
+                                  onClick={() => setEditMenuPreviewOpen(true)}
+                                >
+                                  <Eye className="h-3.5 w-3.5 mr-1.5" />
+                                  {t.menu.menuPreview}
+                                </Button>
                                 <div className="space-y-1.5">
                                   <Label className="text-xs">{t.admin.descriptionLabel}</Label>
                                   <Textarea
@@ -1150,6 +1179,11 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
                                     className="gap-1.5"
                                     disabled={!editStopStartTime || !editStopEndTime || updateStopMutation.isPending}
                                     onClick={() => {
+                                      const editLimits: SelectionLimit[] = Object.entries(editStopSelectionLimits).map(([id, max]) => ({
+                                        id: Number(id),
+                                        type: 'service-category' as const,
+                                        max,
+                                      }));
                                       const data: UpdateTourStopPayload = {
                                         description: editStopDescription,
                                         scheduledStartTime: editStopStartTime,
@@ -1157,6 +1191,7 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
                                         showPriceToCustomer: editStopShowPrice,
                                         maxSpendLimit: editStopMaxSpend ? Number(editStopMaxSpend) : null,
                                         choiceDeadlineTime: editStopChoiceDeadline || undefined,
+                                        selectionLimits: editLimits.length > 0 ? editLimits : null,
                                       };
                                       updateStopMutation.mutate({ stopId: stop.id, data });
                                     }}
@@ -1653,7 +1688,7 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
       </Dialog>
 
       {/* Add Stop Dialog */}
-      <Dialog open={addStopOpen} onOpenChange={(open) => { if (!open) { setAddStopOpen(false); setSelectedOrgDetail(null); setAddStopOrgSearch(''); setStopStartTime(''); setStopEndTime(''); setStopDescription(''); setStopShowPrice(false); setStopMaxSpend(''); setStopChoiceDeadline(''); } }}>
+      <Dialog open={addStopOpen} onOpenChange={(open) => { if (!open) { setAddStopOpen(false); setSelectedOrgDetail(null); setAddStopOrgSearch(''); setStopStartTime(''); setStopEndTime(''); setStopDescription(''); setStopShowPrice(false); setStopMaxSpend(''); setStopChoiceDeadline(''); setStopSelectionLimits({}); } }}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>{t.admin.addTourStop}</DialogTitle>
@@ -1671,6 +1706,7 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
                     setAddStopOrgSearch(e.target.value);
                     if (selectedOrgDetail) {
                       setSelectedOrgDetail(null);
+                      setStopSelectionLimits({});
                     }
                   }}
                   className="pl-9"
@@ -1726,6 +1762,7 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
                         onClick={() => {
                           setSelectedOrgDetail(null);
                           setAddStopOrgSearch('');
+                          setStopSelectionLimits({});
                         }}
                       >
                         <X className="h-3.5 w-3.5" />
@@ -1840,6 +1877,11 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
             <Button
               disabled={!selectedOrgDetail || !stopStartTime || !stopEndTime || addStopMutation.isPending}
               onClick={() => {
+                const limits: SelectionLimit[] = Object.entries(stopSelectionLimits).map(([id, max]) => ({
+                  id: Number(id),
+                  type: 'service-category' as const,
+                  max,
+                }));
                 addStopMutation.mutate({
                   tourId: selectedTourId!,
                   organizationId: selectedOrgDetail!.id,
@@ -1849,6 +1891,7 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
                   showPriceToCustomer: stopShowPrice,
                   maxSpendLimit: stopMaxSpend ? Number(stopMaxSpend) : undefined,
                   choiceDeadlineTime: stopChoiceDeadline || undefined,
+                  ...(limits.length > 0 ? { selectionLimits: limits } : {}),
                 });
               }}
             >
@@ -1943,12 +1986,43 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
         </DialogContent>
       </Dialog>
 
-      {/* Menu Preview */}
+      {/* Menu Preview (Add Stop) */}
       <OrgMenuPreviewDialog
         open={menuPreviewOpen}
         onOpenChange={setMenuPreviewOpen}
         organizationId={selectedOrgDetail?.id}
         organizationName={selectedOrgDetail?.name}
+        selectionLimits={stopSelectionLimits}
+        onSelectionLimitChange={(catId, val) => {
+          setStopSelectionLimits((prev) => {
+            if (val === undefined) {
+              const next = { ...prev };
+              delete next[catId];
+              return next;
+            }
+            return { ...prev, [catId]: val };
+          });
+        }}
+      />
+
+      {/* Menu Preview (Edit Stop) */}
+      <OrgMenuPreviewDialog
+        open={editMenuPreviewOpen}
+        onOpenChange={setEditMenuPreviewOpen}
+        organizationId={editMenuPreviewOrgId}
+        organizationName={editMenuPreviewOrgName}
+        stopId={editingStopId}
+        selectionLimits={editStopSelectionLimits}
+        onSelectionLimitChange={(catId, val) => {
+          setEditStopSelectionLimits((prev) => {
+            if (val === undefined) {
+              const next = { ...prev };
+              delete next[catId];
+              return next;
+            }
+            return { ...prev, [catId]: val };
+          });
+        }}
       />
 
       {/* Lightbox — portal ile body seviyesinde render, Dialog'un üstünde */}

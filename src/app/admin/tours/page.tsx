@@ -39,7 +39,7 @@ import { toast } from 'sonner';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useDebounce } from '@/hooks/useDebounce';
 import { adminApi } from '@/lib/api';
-import type { ApiTourDto, AgencyStopChoicesDto, AgencyStopServiceSummaryDto, CreateTourStopPayload, UpdateTourStopPayload } from '@/lib/api';
+import type { ApiTourDto, AgencyStopChoicesDto, AgencyStopServiceSummaryDto, CreateTourStopPayload, UpdateTourStopPayload, SelectionLimit } from '@/lib/api';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { ConfirmDialog } from '@/components/shared';
@@ -150,6 +150,7 @@ export default function AdminToursPage() {
   const [stopShowPrice, setStopShowPrice] = useState(true);
   const [stopMaxSpend, setStopMaxSpend] = useState('');
   const [stopChoiceDeadline, setStopChoiceDeadline] = useState('');
+  const [stopSelectionLimits, setStopSelectionLimits] = useState<Record<number, number>>({});
   const [menuPreviewOpen, setMenuPreviewOpen] = useState(false);
   const [deleteStopId, setDeleteStopId] = useState<number | null>(null);
   const [rejectStopId, setRejectStopId] = useState<number | null>(null);
@@ -163,6 +164,10 @@ export default function AdminToursPage() {
   const [editStopShowPrice, setEditStopShowPrice] = useState(true);
   const [editStopMaxSpend, setEditStopMaxSpend] = useState('');
   const [editStopChoiceDeadline, setEditStopChoiceDeadline] = useState('');
+  const [editStopSelectionLimits, setEditStopSelectionLimits] = useState<Record<number, number>>({});
+  const [editMenuPreviewOpen, setEditMenuPreviewOpen] = useState(false);
+  const [editMenuPreviewOrgId, setEditMenuPreviewOrgId] = useState<number | null>(null);
+  const [editMenuPreviewOrgName, setEditMenuPreviewOrgName] = useState('');
 
   // Reset page on filter change
   const prevFilters = useRef({ debouncedSearch, statusFilter, agencyFilter, timeFilter, sortBy, sortOrder });
@@ -298,6 +303,7 @@ export default function AdminToursPage() {
       setStopShowPrice(true);
       setStopMaxSpend('');
       setStopChoiceDeadline('');
+      setStopSelectionLimits({});
       setAddStopOrgSearch('');
     },
     onError: (err: Error) => toast.error(err.message || t.admin.tourStopError),
@@ -386,6 +392,11 @@ export default function AdminToursPage() {
 
   const handleAddStop = () => {
     if (!selectedTourId || !selectedOrgDetail || !stopStartTime || !stopEndTime) return;
+    const limits: SelectionLimit[] = Object.entries(stopSelectionLimits).map(([id, max]) => ({
+      id: Number(id),
+      type: 'service-category' as const,
+      max,
+    }));
     addStopMutation.mutate({
       tourId: selectedTourId,
       organizationId: selectedOrgDetail.id,
@@ -394,6 +405,7 @@ export default function AdminToursPage() {
       showPriceToCustomer: stopShowPrice,
       maxSpendLimit: stopMaxSpend ? Number(stopMaxSpend) : null,
       choiceDeadlineTime: stopChoiceDeadline || undefined,
+      ...(limits.length > 0 ? { selectionLimits: limits } : {}),
     });
   };
 
@@ -1090,6 +1102,18 @@ export default function AdminToursPage() {
                                           setEditStopShowPrice(stop.showPriceToCustomer ?? true);
                                           setEditStopMaxSpend(stop.maxSpendLimit != null ? String(stop.maxSpendLimit) : '');
                                           setEditStopChoiceDeadline(stop.choiceDeadlineTime ? toLocalInput(stop.choiceDeadlineTime) : '');
+                                          // Populate selectionLimits from stop data
+                                          if (stop.selectionLimits?.length) {
+                                            const limitsMap: Record<number, number> = {};
+                                            for (const sl of stop.selectionLimits) {
+                                              if (sl.type === 'service-category') limitsMap[sl.id] = sl.max;
+                                            }
+                                            setEditStopSelectionLimits(limitsMap);
+                                          } else {
+                                            setEditStopSelectionLimits({});
+                                          }
+                                          setEditMenuPreviewOrgId(stop.organizationId);
+                                          setEditMenuPreviewOrgName(stop.organization?.name || '');
                                         }
                                       }}
                                     >
@@ -1117,6 +1141,16 @@ export default function AdminToursPage() {
                             {/* Inline edit form */}
                             {isEditing && (
                               <div className="mt-3 pt-3 border-t space-y-3">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="w-full"
+                                  onClick={() => setEditMenuPreviewOpen(true)}
+                                >
+                                  <Eye className="h-3.5 w-3.5 mr-1.5" />
+                                  {t.menu.menuPreview}
+                                </Button>
                                 <div className="space-y-1.5">
                                   <Label className="text-xs">{t.admin.descriptionLabel}</Label>
                                   <Textarea
@@ -1186,6 +1220,11 @@ export default function AdminToursPage() {
                                     className="gap-1.5"
                                     disabled={!editStopStartTime || !editStopEndTime || updateStopMutation.isPending}
                                     onClick={() => {
+                                      const editLimits: SelectionLimit[] = Object.entries(editStopSelectionLimits).map(([id, max]) => ({
+                                        id: Number(id),
+                                        type: 'service-category' as const,
+                                        max,
+                                      }));
                                       const data: UpdateTourStopPayload = {
                                         description: editStopDescription,
                                         scheduledStartTime: editStopStartTime,
@@ -1193,6 +1232,7 @@ export default function AdminToursPage() {
                                         showPriceToCustomer: editStopShowPrice,
                                         maxSpendLimit: editStopMaxSpend ? Number(editStopMaxSpend) : null,
                                         choiceDeadlineTime: editStopChoiceDeadline || undefined,
+                                        selectionLimits: editLimits.length > 0 ? editLimits : null,
                                       };
                                       updateStopMutation.mutate({ stopId: stop.id, data });
                                     }}
@@ -1666,6 +1706,7 @@ export default function AdminToursPage() {
           setStopShowPrice(true);
           setStopMaxSpend('');
           setStopChoiceDeadline('');
+          setStopSelectionLimits({});
           setAddStopOrgSearch('');
         }
       }}>
@@ -1686,6 +1727,7 @@ export default function AdminToursPage() {
                     setAddStopOrgSearch(e.target.value);
                     if (selectedOrgDetail) {
                       setSelectedOrgDetail(null);
+                      setStopSelectionLimits({});
                     }
                   }}
                   className="pl-9"
@@ -1741,6 +1783,7 @@ export default function AdminToursPage() {
                         onClick={() => {
                           setSelectedOrgDetail(null);
                           setAddStopOrgSearch('');
+                          setStopSelectionLimits({});
                         }}
                       >
                         <X className="h-3.5 w-3.5" />
@@ -1891,12 +1934,43 @@ export default function AdminToursPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Menu Preview */}
+      {/* Menu Preview (Add Stop) */}
       <OrgMenuPreviewDialog
         open={menuPreviewOpen}
         onOpenChange={setMenuPreviewOpen}
         organizationId={selectedOrgDetail?.id}
         organizationName={selectedOrgDetail?.name}
+        selectionLimits={stopSelectionLimits}
+        onSelectionLimitChange={(catId, val) => {
+          setStopSelectionLimits((prev) => {
+            if (val === undefined) {
+              const next = { ...prev };
+              delete next[catId];
+              return next;
+            }
+            return { ...prev, [catId]: val };
+          });
+        }}
+      />
+
+      {/* Menu Preview (Edit Stop) */}
+      <OrgMenuPreviewDialog
+        open={editMenuPreviewOpen}
+        onOpenChange={setEditMenuPreviewOpen}
+        organizationId={editMenuPreviewOrgId}
+        organizationName={editMenuPreviewOrgName}
+        stopId={editingStopId}
+        selectionLimits={editStopSelectionLimits}
+        onSelectionLimitChange={(catId, val) => {
+          setEditStopSelectionLimits((prev) => {
+            if (val === undefined) {
+              const next = { ...prev };
+              delete next[catId];
+              return next;
+            }
+            return { ...prev, [catId]: val };
+          });
+        }}
       />
 
       {/* Lightbox */}

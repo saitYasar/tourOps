@@ -973,6 +973,7 @@ export interface ClientStopMenuCategoryDto {
   name: string;
   displayOrder: number;
   imageUrl: string | null;
+  max?: number | null;
   child_service_categories: ClientStopMenuCategoryDto[];
   services: ClientStopMenuServiceDto[];
 }
@@ -1298,6 +1299,7 @@ export interface ApiTourStopDto {
   choiceDeadlineTime?: string | null;
   preReservationStatus?: 'pending' | 'approved' | 'rejected' | null;
   choicesStatus?: 'in_progress' | 'submitted' | 'approved' | 'rejected' | 'revision_requested' | null;
+  selectionLimits?: SelectionLimit[] | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -1441,6 +1443,12 @@ export interface ChoiceDeadlineRemainingDto {
   };
 }
 
+export interface SelectionLimit {
+  id: number;
+  type: 'service' | 'service-category';
+  max: number;
+}
+
 export interface CreateTourStopPayload {
   tourId: number;
   organizationId: number;
@@ -1450,6 +1458,7 @@ export interface CreateTourStopPayload {
   showPriceToCustomer?: boolean;
   maxSpendLimit?: number | null;
   choiceDeadlineTime?: string;
+  selectionLimits?: SelectionLimit[];
 }
 
 export interface UpdateTourStopPayload {
@@ -1460,6 +1469,7 @@ export interface UpdateTourStopPayload {
   showPriceToCustomer?: boolean;
   maxSpendLimit?: number | null;
   choiceDeadlineTime?: string;
+  selectionLimits?: SelectionLimit[] | null;
 }
 
 // ============================================

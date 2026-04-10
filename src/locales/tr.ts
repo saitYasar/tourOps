@@ -704,6 +704,7 @@ export const tr = {
     spendLimitExceeded: 'Maksimum seçim limitini doldurdunuz. Yalnızca seçimleriniz arasında değişiklik yapabilirsiniz.',
     spendLimit: 'Üst Limit',
     stockLimitReached: 'Bu hizmet için stok limiti doldu',
+    categoryLimitReached: 'Bu kategoriden daha fazla seçim yapamazsınız. Başka bir kategoriden seçime devam edebilirsiniz.',
     stockDepleted: 'Stok Tükendi',
     noteSaveError: 'Not kaydedilemedi',
     changeTable: 'Yer Değiştir',

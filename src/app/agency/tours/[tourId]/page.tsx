@@ -30,6 +30,7 @@ import {
   Star,
   MapPin,
   Loader2,
+  Minus,
   Percent,
   ClipboardList,
   DollarSign,
@@ -50,7 +51,7 @@ import dynamic from 'next/dynamic';
 
 import { tourApi, tourStopApi, apiClient, agencyApi } from '@/lib/api';
 import { getCurrencySymbol } from '@/lib/utils';
-import type { ApiTourDto, ApiTourStopDto, CreateTourStopPayload, UpdateTourPayload, ServiceRequestDto, OrganizationPublicDto, TourClientDto, AgencyClientDto, AgencyStopChoicesDto, AgencyStopServiceSummaryDto, CategoryDto, LocationDto, CreateAgencyClientDto, ClientStopMenuCategoryDto, ClientStopMenuServiceDto } from '@/lib/api';
+import type { ApiTourDto, ApiTourStopDto, CreateTourStopPayload, UpdateTourPayload, ServiceRequestDto, OrganizationPublicDto, TourClientDto, AgencyClientDto, AgencyStopChoicesDto, AgencyStopServiceSummaryDto, CategoryDto, LocationDto, CreateAgencyClientDto, ClientStopMenuCategoryDto, ClientStopMenuServiceDto, SelectionLimit } from '@/lib/api';
 import { ServiceDetailDialog } from '@/components/shared/ServiceDetailDialog';
 import { formatDate, formatShortDateTime } from '@/lib/dateUtils';
 
@@ -152,7 +153,32 @@ function MenuPreviewServiceList({ services, t, onServiceClick }: { services: Cli
   );
 }
 
-function MenuPreviewCategoryItem({ cat, depth, t, onServiceClick }: { cat: ClientStopMenuCategoryDto; depth: number; t: ReturnType<typeof useLanguage>['t']; onServiceClick?: (svc: ClientStopMenuServiceDto) => void }) {
+function MenuPreviewCategoryLimitControl({ categoryId, value, onChange, t }: { categoryId: number; value: number | undefined; onChange: (categoryId: number, value: number | undefined) => void; t: ReturnType<typeof useLanguage>['t'] }) {
+  const isUnlimited = value === undefined;
+  return (
+    <div className="flex items-center gap-0.5 bg-white/10 rounded-lg px-1 py-0.5" onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); if (!isUnlimited) { onChange(categoryId, value === 0 ? undefined : value - 1); } }}
+        className="w-5 h-5 flex items-center justify-center rounded text-white/70 hover:bg-white/20 transition-colors"
+      >
+        <Minus className="h-3 w-3" />
+      </button>
+      <span className="min-w-[52px] text-center text-[11px] font-medium text-amber-400 select-none">
+        {isUnlimited ? t.menu.stockUnlimited : value}
+      </span>
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); onChange(categoryId, isUnlimited ? 0 : value + 1); }}
+        className="w-5 h-5 flex items-center justify-center rounded text-white/70 hover:bg-white/20 transition-colors"
+      >
+        <Plus className="h-3 w-3" />
+      </button>
+    </div>
+  );
+}
+
+function MenuPreviewCategoryItem({ cat, depth, t, onServiceClick, selectionLimits, onSelectionLimitChange }: { cat: ClientStopMenuCategoryDto; depth: number; t: ReturnType<typeof useLanguage>['t']; onServiceClick?: (svc: ClientStopMenuServiceDto) => void; selectionLimits?: Record<number, number>; onSelectionLimitChange?: (categoryId: number, value: number | undefined) => void }) {
   const [open, setOpen] = useState(depth === 0);
   const hasServices = cat.services?.length > 0;
   const hasChildren = cat.child_service_categories?.length > 0;
@@ -161,8 +187,18 @@ function MenuPreviewCategoryItem({ cat, depth, t, onServiceClick }: { cat: Clien
     <div>
       {depth === 0 ? (
         <button type="button" onClick={() => setOpen((v) => !v)} className="w-full bg-gradient-to-r from-stone-800 to-stone-700 px-4 py-3 rounded-xl mb-3 flex items-center justify-between cursor-pointer">
-          <h3 className="text-lg font-bold text-white">{cat.name}</h3>
-          <ChevronDown className={`h-4 w-4 text-white/70 transition-transform ${open ? '' : '-rotate-90'}`} />
+          <h3 className="text-lg font-bold text-white truncate mr-2">{cat.name}</h3>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {selectionLimits !== undefined && onSelectionLimitChange && (
+              <MenuPreviewCategoryLimitControl
+                categoryId={cat.id}
+                value={selectionLimits[cat.id]}
+                onChange={onSelectionLimitChange}
+                t={t}
+              />
+            )}
+            <ChevronDown className={`h-4 w-4 text-white/70 transition-transform ${open ? '' : '-rotate-90'}`} />
+          </div>
         </button>
       ) : (
         <button type="button" onClick={() => setOpen((v) => !v)} className="w-full px-4 py-2 mb-2 flex items-center justify-between cursor-pointer">
@@ -173,18 +209,18 @@ function MenuPreviewCategoryItem({ cat, depth, t, onServiceClick }: { cat: Clien
       {open && (
         <>
           {hasServices && <MenuPreviewServiceList services={cat.services} t={t} onServiceClick={onServiceClick} />}
-          {hasChildren && <MenuPreviewCategoryTree categories={cat.child_service_categories} depth={depth + 1} t={t} onServiceClick={onServiceClick} />}
+          {hasChildren && <MenuPreviewCategoryTree categories={cat.child_service_categories} depth={depth + 1} t={t} onServiceClick={onServiceClick} selectionLimits={selectionLimits} onSelectionLimitChange={onSelectionLimitChange} />}
         </>
       )}
     </div>
   );
 }
 
-function MenuPreviewCategoryTree({ categories, depth, t, onServiceClick }: { categories: ClientStopMenuCategoryDto[]; depth: number; t: ReturnType<typeof useLanguage>['t']; onServiceClick?: (svc: ClientStopMenuServiceDto) => void }) {
+function MenuPreviewCategoryTree({ categories, depth, t, onServiceClick, selectionLimits, onSelectionLimitChange }: { categories: ClientStopMenuCategoryDto[]; depth: number; t: ReturnType<typeof useLanguage>['t']; onServiceClick?: (svc: ClientStopMenuServiceDto) => void; selectionLimits?: Record<number, number>; onSelectionLimitChange?: (categoryId: number, value: number | undefined) => void }) {
   return (
     <>
       {categories.map((cat) => (
-        <MenuPreviewCategoryItem key={cat.id} cat={cat} depth={depth} t={t} onServiceClick={onServiceClick} />
+        <MenuPreviewCategoryItem key={cat.id} cat={cat} depth={depth} t={t} onServiceClick={onServiceClick} selectionLimits={selectionLimits} onSelectionLimitChange={onSelectionLimitChange} />
       ))}
     </>
   );
@@ -220,6 +256,7 @@ export default function TourDetailPage() {
   const [isMenuPreviewOpen, setIsMenuPreviewOpen] = useState(false);
   const [menuPreviewLang, setMenuPreviewLang] = useState<'tr' | 'en' | 'de'>('tr');
   const [menuDetailService, setMenuDetailService] = useState<ClientStopMenuServiceDto | null>(null);
+  const [stopSelectionLimits, setStopSelectionLimits] = useState<Record<number, number>>({});
   const [choicesStopId, setChoicesStopId] = useState<number | null>(null);
   const [expandedClientId, setExpandedClientId] = useState<number | null>(null);
   const [isCreateClientOpen, setIsCreateClientOpen] = useState(false);
@@ -458,16 +495,34 @@ export default function TourDetailPage() {
     enabled: isStopFormOpen,
   });
 
-  // Query: Organization menu for preview
+  // Query: Organization/Stop menu for preview (use stop endpoint when editing existing stop)
   const { data: orgMenuPreview } = useQuery({
-    queryKey: ['org-menu-preview', selectedOrgDetail?.id, menuPreviewLang],
+    queryKey: editingStop ? ['stop-menu-preview', editingStop.id, menuPreviewLang] : ['org-menu-preview', selectedOrgDetail?.id, menuPreviewLang],
     queryFn: async () => {
+      if (editingStop) {
+        const response = await apiClient.getStopMenu(editingStop.id, menuPreviewLang);
+        return Array.isArray(response) ? response : (response as unknown as { data: ClientStopMenuCategoryDto[] }).data ?? [];
+      }
       const response = await apiClient.getOrganizationMenu(selectedOrgDetail!.id, menuPreviewLang);
-      const data = Array.isArray(response) ? response : (response as unknown as { data: ClientStopMenuCategoryDto[] }).data ?? [];
-      return data;
+      return Array.isArray(response) ? response : (response as unknown as { data: ClientStopMenuCategoryDto[] }).data ?? [];
     },
-    enabled: isMenuPreviewOpen && !!selectedOrgDetail?.id,
+    enabled: isMenuPreviewOpen && (!!editingStop || !!selectedOrgDetail?.id),
   });
+
+  // Auto-populate missing depth-0 categories with default limit of 1 (only once per org)
+  const limitsInitializedForOrg = useRef<number | null>(null);
+  useEffect(() => {
+    if (!orgMenuPreview || orgMenuPreview.length === 0 || !selectedOrgDetail?.id) return;
+    if (limitsInitializedForOrg.current === selectedOrgDetail.id) return;
+    limitsInitializedForOrg.current = selectedOrgDetail.id;
+    setStopSelectionLimits((prev) => {
+      const missing = orgMenuPreview.filter((cat) => prev[cat.id] === undefined);
+      if (missing.length === 0) return prev;
+      const next = { ...prev };
+      for (const cat of missing) next[cat.id] = 1;
+      return next;
+    });
+  }, [orgMenuPreview, selectedOrgDetail?.id]);
 
   // Mutations
 
@@ -605,6 +660,11 @@ export default function TourDetailPage() {
 
   const createStopMutation = useMutation({
     mutationFn: async () => {
+      const limits: SelectionLimit[] = Object.entries(stopSelectionLimits).map(([id, max]) => ({
+        id: Number(id),
+        type: 'service-category' as const,
+        max,
+      }));
       const payload: CreateTourStopPayload = {
         tourId,
         organizationId: stopForm.organizationId,
@@ -613,6 +673,7 @@ export default function TourDetailPage() {
         scheduledEndTime: stopForm.scheduledEndTime || '',
         showPriceToCustomer: stopForm.showPriceToCustomer,
         maxSpendLimit: stopForm.maxSpendLimit !== '' ? Number(stopForm.maxSpendLimit) : null,
+        ...(limits.length > 0 ? { selectionLimits: limits } : {}),
       };
       const result = await tourStopApi.create(payload, apiLang);
       if (!result.success) throw new Error(result.error);
@@ -631,12 +692,18 @@ export default function TourDetailPage() {
   const updateStopMutation = useMutation({
     mutationFn: async () => {
       if (!editingStop) return;
+      const limits: SelectionLimit[] = Object.entries(stopSelectionLimits).map(([id, max]) => ({
+        id: Number(id),
+        type: 'service-category' as const,
+        max,
+      }));
       const result = await tourStopApi.update(editingStop.id, {
         description: stopForm.description || undefined,
         scheduledStartTime: stopForm.scheduledStartTime || undefined,
         scheduledEndTime: stopForm.scheduledEndTime || undefined,
         showPriceToCustomer: stopForm.showPriceToCustomer,
         maxSpendLimit: stopForm.maxSpendLimit !== '' ? Number(stopForm.maxSpendLimit) : null,
+        selectionLimits: limits.length > 0 ? limits : null,
       }, apiLang);
       if (!result.success) throw new Error(result.error);
       return result.data;
@@ -722,6 +789,8 @@ export default function TourDetailPage() {
       showPriceToCustomer: false,
       maxSpendLimit: '',
     });
+    setStopSelectionLimits({});
+    limitsInitializedForOrg.current = null;
     setOrgSearch('');
     setSelectedOrgDetail(null);
     setIsStopFormOpen(true);
@@ -737,6 +806,16 @@ export default function TourDetailPage() {
       showPriceToCustomer: stop.showPriceToCustomer || false,
       maxSpendLimit: stop.maxSpendLimit != null ? String(stop.maxSpendLimit) : '',
     });
+    // Populate selectionLimits from existing stop data
+    if (stop.selectionLimits?.length) {
+      const limitsMap: Record<number, number> = {};
+      for (const sl of stop.selectionLimits) {
+        if (sl.type === 'service-category') limitsMap[sl.id] = sl.max;
+      }
+      setStopSelectionLimits(limitsMap);
+    } else {
+      setStopSelectionLimits({});
+    }
     // Find org from existing data for edit mode
     const existingOrg = organizations?.find((o) => o.id === stop.organizationId);
     if (existingOrg) {
@@ -761,6 +840,8 @@ export default function TourDetailPage() {
       showPriceToCustomer: false,
       maxSpendLimit: '',
     });
+    setStopSelectionLimits({});
+    limitsInitializedForOrg.current = null;
     setSelectedOrgDetail(org);
     setOrgSearch(org.name);
     setIsStopFormOpen(true);
@@ -777,6 +858,8 @@ export default function TourDetailPage() {
       showPriceToCustomer: false,
       maxSpendLimit: '',
     });
+    setStopSelectionLimits({});
+    limitsInitializedForOrg.current = null;
     setOrgSearch('');
     setSelectedOrgDetail(null);
     setOrgFilterCityId(null);
@@ -2233,6 +2316,8 @@ export default function TourDetailPage() {
                       if (selectedOrgDetail) {
                         setSelectedOrgDetail(null);
                         setStopForm((prev) => ({ ...prev, organizationId: 0 }));
+                        setStopSelectionLimits({});
+                        limitsInitializedForOrg.current = null;
                       }
                     }}
                     className="pl-9"
@@ -2298,6 +2383,8 @@ export default function TourDetailPage() {
                             setSelectedOrgDetail(null);
                             setStopForm((prev) => ({ ...prev, organizationId: 0 }));
                             setOrgSearch('');
+                            setStopSelectionLimits({});
+                            limitsInitializedForOrg.current = null;
                           }}
                         >
                           <X className="h-3.5 w-3.5" />
@@ -2741,7 +2828,23 @@ export default function TourDetailPage() {
               </div>
               <div className="px-4 py-4 space-y-5">
                 {orgMenuPreview && orgMenuPreview.length > 0 ? (
-                  <MenuPreviewCategoryTree categories={orgMenuPreview} depth={0} t={t} onServiceClick={setMenuDetailService} />
+                  <MenuPreviewCategoryTree
+                    categories={orgMenuPreview}
+                    depth={0}
+                    t={t}
+                    onServiceClick={setMenuDetailService}
+                    selectionLimits={stopSelectionLimits}
+                    onSelectionLimitChange={(catId, val) => {
+                      setStopSelectionLimits((prev) => {
+                        if (val === undefined) {
+                          const next = { ...prev };
+                          delete next[catId];
+                          return next;
+                        }
+                        return { ...prev, [catId]: val };
+                      });
+                    }}
+                  />
                 ) : (
                   <div className="py-16 text-center">
                     <Store className="h-10 w-10 text-stone-300 mx-auto mb-3" />

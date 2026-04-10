@@ -424,6 +424,35 @@ export default function CustomerTourDetailPage() {
       }
     }
 
+    // Category selection limit check
+    if (qty > currentQty) {
+      const countCategoryQty = (cat: ClientStopMenuCategoryDto): number => {
+        let total = 0;
+        for (const svc of cat.services || []) {
+          total += selectedMenuItems[stopId]?.[svc.id] ?? 0;
+        }
+        for (const child of cat.child_service_categories || []) {
+          total += countCategoryQty(child);
+        }
+        return total;
+      };
+      const serviceInCategory = (cat: ClientStopMenuCategoryDto, svcId: number): boolean => {
+        if (cat.services?.some(s => s.id === svcId)) return true;
+        return cat.child_service_categories?.some(c => serviceInCategory(c, svcId)) ?? false;
+      };
+      for (const rootCat of menuCategories) {
+        if (rootCat.max != null && serviceInCategory(rootCat, serviceId)) {
+          const currentCatTotal = countCategoryQty(rootCat);
+          const added = qty - currentQty;
+          if (currentCatTotal + added > rootCat.max) {
+            showCenterToast(t.customer.categoryLimitReached);
+            return;
+          }
+          break;
+        }
+      }
+    }
+
     // Find service title from menu categories for title tracking
     const findServiceTitle = (cats: ClientStopMenuCategoryDto[]): string => {
       for (const cat of cats) {
@@ -1142,6 +1171,8 @@ function InteractiveMenuCategory({
   onServiceClick,
   readOnly = false,
   getInitialQty,
+  categoryMax,
+  isCategoryLimitReached = false,
 }: {
   category: ClientStopMenuCategoryDto;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1156,6 +1187,8 @@ function InteractiveMenuCategory({
   onServiceClick?: (svc: ClientStopMenuServiceDto) => void;
   readOnly?: boolean;
   getInitialQty?: (stopId: number, serviceId: number) => number;
+  categoryMax?: number | null;
+  isCategoryLimitReached?: boolean;
 }) {
   const priceLabel = (type: string) => {
     if (type === 'fixed') return '';
@@ -1167,6 +1200,19 @@ function InteractiveMenuCategory({
 
   const [collapsed, setCollapsed] = useState(false);
 
+  // Compute category selection limit — max is on root (depth-0) categories
+  const countCatQty = (cat: ClientStopMenuCategoryDto): number => {
+    let total = 0;
+    for (const svc of cat.services || []) total += getItemQty(stopId, svc.id);
+    for (const child of cat.child_service_categories || []) total += countCatQty(child);
+    return total;
+  };
+  const effectiveMax = depth === 0 ? category.max : categoryMax;
+  const rootCatTotal = depth === 0 ? countCatQty(category) : 0;
+  const limitReached = depth === 0
+    ? (effectiveMax != null && rootCatTotal >= effectiveMax)
+    : isCategoryLimitReached;
+
   return (
     <div>
       {/* Category header — matches restaurant preview */}
@@ -1176,7 +1222,14 @@ function InteractiveMenuCategory({
             className="bg-gradient-to-r from-stone-800 to-stone-700 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl mb-3 cursor-pointer flex items-center justify-between"
             onClick={() => setCollapsed(prev => !prev)}
           >
-            <h3 className="text-base sm:text-lg font-bold text-white">{category.name}</h3>
+            <div className="min-w-0 flex-1">
+              <h3 className="text-base sm:text-lg font-bold text-white">{category.name}</h3>
+              {effectiveMax != null && (
+                <p className={`text-[11px] mt-0.5 ${limitReached ? 'text-red-300' : 'text-white/50'}`}>
+                  {countCatQty(category)}/{effectiveMax}
+                </p>
+              )}
+            </div>
             <ChevronDown className={`h-4 w-4 text-white transition-transform ${collapsed ? '-rotate-90' : ''}`} />
           </div>
         ) : (
@@ -1188,6 +1241,13 @@ function InteractiveMenuCategory({
             <ChevronDown className={`h-3.5 w-3.5 text-stone-400 transition-transform ${collapsed ? '-rotate-90' : ''}`} />
           </div>
         )
+      )}
+
+      {/* Category limit warning */}
+      {!collapsed && depth === 0 && limitReached && (
+        <div className="mx-1 mb-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-xs text-red-600 font-medium">{t.customer.categoryLimitReached}</p>
+        </div>
       )}
 
       {/* Services — restaurant preview style with +/- controls */}
@@ -1285,7 +1345,7 @@ function InteractiveMenuCategory({
                       <button
                         className="w-8 h-8 sm:w-9 sm:h-9 rounded-full border border-orange-300 bg-orange-50 flex items-center justify-center hover:bg-orange-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                         onClick={() => setItemQty(stopId, svc.id, qty + 1)}
-                        disabled={isOutOfStock || isStockLimitReached}
+                        disabled={isOutOfStock || isStockLimitReached || limitReached}
                       >
                         <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-orange-600" />
                       </button>
@@ -1332,6 +1392,8 @@ function InteractiveMenuCategory({
               onServiceClick={onServiceClick}
               readOnly={readOnly}
               getInitialQty={getInitialQty}
+              categoryMax={effectiveMax}
+              isCategoryLimitReached={limitReached}
             />
           ))}
         </div>
