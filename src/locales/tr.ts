@@ -812,6 +812,7 @@ export const tr = {
     excelRowNo: 'Sıra No',
     excelLastName: 'SOYADI',
     excelFirstName: 'ADI',
+    excelGender: 'CİNSİYETİ',
     // Form labels
     labelFirstName: 'Ad *',
     labelLastName: 'Soyad *',

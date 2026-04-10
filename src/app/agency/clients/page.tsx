@@ -967,15 +967,15 @@ export default function AgencyClientsPage() {
                     const XLSX = require('xlsx-js-style');
                     const tourTitle = batchSelectedTourName || 'TUR ADI';
                     const data = [
-                      [tourTitle, '', ''],
-                      [t.invitations.excelRowNo, t.invitations.excelLastName, t.invitations.excelFirstName],
-                      [1, 'HILLEBRAND', 'INGE'],
-                      [2, 'SUPPAN-DANIA', 'BETTINA'],
-                      [3, 'SCHNEIDER', 'KARIN'],
+                      [tourTitle, '', '', ''],
+                      [t.invitations.excelRowNo, t.invitations.excelLastName, t.invitations.excelFirstName, t.invitations.excelGender],
+                      [1, 'HILLEBRAND', 'INGE', 'MRS'],
+                      [2, 'SUPPAN-DANIA', 'BETTINA', 'MRS'],
+                      [3, 'SCHNEIDER', 'KARIN', 'MR'],
                     ];
                     const ws = XLSX.utils.aoa_to_sheet(data);
-                    ws['!cols'] = [{ wch: 8 }, { wch: 20 }, { wch: 20 }];
-                    ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 2 } }];
+                    ws['!cols'] = [{ wch: 8 }, { wch: 20 }, { wch: 20 }, { wch: 12 }];
+                    ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }];
                     const wb = XLSX.utils.book_new();
                     XLSX.utils.book_append_sheet(wb, ws, 'Misafirler');
                     XLSX.writeFile(wb, 'misafir_sablonu.xlsx');
@@ -990,18 +990,19 @@ export default function AgencyClientsPage() {
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="bg-blue-50 border-b">
-                      <th colSpan={3} className="px-3 py-1.5 text-left font-semibold text-blue-700 italic">23-27 MART 2026 İSTANBUL TURU</th>
+                      <th colSpan={4} className="px-3 py-1.5 text-left font-semibold text-blue-700 italic">23-27 MART 2026 İSTANBUL TURU</th>
                     </tr>
                     <tr className="bg-slate-100 border-b">
                       <th className="px-3 py-1.5 text-left font-semibold text-slate-700">{t.invitations.excelRowNo}</th>
                       <th className="px-3 py-1.5 text-left font-semibold text-slate-700">{t.invitations.excelLastName}</th>
                       <th className="px-3 py-1.5 text-left font-semibold text-slate-700">{t.invitations.excelFirstName}</th>
+                      <th className="px-3 py-1.5 text-left font-semibold text-slate-700">{t.invitations.excelGender}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    <tr><td className="px-3 py-1 text-slate-500">1</td><td className="px-3 py-1">HILLEBRAND</td><td className="px-3 py-1">INGE</td></tr>
-                    <tr><td className="px-3 py-1 text-slate-500">2</td><td className="px-3 py-1">SUPPAN-DANIA</td><td className="px-3 py-1">BETTINA</td></tr>
-                    <tr><td className="px-3 py-1 text-slate-500">3</td><td className="px-3 py-1">SCHNEIDER</td><td className="px-3 py-1">KARIN</td></tr>
+                    <tr><td className="px-3 py-1 text-slate-500">1</td><td className="px-3 py-1">HILLEBRAND</td><td className="px-3 py-1">INGE</td><td className="px-3 py-1">MRS</td></tr>
+                    <tr><td className="px-3 py-1 text-slate-500">2</td><td className="px-3 py-1">SUPPAN-DANIA</td><td className="px-3 py-1">BETTINA</td><td className="px-3 py-1">MRS</td></tr>
+                    <tr><td className="px-3 py-1 text-slate-500">3</td><td className="px-3 py-1">SCHNEIDER</td><td className="px-3 py-1">KARIN</td><td className="px-3 py-1">MR</td></tr>
                   </tbody>
                 </table>
               </div>

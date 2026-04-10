@@ -811,6 +811,7 @@ export const en = {
     excelRowNo: 'Sıra No',
     excelLastName: 'SOYADI',
     excelFirstName: 'ADI',
+    excelGender: 'CİNSİYETİ',
     // Form labels
     labelFirstName: 'First Name *',
     labelLastName: 'Last Name *',
