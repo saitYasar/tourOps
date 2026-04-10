@@ -112,6 +112,7 @@ export default function AdminToursPage() {
   const [expandedParticipantId, setExpandedParticipantId] = useState<number | null>(null);
   const [batchImportOpen, setBatchImportOpen] = useState(false);
   const [batchFile, setBatchFile] = useState<File | null>(null);
+  const [batchPreview, setBatchPreview] = useState<string[][]>([]);
   const batchFileRef = useRef<HTMLInputElement>(null);
   const [choicesStopId, setChoicesStopId] = useState<number | null>(null);
   const [expandedClientId, setExpandedClientId] = useState<number | null>(null);
@@ -295,6 +296,7 @@ export default function AdminToursPage() {
   const closeBatchImport = () => {
     setBatchImportOpen(false);
     setBatchFile(null);
+    setBatchPreview([]);
   };
 
   const batchImportMutation = useMutation({
@@ -2034,7 +2036,7 @@ export default function AdminToursPage() {
                     <button
                       type="button"
                       className="text-slate-400 hover:text-red-500"
-                      onClick={(e) => { e.stopPropagation(); setBatchFile(null); }}
+                      onClick={(e) => { e.stopPropagation(); setBatchFile(null); setBatchPreview([]); }}
                     >
                       <X className="h-4 w-4" />
                     </button>
@@ -2053,59 +2055,110 @@ export default function AdminToursPage() {
                 accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
-                  if (file) setBatchFile(file);
+                  if (file) {
+                    setBatchFile(file);
+                    const XLSX = require('xlsx-js-style');
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                      try {
+                        const wb = XLSX.read(ev.target?.result, { type: 'array' });
+                        const ws = wb.Sheets[wb.SheetNames[0]];
+                        const rows: string[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+                        setBatchPreview(rows);
+                      } catch { setBatchPreview([]); }
+                    };
+                    reader.readAsArrayBuffer(file);
+                  }
                   e.target.value = '';
                 }}
               />
             </div>
 
-            {/* Excel Template */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>{t.invitations.excelTemplate}</Label>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const XLSX = require('xlsx-js-style');
-                    const data = [
-                      [t.invitations.excelRowNo, t.invitations.excelLastName, t.invitations.excelFirstName, t.invitations.excelGender],
-                      [1, 'HILLEBRAND', 'INGE', 'MRS'],
-                      [2, 'SUPPAN-DANIA', 'BETTINA', 'MRS'],
-                      [3, 'SCHNEIDER', 'KARIN', 'MR'],
-                    ];
-                    const ws = XLSX.utils.aoa_to_sheet(data);
-                    ws['!cols'] = [{ wch: 8 }, { wch: 20 }, { wch: 20 }, { wch: 12 }];
-                    const wb = XLSX.utils.book_new();
-                    XLSX.utils.book_append_sheet(wb, ws, 'Misafirler');
-                    XLSX.writeFile(wb, 'misafir_sablonu.xlsx');
-                  }}
-                  className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium"
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  {t.invitations.downloadTemplate}
-                </button>
+            {batchPreview.length > 0 ? (() => {
+              const headerIdx = batchPreview.findIndex(row => row.some(c => String(c).toUpperCase().includes('SOYADI')));
+              const titleText = headerIdx > 0 ? batchPreview.slice(0, headerIdx).map(r => r.filter(c => String(c).trim()).join(' ')).filter(Boolean).join(' ') : null;
+              const headerRow = headerIdx >= 0 ? batchPreview[headerIdx] : batchPreview[0];
+              const dataRows = batchPreview.slice((headerIdx >= 0 ? headerIdx : 0) + 1);
+              const colCount = headerRow?.length || 4;
+              return (
+              /* File Preview */
+              <div className="space-y-2">
+                <Label>{t.invitations.excelPreview} ({dataRows.length} {t.tours.clients.toLowerCase()})</Label>
+                <div className="border rounded-lg overflow-hidden max-h-52 overflow-y-auto">
+                  <table className="w-full text-xs">
+                    <thead className="sticky top-0">
+                      {titleText && (
+                        <tr className="bg-blue-50 border-b">
+                          <th colSpan={colCount} className="px-3 py-1.5 text-left font-semibold text-blue-700 italic">{titleText}</th>
+                        </tr>
+                      )}
+                      <tr className="bg-green-50 border-b">
+                        {headerRow?.map((cell, i) => (
+                          <th key={i} className="px-3 py-1.5 text-left font-semibold text-green-800">{String(cell)}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {dataRows.map((row, ri) => (
+                        <tr key={ri} className={ri % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                          {row.map((cell, ci) => (
+                            <td key={ci} className="px-3 py-1">{String(cell)}</td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-              <div className="border rounded-lg overflow-hidden">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="bg-slate-100 border-b">
-                      <th className="px-3 py-1.5 text-left font-semibold text-slate-700">{t.invitations.excelRowNo}</th>
-                      <th className="px-3 py-1.5 text-left font-semibold text-slate-700">{t.invitations.excelLastName}</th>
-                      <th className="px-3 py-1.5 text-left font-semibold text-slate-700">{t.invitations.excelFirstName}</th>
-                      <th className="px-3 py-1.5 text-left font-semibold text-slate-700">{t.invitations.excelGender}</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    <tr><td className="px-3 py-1 text-slate-500">1</td><td className="px-3 py-1">HILLEBRAND</td><td className="px-3 py-1">INGE</td><td className="px-3 py-1">MRS</td></tr>
-                    <tr><td className="px-3 py-1 text-slate-500">2</td><td className="px-3 py-1">SUPPAN-DANIA</td><td className="px-3 py-1">BETTINA</td><td className="px-3 py-1">MRS</td></tr>
-                    <tr><td className="px-3 py-1 text-slate-500">3</td><td className="px-3 py-1">SCHNEIDER</td><td className="px-3 py-1">KARIN</td><td className="px-3 py-1">MR</td></tr>
-                  </tbody>
-                </table>
+              ); })() : (
+              /* Excel Template */
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>{t.invitations.excelTemplate}</Label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const XLSX = require('xlsx-js-style');
+                      const data = [
+                        [t.invitations.excelRowNo, t.invitations.excelLastName, t.invitations.excelFirstName, t.invitations.excelGender],
+                        [1, 'HILLEBRAND', 'INGE', 'MRS'],
+                        [2, 'SUPPAN-DANIA', 'BETTINA', 'MRS'],
+                        [3, 'SCHNEIDER', 'KARIN', 'MR'],
+                      ];
+                      const ws = XLSX.utils.aoa_to_sheet(data);
+                      ws['!cols'] = [{ wch: 8 }, { wch: 20 }, { wch: 20 }, { wch: 12 }];
+                      const wb = XLSX.utils.book_new();
+                      XLSX.utils.book_append_sheet(wb, ws, 'Misafirler');
+                      XLSX.writeFile(wb, 'misafir_sablonu.xlsx');
+                    }}
+                    className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    {t.invitations.downloadTemplate}
+                  </button>
+                </div>
+                <div className="border rounded-lg overflow-hidden">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-slate-100 border-b">
+                        <th className="px-3 py-1.5 text-left font-semibold text-slate-700">{t.invitations.excelRowNo}</th>
+                        <th className="px-3 py-1.5 text-left font-semibold text-slate-700">{t.invitations.excelLastName}</th>
+                        <th className="px-3 py-1.5 text-left font-semibold text-slate-700">{t.invitations.excelFirstName}</th>
+                        <th className="px-3 py-1.5 text-left font-semibold text-slate-700">{t.invitations.excelGender}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      <tr><td className="px-3 py-1 text-slate-500">1</td><td className="px-3 py-1">HILLEBRAND</td><td className="px-3 py-1">INGE</td><td className="px-3 py-1">MRS</td></tr>
+                      <tr><td className="px-3 py-1 text-slate-500">2</td><td className="px-3 py-1">SUPPAN-DANIA</td><td className="px-3 py-1">BETTINA</td><td className="px-3 py-1">MRS</td></tr>
+                      <tr><td className="px-3 py-1 text-slate-500">3</td><td className="px-3 py-1">SCHNEIDER</td><td className="px-3 py-1">KARIN</td><td className="px-3 py-1">MR</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p className="text-[11px] text-amber-600 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-1.5">
+                  ⚠ {t.invitations.excelTemplateDesc}
+                </p>
               </div>
-              <p className="text-[11px] text-amber-600 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-1.5">
-                ⚠ {t.invitations.excelTemplateDesc}
-              </p>
-            </div>
+            )}
 
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="outline" onClick={closeBatchImport}>

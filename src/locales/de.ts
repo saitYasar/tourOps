@@ -812,6 +812,7 @@ export const de = {
     excelLastName: 'SOYADI',
     excelFirstName: 'ADI',
     excelGender: 'CİNSİYETİ',
+    excelPreview: 'Dateivorschau',
     // Form labels
     labelFirstName: 'Vorname *',
     labelLastName: 'Nachname *',

@@ -813,6 +813,7 @@ export const tr = {
     excelLastName: 'SOYADI',
     excelFirstName: 'ADI',
     excelGender: 'CİNSİYETİ',
+    excelPreview: 'Dosya Önizleme',
     // Form labels
     labelFirstName: 'Ad *',
     labelLastName: 'Soyad *',
