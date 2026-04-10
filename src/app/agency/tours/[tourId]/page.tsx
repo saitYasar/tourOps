@@ -114,6 +114,7 @@ import {
 } from '@/components/shared';
 import type { ReceiptTemplate } from '@/components/shared';
 import { DialogDescription } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 
 function resolveImageUrl(url?: string | null): string | null {
   return url || null;
@@ -533,6 +534,64 @@ export default function TourDetailPage() {
   }, [orgMenuPreview, selectedOrgDetail?.id]);
 
   // Mutations
+
+  const handleDownloadParticipantsPdf = () => {
+    if (!tourClients?.length) return;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    const rows = tourClients.map((tc: TourClientDto, i: number) => {
+      const c = tc.client;
+      const name = c ? `${c.firstName || ''} ${c.lastName || ''}`.trim() : `#${tc.clientId}`;
+      const email = c?.email || '-';
+      const username = c?.username || '-';
+      const phone = c?.phone ? `+${c.phoneCountryCode || '90'} ${c.phone}` : '-';
+      return `<tr>
+        <td style="padding:6px 10px;border:1px solid #e2e8f0;text-align:center">${i + 1}</td>
+        <td style="padding:6px 10px;border:1px solid #e2e8f0">${name}</td>
+        <td style="padding:6px 10px;border:1px solid #e2e8f0">${email}</td>
+        <td style="padding:6px 10px;border:1px solid #e2e8f0">${username}</td>
+        <td style="padding:6px 10px;border:1px solid #e2e8f0">${phone}</td>
+        <td style="padding:6px 10px;border:1px solid #e2e8f0;text-align:center">${tc.status || '-'}</td>
+      </tr>`;
+    }).join('');
+    printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${t.invitations.clientList}</title>
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 20px; color: #1e293b; }
+        h1 { font-size: 18px; margin-bottom: 4px; }
+        p { font-size: 13px; color: #64748b; margin-bottom: 16px; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        th { padding: 8px 10px; border: 1px solid #cbd5e1; background: #f1f5f9; font-weight: 600; text-align: left; }
+        @media print { body { padding: 0; } }
+      </style></head><body>
+      <h1>${tour?.tourName || ''}</h1>
+      <p>${t.invitations.clientList} — ${tourClients.length} ${t.tours.clients.toLowerCase()}</p>
+      <table>
+        <thead><tr>
+          <th style="text-align:center">#</th>
+          <th>${t.invitations.columnClient}</th>
+          <th>${t.invitations.columnEmail}</th>
+          <th>${t.invitations.columnUsername}</th>
+          <th>${t.common.phone || 'Telefon'}</th>
+          <th style="text-align:center">${t.invitations.columnStatus}</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table></body></html>`);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => printWindow.print(), 300);
+  };
+
+  const handleSendParticipantsWhatsapp = () => {
+    if (!tourClients?.length) return;
+    const lines = tourClients.map((tc: TourClientDto, i: number) => {
+      const c = tc.client;
+      const n = c ? `${c.firstName || ''} ${c.lastName || ''}`.trim() : `#${tc.clientId}`;
+      return `${i + 1}. ${n}`;
+    });
+    const header = `*${t.invitations.clientList}* — ${tour?.tourName || ''}`;
+    const text = encodeURIComponent(`${header}\n\n${lines.join('\n')}`);
+    window.open(`https://web.whatsapp.com/send?text=${text}`, '_blank');
+  };
 
   const closeBatchImport = () => {
     setBatchImportOpen(false);
@@ -1523,23 +1582,25 @@ export default function TourDetailPage() {
                     Yenile
                   </Button>
                   {tourClients && tourClients.length > 0 && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-1.5 text-green-600 hover:text-green-800 hover:bg-green-50"
-                      onClick={() => {
-                        const lines = tourClients.map((tc: TourClientDto, i: number) => {
-                          const n = `${tc.client?.firstName || ''} ${tc.client?.lastName || ''}`.trim() || `#${tc.clientId}`;
-                          return `${i + 1}. ${n}`;
-                        });
-                        const header = `*${t.invitations.clientList}* — ${tour?.tourName || ''}`;
-                        const text = encodeURIComponent(`${header}\n\n${lines.join('\n')}`);
-                        window.open(`https://web.whatsapp.com/send?text=${text}`, '_blank');
-                      }}
-                    >
-                      <MessageCircle className="h-4 w-4" />
-                      {t.invitations.sendViaWhatsapp}
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" className="gap-1.5">
+                          <Send className="h-4 w-4" />
+                          {t.invitations.sendPdf}
+                          <ChevronDown className="h-3.5 w-3.5 ml-1" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="z-[1002]">
+                        <DropdownMenuItem onClick={handleDownloadParticipantsPdf}>
+                          <Download className="h-4 w-4 mr-2" />
+                          {t.invitations.downloadPdf}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={handleSendParticipantsWhatsapp}>
+                          <MessageCircle className="h-4 w-4 mr-2" />
+                          {t.invitations.sendViaWhatsapp}
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   )}
                   <Button variant="outline" size="sm" onClick={() => setBatchImportOpen(true)} className="gap-1.5">
                     <FileSpreadsheet className="h-4 w-4" />

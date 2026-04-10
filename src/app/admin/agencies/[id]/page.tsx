@@ -92,6 +92,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { DateTimeInput } from '@/components/ui/datetime-input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import {
   Table,
   TableBody,
@@ -417,6 +418,64 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
   // Mutations
   const invalidateTourDetail = () => {
     queryClient.invalidateQueries({ queryKey: ['admin-tour-detail', selectedTourId, lang] });
+  };
+
+  const handleDownloadParticipantsPdf = () => {
+    if (!tourDetail?.participants?.length) return;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    const rows = tourDetail.participants.map((p: any, i: number) => {
+      const c = p.client;
+      const name = c ? `${c.firstName || ''} ${c.lastName || ''}`.trim() : p.clientName || `#${p.clientId}`;
+      const email = c?.email || '-';
+      const username = c?.username || '-';
+      const phone = c?.phone ? `+${c.phoneCountryCode || '90'} ${c.phone}` : '-';
+      return `<tr>
+        <td style="padding:6px 10px;border:1px solid #e2e8f0;text-align:center">${i + 1}</td>
+        <td style="padding:6px 10px;border:1px solid #e2e8f0">${name}</td>
+        <td style="padding:6px 10px;border:1px solid #e2e8f0">${email}</td>
+        <td style="padding:6px 10px;border:1px solid #e2e8f0">${username}</td>
+        <td style="padding:6px 10px;border:1px solid #e2e8f0">${phone}</td>
+        <td style="padding:6px 10px;border:1px solid #e2e8f0;text-align:center">${p.status || '-'}</td>
+      </tr>`;
+    }).join('');
+    printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${t.invitations.clientList}</title>
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 20px; color: #1e293b; }
+        h1 { font-size: 18px; margin-bottom: 4px; }
+        p { font-size: 13px; color: #64748b; margin-bottom: 16px; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        th { padding: 8px 10px; border: 1px solid #cbd5e1; background: #f1f5f9; font-weight: 600; text-align: left; }
+        @media print { body { padding: 0; } }
+      </style></head><body>
+      <h1>${tourDetail.tourName}</h1>
+      <p>${t.invitations.clientList} — ${tourDetail.participants.length} ${t.tours.clients.toLowerCase()}</p>
+      <table>
+        <thead><tr>
+          <th style="text-align:center">#</th>
+          <th>${t.invitations.columnClient}</th>
+          <th>${t.invitations.columnEmail}</th>
+          <th>${t.invitations.columnUsername}</th>
+          <th>${t.common.phone || 'Telefon'}</th>
+          <th style="text-align:center">${t.invitations.columnStatus}</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table></body></html>`);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => printWindow.print(), 300);
+  };
+
+  const handleSendParticipantsWhatsapp = () => {
+    if (!tourDetail?.participants?.length) return;
+    const lines = tourDetail.participants.map((p: any, i: number) => {
+      const c = p.client;
+      const n = c ? `${c.firstName || ''} ${c.lastName || ''}`.trim() : p.clientName || `#${p.clientId}`;
+      return `${i + 1}. ${n}`;
+    });
+    const header = `*${t.invitations.clientList}* — ${tourDetail.tourName}`;
+    const text = encodeURIComponent(`${header}\n\n${lines.join('\n')}`);
+    window.open(`https://web.whatsapp.com/send?text=${text}`, '_blank');
   };
 
   const closeBatchImport = () => {
@@ -1256,24 +1315,25 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
                     </p>
                     <div className="flex items-center gap-2">
                       {tourDetail.participants && tourDetail.participants.length > 0 && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="gap-1.5 text-green-600 hover:text-green-800 hover:bg-green-50"
-                          onClick={() => {
-                            const lines = tourDetail.participants!.map((p: any, i: number) => {
-                              const c = p.client;
-                              const n = c ? `${c.firstName || ''} ${c.lastName || ''}`.trim() : p.clientName || `#${p.clientId}`;
-                              return `${i + 1}. ${n}`;
-                            });
-                            const header = `*${t.invitations.clientList}* — ${tourDetail.tourName}`;
-                            const text = encodeURIComponent(`${header}\n\n${lines.join('\n')}`);
-                            window.open(`https://web.whatsapp.com/send?text=${text}`, '_blank');
-                          }}
-                        >
-                          <MessageCircle className="h-4 w-4" />
-                          {t.invitations.sendViaWhatsapp}
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm">
+                              <Send className="h-4 w-4 mr-1.5" />
+                              {t.invitations.sendPdf}
+                              <ChevronDown className="h-3.5 w-3.5 ml-1" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="z-[1002]">
+                            <DropdownMenuItem onClick={handleDownloadParticipantsPdf}>
+                              <Download className="h-4 w-4 mr-2" />
+                              {t.invitations.downloadPdf}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={handleSendParticipantsWhatsapp}>
+                              <MessageCircle className="h-4 w-4 mr-2" />
+                              {t.invitations.sendViaWhatsapp}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       )}
                       <Button size="sm" variant="outline" onClick={() => setBatchImportOpen(true)} className="gap-1.5">
                         <FileSpreadsheet className="h-4 w-4" />
@@ -1333,6 +1393,16 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
                                     {p.status}
                                   </Badge>
                                 )}
+                                {client?.username && (
+                                  <button
+                                    type="button"
+                                    className="h-6 w-6 flex items-center justify-center rounded text-green-600 hover:text-green-800 hover:bg-green-50"
+                                    onClick={(e) => { e.stopPropagation(); setWhatsappTarget({ client, name }); }}
+                                    title={t.invitations.whatsappShare}
+                                  >
+                                    <Send className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
                                 <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                               </div>
                             </button>
@@ -1360,19 +1430,6 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
                                   <div className="flex items-center gap-2 text-slate-600">
                                     <Clock className="h-3 w-3 text-slate-400" />
                                     <span className="font-medium text-slate-800">{formatDate(p.paidAt)}</span>
-                                  </div>
-                                )}
-                                {client?.username && (
-                                  <div className="pt-1">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-7 px-2 text-green-600 hover:text-green-800 hover:bg-green-50 gap-1.5"
-                                      onClick={(e) => { e.stopPropagation(); setWhatsappTarget({ client, name }); }}
-                                    >
-                                      <Send className="h-3.5 w-3.5" />
-                                      <span className="text-xs">{t.invitations.whatsappShare}</span>
-                                    </Button>
                                   </div>
                                 )}
                               </div>
