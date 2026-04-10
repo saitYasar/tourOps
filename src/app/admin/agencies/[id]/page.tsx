@@ -46,10 +46,13 @@ import {
   Pencil,
   FileSpreadsheet,
   Download,
+  MessageCircle,
+  Send,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useLanguage } from '@/contexts/LanguageContext';
+import { locales, type Locale } from '@/locales';
 import { useDebounce } from '@/hooks/useDebounce';
 import {
   adminApi,
@@ -161,6 +164,8 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
   const [dialogTab, setDialogTab] = useState('info');
   const [expandedParticipantId, setExpandedParticipantId] = useState<number | null>(null);
   const [batchImportOpen, setBatchImportOpen] = useState(false);
+  const [whatsappTarget, setWhatsappTarget] = useState<any>(null);
+  const [whatsappLang, setWhatsappLang] = useState<Locale>('tr');
   const [batchFile, setBatchFile] = useState<File | null>(null);
   const [batchPreview, setBatchPreview] = useState<string[][]>([]);
   const batchFileRef = useRef<HTMLInputElement>(null);
@@ -1249,10 +1254,32 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
                     <p className="text-sm font-medium text-slate-700">
                       {t.tours.clients} ({tourDetail.participants?.length || 0})
                     </p>
-                    <Button size="sm" variant="outline" onClick={() => setBatchImportOpen(true)} className="gap-1.5">
-                      <FileSpreadsheet className="h-4 w-4" />
-                      {t.invitations.batchImport}
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      {tourDetail.participants && tourDetail.participants.length > 0 && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-1.5 text-green-600 hover:text-green-800 hover:bg-green-50"
+                          onClick={() => {
+                            const lines = tourDetail.participants!.map((p: any, i: number) => {
+                              const c = p.client;
+                              const n = c ? `${c.firstName || ''} ${c.lastName || ''}`.trim() : p.clientName || `#${p.clientId}`;
+                              return `${i + 1}. ${n}`;
+                            });
+                            const header = `*${t.invitations.clientList}* — ${tourDetail.tourName}`;
+                            const text = encodeURIComponent(`${header}\n\n${lines.join('\n')}`);
+                            window.open(`https://web.whatsapp.com/send?text=${text}`, '_blank');
+                          }}
+                        >
+                          <MessageCircle className="h-4 w-4" />
+                          {t.invitations.sendViaWhatsapp}
+                        </Button>
+                      )}
+                      <Button size="sm" variant="outline" onClick={() => setBatchImportOpen(true)} className="gap-1.5">
+                        <FileSpreadsheet className="h-4 w-4" />
+                        {t.invitations.batchImport}
+                      </Button>
+                    </div>
                   </div>
                   {!tourDetail.participants?.length ? (
                     <EmptyState icon={Users} title={t.tours.clients} description={t.tours.noClients} />
@@ -1333,6 +1360,19 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
                                   <div className="flex items-center gap-2 text-slate-600">
                                     <Clock className="h-3 w-3 text-slate-400" />
                                     <span className="font-medium text-slate-800">{formatDate(p.paidAt)}</span>
+                                  </div>
+                                )}
+                                {client?.username && (
+                                  <div className="pt-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-7 px-2 text-green-600 hover:text-green-800 hover:bg-green-50 gap-1.5"
+                                      onClick={(e) => { e.stopPropagation(); setWhatsappTarget({ client, name }); }}
+                                    >
+                                      <Send className="h-3.5 w-3.5" />
+                                      <span className="text-xs">{t.invitations.whatsappShare}</span>
+                                    </Button>
                                   </div>
                                 )}
                               </div>
@@ -2066,6 +2106,70 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
           });
         }}
       />
+
+      {/* WhatsApp Share Dialog */}
+      <Dialog open={!!whatsappTarget} onOpenChange={(open) => { if (!open) { setWhatsappTarget(null); setWhatsappLang('tr'); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageCircle className="h-5 w-5 text-green-600" />
+              {t.invitations.whatsappShare}
+            </DialogTitle>
+            <DialogDescription className="sr-only">{t.invitations.whatsappShare}</DialogDescription>
+          </DialogHeader>
+          {whatsappTarget && (() => {
+            const fullName = whatsappTarget.name || `${whatsappTarget.client?.firstName || ''} ${whatsappTarget.client?.lastName || ''}`.trim();
+            const username = whatsappTarget.client?.username || '';
+            const wpT = locales[whatsappLang];
+            const message = wpT.invitations.whatsappMessage
+              .replace('{fullName}', fullName)
+              .replace('{username}', username);
+            return (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  {(['tr', 'en', 'de'] as Locale[]).map((l) => (
+                    <button
+                      key={l}
+                      type="button"
+                      onClick={() => setWhatsappLang(l)}
+                      className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                        whatsappLang === l
+                          ? 'bg-green-600 text-white shadow-sm'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      {l === 'tr' ? 'Türkçe' : l === 'en' ? 'English' : 'Deutsch'}
+                    </button>
+                  ))}
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-slate-500 mb-2">{t.invitations.whatsappPreview}</p>
+                  <div className="bg-slate-50 rounded-lg p-3 text-sm whitespace-pre-line text-slate-700 border max-h-60 overflow-y-auto">
+                    {message}
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => { setWhatsappTarget(null); setWhatsappLang('tr'); }}>
+                    {t.common.cancel}
+                  </Button>
+                  <Button
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                    onClick={() => {
+                      const encoded = encodeURIComponent(message);
+                      window.open(`https://web.whatsapp.com/send?text=${encoded}`, '_blank');
+                      setWhatsappTarget(null);
+                      setWhatsappLang('tr');
+                    }}
+                  >
+                    <MessageCircle className="h-4 w-4 mr-2" />
+                    {t.invitations.whatsappSend}
+                  </Button>
+                </DialogFooter>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
 
       {/* Batch Import Dialog */}
       <Dialog open={batchImportOpen} onOpenChange={(open) => !open && closeBatchImport()}>
