@@ -111,6 +111,14 @@ export default function CustomerDashboard() {
     queryFn: () => apiClient.getClientProfile(apiLang),
   });
 
+  // Tours - total count
+  const { data: toursCountData } = useQuery({
+    queryKey: ['client-tours-count'],
+    queryFn: () => apiClient.getMyToursCount(),
+    enabled: !!profile,
+  });
+  const totalTourCount = (toursCountData as { totalCount?: number })?.totalCount ?? 0;
+
   // Tours - active
   const { data: activeToursData, isLoading: activeToursLoading } = useQuery({
     queryKey: ['client-my-tours', apiLang, activeToursPage, 'active'],
@@ -351,6 +359,7 @@ export default function CustomerDashboard() {
         {activeTab === 'dashboard' && (
           <DashboardView
             profile={profile}
+            totalTourCount={totalTourCount}
             activeTours={activeTours}
             pastTours={pastTours}
             activeToursLoading={activeToursLoading}
@@ -428,6 +437,7 @@ export default function CustomerDashboard() {
 // ============================================
 function DashboardView({
   profile,
+  totalTourCount,
   activeTours,
   pastTours,
   activeToursLoading,
@@ -443,6 +453,7 @@ function DashboardView({
   onPastToursPageChange,
 }: {
   profile: ClientProfileDto;
+  totalTourCount: number;
   activeTours: ClientParticipantTourDto[];
   pastTours: ClientParticipantTourDto[];
   activeToursLoading: boolean;
@@ -514,7 +525,7 @@ function DashboardView({
           <div className="flex flex-wrap gap-2 sm:gap-3 mt-3 sm:mt-4">
             <div className="flex items-center gap-1.5 sm:gap-2 bg-white/20 backdrop-blur-sm rounded-full px-2.5 sm:px-4 py-1.5 sm:py-2">
               <Plane className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <span className="text-xs sm:text-sm font-medium">{activeTours.length + pastTours.length} {t.customer.tourCount}</span>
+              <span className="text-xs sm:text-sm font-medium">{totalTourCount} {t.customer.tourCount}</span>
             </div>
             <div className="flex items-center gap-1.5 sm:gap-2 bg-white/20 backdrop-blur-sm rounded-full px-2.5 sm:px-4 py-1.5 sm:py-2">
               <Camera className="h-3.5 w-3.5 sm:h-4 sm:w-4" />

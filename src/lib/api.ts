@@ -4283,6 +4283,12 @@ class ApiClient {
   // Client Panel - New Endpoints
   // ============================================
 
+  async getMyToursCount() {
+    return this.request<{ totalCount: number }>(`/client/tours/participations/count`, {
+      method: 'GET',
+    });
+  }
+
   async getMyTours(page = 1, limit = 50, lang: 'tr' | 'en' | 'de' = 'tr', timeStatus?: string) {
     const params = new URLSearchParams({ page: String(page), limit: String(limit) });
     if (timeStatus) params.set('timeStatus', timeStatus);
