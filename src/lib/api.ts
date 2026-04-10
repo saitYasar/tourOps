@@ -1978,13 +1978,14 @@ class ApiClient {
   // Organizations - Public
   // ============================================
 
-  async getOrganizationsPublic(page = 1, limit = 10, name?: string, lang: 'tr' | 'en' | 'de' = 'tr', filters?: { cityId?: number; districtId?: number; categoryId?: number; sortByCommission?: string }) {
+  async getOrganizationsPublic(page = 1, limit = 10, name?: string, lang: 'tr' | 'en' | 'de' = 'tr', filters?: { cityId?: number; districtId?: number; categoryId?: number; sortByCommission?: string; agencyId?: number }) {
     const params = new URLSearchParams({ page: String(page), limit: String(limit), status: 'active' });
     if (name) params.set('name', name);
     if (filters?.cityId) params.set('cityId', String(filters.cityId));
     if (filters?.districtId) params.set('districtId', String(filters.districtId));
     if (filters?.categoryId) params.set('categoryId', String(filters.categoryId));
     if (filters?.sortByCommission) params.set('sortByCommission', filters.sortByCommission);
+    if (filters?.agencyId) params.set('agencyId', String(filters.agencyId));
     return this.request<PaginatedResponse<OrganizationPublicDto>>(`/organizations?${params}`, {
       method: 'GET',
     }, lang);

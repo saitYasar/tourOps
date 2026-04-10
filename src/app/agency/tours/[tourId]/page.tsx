@@ -389,14 +389,18 @@ export default function TourDetailPage() {
     enabled: isAddParticipantOpen,
   });
 
+  const agencyId = agencyResult?.success ? agencyResult.data?.id : undefined;
+
   // Query: All organizations (for map + stop form)
   const { data: allOrganizations } = useQuery({
-    queryKey: ['organizations-public-all', apiLang],
+    queryKey: ['organizations-public-all', apiLang, agencyId],
     queryFn: async () => {
-      const response = await apiClient.getOrganizationsPublic(1, 100, undefined, apiLang);
+      const response = await apiClient.getOrganizationsPublic(1, 100, undefined, apiLang, {
+        agencyId: agencyId,
+      });
       return response.data;
     },
-    enabled: !!tourId,
+    enabled: !!tourId && !!agencyId,
   });
 
   // organizations list for both map and stop form
@@ -461,13 +465,14 @@ export default function TourDetailPage() {
 
   // Query: Search organizations for stop form
   const { data: searchedOrgs, isLoading: orgSearchLoading } = useQuery({
-    queryKey: ['org-search', orgSearchDebounced, orgFilterCityId, orgFilterDistrictId, orgFilterCategoryId, orgSortByCommission, apiLang],
+    queryKey: ['org-search', orgSearchDebounced, orgFilterCityId, orgFilterDistrictId, orgFilterCategoryId, orgSortByCommission, agencyId, apiLang],
     queryFn: async () => {
       const response = await apiClient.getOrganizationsPublic(1, 20, orgSearchDebounced || undefined, apiLang, {
         cityId: orgFilterCityId || undefined,
         districtId: orgFilterDistrictId || undefined,
         categoryId: orgFilterCategoryId || undefined,
         sortByCommission: orgSortByCommission || undefined,
+        agencyId: agencyId,
       });
       return response.data || [];
     },
