@@ -11,6 +11,7 @@ import { adminApi, type AdminQuickCreateOrganizationDto, type AdminQuickCreateOr
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function QuickCreateOrganizationPage() {
   const router = useRouter();
@@ -18,6 +19,7 @@ export default function QuickCreateOrganizationPage() {
   const a = t.admin as Record<string, string>;
 
   const [name, setName] = useState('');
+  const [currency, setCurrency] = useState<'TRY' | 'EUR' | 'USD'>('TRY');
 
   const createMutation = useMutation({
     mutationFn: (data: AdminQuickCreateOrganizationDto) =>
@@ -42,7 +44,7 @@ export default function QuickCreateOrganizationPage() {
       toast.error(`${t.tooltips.fillRequired}: ${a.nameLabel}`);
       return;
     }
-    createMutation.mutate({ name });
+    createMutation.mutate({ name, currency });
   };
 
   return (
@@ -76,6 +78,20 @@ export default function QuickCreateOrganizationPage() {
               onKeyDown={(e) => e.key === 'Enter' && !createMutation.isPending && handleSubmit()}
               autoFocus
             />
+          </div>
+
+          <div>
+            <label className="text-sm text-slate-600 mb-1.5 block font-medium">{a.currencyLabel}</label>
+            <Select value={currency} onValueChange={(v) => setCurrency(v as 'TRY' | 'EUR' | 'USD')}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="TRY">TRY</SelectItem>
+                <SelectItem value="EUR">EUR</SelectItem>
+                <SelectItem value="USD">USD</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <Button
