@@ -1,5 +1,7 @@
 'use client';
 
+import { Loader2 } from 'lucide-react';
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,6 +23,7 @@ interface ConfirmDialogProps {
   cancelLabel?: string;
   onConfirm: () => void;
   variant?: 'default' | 'destructive';
+  loading?: boolean;
 }
 
 export function ConfirmDialog({
@@ -32,26 +35,29 @@ export function ConfirmDialog({
   cancelLabel,
   onConfirm,
   variant = 'default',
+  loading = false,
 }: ConfirmDialogProps) {
   const { t } = useLanguage();
 
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
+    <AlertDialog open={open} onOpenChange={loading ? undefined : onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>{cancelLabel || t.common.cancel}</AlertDialogCancel>
+          <AlertDialogCancel disabled={loading}>{cancelLabel || t.common.cancel}</AlertDialogCancel>
           <AlertDialogAction
             onClick={onConfirm}
+            disabled={loading}
             className={
               variant === 'destructive'
                 ? 'bg-red-600 hover:bg-red-700'
                 : undefined
             }
           >
+            {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             {confirmLabel || t.common.confirm}
           </AlertDialogAction>
         </AlertDialogFooter>

@@ -2057,13 +2057,16 @@ class ApiClient {
   // Auth - Logout
   // ============================================
 
-  logout(rolePrefix?: string) {
-    const prefix = rolePrefix || getAuthRolePrefix();
-    const keys = getAuthStorageKeys(prefix);
-    this.setAccessToken(null, prefix);
+  logout() {
+    this.accessToken = null;
     if (typeof window !== 'undefined') {
+      const allPrefixes = ['restaurant', 'agency', 'customer', 'admin'];
+      for (const prefix of allPrefixes) {
+        const keys = getAuthStorageKeys(prefix);
+        localStorage.removeItem(keys.token);
+        localStorage.removeItem(keys.userData);
+      }
       localStorage.removeItem('tourops_auth_user_id');
-      localStorage.removeItem(keys.userData);
     }
   }
 
@@ -2726,6 +2729,12 @@ class ApiClient {
       url += `&categoryId=${categoryId}`;
     }
     return this.request<PaginatedResponse<ResourceTypeDto>>(url, {
+      method: 'GET',
+    }, 'tr', true);
+  }
+
+  async getResourceTypeById(id: number) {
+    return this.request<ResourceTypeDto>(`/resources/types/${id}`, {
       method: 'GET',
     }, 'tr', true);
   }
@@ -5282,6 +5291,16 @@ export const resourceApi = {
       }
       const response = await apiClient.getResourceTypes(categoryId);
       return { success: true, data: response.data };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  // Tek bir kaynak tipini getir
+  async getTypeById(id: number): Promise<{ success: boolean; data?: ResourceTypeDto; error?: string }> {
+    try {
+      const response = await apiClient.getResourceTypeById(id);
+      return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }

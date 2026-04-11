@@ -313,12 +313,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
-    const keys = getAuthStorageKeys();
-    setUser(null);
-    localStorage.removeItem(keys.token);
-    localStorage.removeItem(keys.userData);
-    realAuthApi.logout();
     const prefix = getAuthRolePrefix();
+    setUser(null);
+    realAuthApi.logout();
     const loginPaths: Record<string, string> = {
       customer: '/login/customer',
       admin: '/login/admin',

@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, ChevronRight, ChevronDown, Box, Layers, Square, Circle, User, Power, PowerOff, MapPin, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { resourceApi, organizationApi, type ResourceDto, type ResourceTypeDto, type CreateResourceDto, type UpdateResourceDto } from '@/lib/api';
+import { resourceApi, organizationApi, getAuthStorageKeys, type ResourceDto, type ResourceTypeDto, type CreateResourceDto, type UpdateResourceDto } from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 import { Header } from '@/components/layout/Header';
@@ -37,6 +37,8 @@ import {
 import { LoadingState, EmptyState, ErrorState, ConfirmDialog } from '@/components/shared';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { VenueModel3D } from '@/components/restaurant/VenueModel3D';
+import { TransportModel3D } from '@/components/transport/TransportModel3D';
+import { TransportLayoutEditor } from '@/components/transport/TransportLayoutEditor';
 import { LayoutEditor, TablePreview } from '@/components/restaurant/layout-editor';
 
 interface FormState {
@@ -51,6 +53,15 @@ interface FormState {
   serviceEndAt: string;
   // Multiple creation for chairs
   count: number;
+  // Grid creation for transport seats (columns × rows)
+  seatMode: 'single' | 'grid';
+  seatColumns: number;
+  seatRows: number;
+  // Dimensions for section/room/object
+  width: number;
+  height: number;
+  // Color for objects
+  color: string;
   // Coordinates for tables
   coordinateX: number;
   coordinateY: number;
@@ -70,6 +81,12 @@ const initialForm: FormState = {
   serviceStartAt: '09:00',
   serviceEndAt: '23:00',
   count: 1,
+  seatMode: 'grid',
+  seatColumns: 2,
+  seatRows: 10,
+  width: 0,
+  height: 0,
+  color: '#A3E635',
   coordinateX: 50, // Center by default
   coordinateY: 50,
   siblingTables: [],
@@ -82,6 +99,8 @@ const typeIcons: Record<string, React.ComponentType<{ className?: string }>> = {
   table: Circle,
   chair: User,
   seat: User,
+  section: Box,
+  transport_seat: User,
 };
 
 // Component to show table with seat dots
@@ -156,23 +175,39 @@ export default function VenuePage() {
     queryKey: ['my-organization'],
     queryFn: () => organizationApi.getMyOrganization(),
   });
-  const orgStatus = orgResult?.success ? orgResult.data?.status : undefined;
+  const organization = orgResult?.success ? orgResult.data : undefined;
+  const orgStatus = organization?.status;
 
   const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set());
   const [childrenCache, setChildrenCache] = useState<Record<number, ResourceDto[]>>({});
   const [loadingChildren, setLoadingChildren] = useState<Set<number>>(new Set());
   const [form, setForm] = useState<FormState>(initialForm);
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [multipleCreating, setMultipleCreating] = useState(false);
   const [childrenLoaded, setChildrenLoaded] = useState(false);
   const [childrenLoadingInProgress, setChildrenLoadingInProgress] = useState(false);
 
-  // Query: Resource Types
+  // Read organizationCategoryId from JWT (instant, no API wait)
+  const orgCategoryId = (() => {
+    if (typeof window === 'undefined') return undefined;
+    try {
+      const token = localStorage.getItem(getAuthStorageKeys('restaurant').token);
+      if (!token) return undefined;
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return payload.organizationCategoryId as number | undefined;
+    } catch { return undefined; }
+  })();
+
+  // Query: Resource Types (dynamically based on organization's category)
   const { data: typesResult, isLoading: typesLoading, error: typesError } = useQuery({
-    queryKey: ['resource-types'],
-    queryFn: () => resourceApi.getTypes(1), // categoryId: 1 = Restoran
+    queryKey: ['resource-types', orgCategoryId],
+    queryFn: () => resourceApi.getTypes(orgCategoryId),
+    enabled: !!orgCategoryId,
   });
   const resourceTypes = typesResult?.success ? typesResult.data || [] : [];
+  const isTransport = resourceTypes.some(t => t.code === 'section');
+  const objectType = resourceTypes.find(t => t.code === 'object' || t.code === 'transport_object');
 
   // Query: Resource Layout (tree structure)
   const {
@@ -201,14 +236,32 @@ export default function VenuePage() {
     }
   }, []);
 
+  // Refresh children for a specific parent without clearing cache first
+  const refreshChildrenCache = useCallback(async (parentId: number | null) => {
+    if (!parentId) return;
+    try {
+      const result = await resourceApi.getLayout(parentId);
+      if (result.success && result.data) {
+        const children = result.data.map(c => ({ ...c, parentId: c.parentId ?? parentId }));
+        setChildrenCache(prev => ({ ...prev, [parentId]: children }));
+      }
+    } catch (error) {
+      console.error('Failed to refresh children cache:', error);
+    }
+  }, []);
+
   // Mutations
   const createMutation = useMutation({
     mutationFn: (data: CreateResourceDto) => resourceApi.create(data),
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
       if (result.success) {
         queryClient.invalidateQueries({ queryKey: ['resource-layout'] });
-        // Keep existing cache visible, trigger background refresh
-        setChildrenLoaded(false);
+        // Refresh parent's children cache instead of clearing everything
+        if (form.parentId) {
+          await refreshChildrenCache(form.parentId);
+        } else {
+          setChildrenLoaded(false);
+        }
         toast.success(t.venue.resourceCreated);
         closeForm();
       } else {
@@ -220,11 +273,13 @@ export default function VenuePage() {
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: UpdateResourceDto }) =>
       resourceApi.update(id, data),
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
       if (result.success) {
         queryClient.invalidateQueries({ queryKey: ['resource-layout'] });
-        // Keep existing cache visible, trigger background refresh
-        setChildrenLoaded(false);
+        // Refresh the specific parent's children instead of re-running full tree load
+        if (form.parentId) {
+          await refreshChildrenCache(form.parentId);
+        }
         toast.success(t.venue.resourceUpdated);
         closeForm();
       } else {
@@ -235,11 +290,21 @@ export default function VenuePage() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => resourceApi.delete(id),
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
       if (result.success) {
         queryClient.invalidateQueries({ queryKey: ['resource-layout'] });
-        // Keep existing cache visible, trigger background refresh
-        setChildrenLoaded(false);
+        // Refresh the specific parent's children instead of re-running full tree load
+        const deleted = deleteTarget;
+        if (deleted) {
+          // Find the parent of the deleted resource
+          const parent = resources.find(r => {
+            const children = childrenCache[r.id] || r.children || [];
+            return children.some(c => c.id === deleted.id);
+          });
+          if (parent) {
+            await refreshChildrenCache(parent.id);
+          }
+        }
         toast.success(t.venue.resourceDeleted);
         setDeleteTarget(null);
       } else {
@@ -268,17 +333,17 @@ export default function VenuePage() {
     },
   });
 
-  // Fetch children for a resource using layout endpoint with parentId
+  // Fetch children for a resource using children endpoint
+  // Transport (categoryId=2): NEVER call children API — use getLayout only
   const fetchChildren = useCallback(async (parentId: number): Promise<ResourceDto[]> => {
+    if (orgCategoryId === 2) return [];
     if (childrenCache[parentId]) return childrenCache[parentId];
     if (loadingChildren.has(parentId)) return [];
 
     setLoadingChildren(prev => new Set(prev).add(parentId));
     try {
-      // Use /resources/{parentId}/children — works for all resource types
       const result = await resourceApi.getChildren(parentId);
       if (result.success && result.data) {
-        // Ensure each child has parentId set
         const childrenWithParentId = result.data.map(child => ({
           ...child,
           parentId: child.parentId ?? parentId
@@ -296,9 +361,9 @@ export default function VenuePage() {
       });
     }
     return [];
-  }, [childrenCache, loadingChildren]);
+  }, [childrenCache, loadingChildren, orgCategoryId]);
 
-  // Load all children recursively — self-contained, no stale closure issues
+  // Load all children — transport: 1 level (section→seats via getLayout), restaurant: 2 levels
   const loadAllChildren = useCallback(async () => {
     if (!resources.length) return;
 
@@ -306,15 +371,13 @@ export default function VenuePage() {
 
     const wait = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-    // Retry helper: try up to 3 times with 1s delay between attempts
     const fetchWithRetry = async <T,>(fn: () => Promise<{ success: boolean; data?: T; error?: string }>, label: string): Promise<T | null> => {
       for (let attempt = 0; attempt < 3; attempt++) {
-        if (attempt > 0) await wait(1000 * attempt); // 1s, 2s backoff
+        if (attempt > 0) await wait(1000 * attempt);
         const result = await fn();
         if (result.success && result.data) return result.data;
         console.warn(`[loadAllChildren] ${label} attempt ${attempt + 1} failed:`, result.error);
       }
-      console.error(`[loadAllChildren] ${label} gave up after 3 attempts`);
       return null;
     };
 
@@ -323,26 +386,27 @@ export default function VenuePage() {
 
       for (let fi = 0; fi < resources.length; fi++) {
         const floor = resources[fi];
-        // Delay between floors to avoid overwhelming backend
         if (fi > 0) await wait(500);
 
-        const roomsRaw = await fetchWithRetry(
+        // getLayout returns direct children — uses /resources/layout?parentId=X (NOT /children)
+        const childrenRaw = await fetchWithRetry(
           () => resourceApi.getLayout(floor.id),
-          `getLayout(floor=${floor.id} "${floor.name}")`
+          `getLayout(${floor.id} "${floor.name}")`
         );
 
-        if (roomsRaw && roomsRaw.length > 0) {
-          const rooms = roomsRaw.map(r => ({ ...r, parentId: r.parentId ?? floor.id }));
-          newCache[floor.id] = rooms;
+        if (childrenRaw && childrenRaw.length > 0) {
+          const children = childrenRaw.map(r => ({ ...r, parentId: r.parentId ?? floor.id }));
+          newCache[floor.id] = children;
 
-          // Get tables: prefer room.children, fall back to getChildren with delay + retry
-          for (let ri = 0; ri < rooms.length; ri++) {
-            const room = rooms[ri];
+          // Transport (categoryId=2): only 2 levels, no children API calls at all
+          if (orgCategoryId === 2) continue;
+
+          for (let ri = 0; ri < children.length; ri++) {
+            const room = children[ri];
             if (room.children && room.children.length > 0) {
               newCache[room.id] = room.children.map(t => ({ ...t, parentId: t.parentId ?? room.id }));
             } else if (!room.children) {
-              // children not populated — fall back to API
-              await wait(500); // Delay before each children call
+              await wait(500);
               const tables = await fetchWithRetry(
                 () => resourceApi.getChildren(room.id),
                 `getChildren(room=${room.id} "${room.name}")`
@@ -355,12 +419,11 @@ export default function VenuePage() {
         }
       }
 
-      console.log('[loadAllChildren] done, newCache keys:', Object.keys(newCache), 'entries:', Object.entries(newCache).map(([k, v]) => `${k}:${(v as ResourceDto[]).length}`));
       setChildrenCache(prev => ({ ...prev, ...newCache }));
     } finally {
       setChildrenLoadingInProgress(false);
     }
-  }, [resources]);
+  }, [resources, orgCategoryId]);
 
   // Load all children AFTER LayoutEditor finishes its initial API calls (avoids concurrent requests)
   const [editorReady, setEditorReady] = useState(false);
@@ -370,11 +433,16 @@ export default function VenuePage() {
   }, []);
 
   useEffect(() => {
-    if (editorReady && resources.length > 0 && !childrenLoaded) {
+    // Wait until resource types are loaded (needed to determine hierarchy)
+    if (!resourceTypes.length) return;
+    // Transport: no LayoutEditor, so load children immediately
+    // Restaurant: wait for LayoutEditor to finish initial API calls
+    const canLoad = isTransport ? resources.length > 0 : (editorReady && resources.length > 0);
+    if (canLoad && !childrenLoaded) {
       setChildrenLoaded(true);
       loadAllChildren();
     }
-  }, [editorReady, resources, childrenLoaded, loadAllChildren]);
+  }, [isTransport, editorReady, resources, resourceTypes, childrenLoaded, loadAllChildren]);
 
   const toggleExpand = useCallback((id: number, hasChildType: boolean) => {
     setExpandedItems((prev) => {
@@ -404,6 +472,41 @@ export default function VenuePage() {
     return undefined;
   };
 
+  // Open section creation form with defaults
+  const openSectionCreateForm = (resourceTypeId: number) => {
+    const type = getTypeById(resourceTypeId);
+    if (!type) return;
+    const nextOrder = resources.length + 1;
+    // Place new section next to existing ones (offset right)
+    let startX = 20;
+    for (const res of resources) {
+      const coords = parseCoordinates(res.coordinates);
+      const w = res.width || 200;
+      startX = Math.max(startX, coords.x + w + 20);
+    }
+    setForm({
+      isOpen: true,
+      editId: null,
+      parentId: null,
+      resourceTypeId,
+      name: '',
+      capacity: type.defaultCapacity || 50,
+      order: nextOrder,
+      serviceStartAt: '09:00',
+      serviceEndAt: '23:00',
+      count: 1,
+      seatMode: 'grid',
+      seatColumns: 2,
+      seatRows: 10,
+      width: 200,
+      height: 150,
+      coordinateX: startX,
+      coordinateY: 20,
+      color: '#A3E635',
+      siblingTables: [],
+    });
+  };
+
   const openCreateForm = async (parentId: number | null, resourceTypeId: number) => {
     const type = getTypeById(resourceTypeId);
 
@@ -429,20 +532,27 @@ export default function VenuePage() {
 
     // Tables always default to 4-person (matching visual editor), others use defaultCapacity
     const isTable = type?.code === 'table';
+    const isObject = type?.code === 'object' || type?.code === 'transport_object';
     setForm({
       isOpen: true,
       editId: null,
       parentId,
       resourceTypeId,
       name: '',
-      capacity: isTable ? 4 : (type?.defaultCapacity || 4),
+      capacity: isObject ? 0 : isTable ? 4 : (type?.defaultCapacity || 4),
       order: 0,
       serviceStartAt: '09:00',
       serviceEndAt: '23:00',
-      count: type?.code === 'chair' || type?.code === 'seat' ? 4 : 1, // Default 4 chairs/seats
+      count: type?.code === 'chair' || type?.code === 'seat' || type?.code === 'transport_seat' ? 4 : 1, // Default 4 chairs/seats
       coordinateX: 50, // Center by default
       coordinateY: 50,
       siblingTables,
+      seatMode: 'grid',
+      seatColumns: 2,
+      seatRows: 10,
+      width: isObject ? 30 : 0,
+      height: isObject ? 20 : 0,
+      color: '#A3E635',
     });
   };
 
@@ -530,6 +640,12 @@ export default function VenuePage() {
       coordinateX: coordX,
       coordinateY: coordY,
       siblingTables,
+      seatMode: 'single',
+      seatColumns: 2,
+      seatRows: 10,
+      width: resource.width || 0,
+      height: resource.height || 0,
+      color: resource.color || '#A3E635',
     });
   };
 
@@ -540,7 +656,7 @@ export default function VenuePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const type = form.resourceTypeId ? getTypeById(form.resourceTypeId) : null;
-    const isChair = type?.code === 'chair' || type?.code === 'seat';
+    const isChair = type?.code === 'chair' || type?.code === 'seat' || type?.code === 'transport_seat';
 
     // For chairs/seats with count > 1, name is optional (will be auto-generated)
     if (!isChair && !form.name.trim()) {
@@ -568,10 +684,80 @@ export default function VenuePage() {
       baseData.coordinates = `${form.coordinateX},${form.coordinateY}`;
     }
 
+    // Section: coordinates + dimensions
+    if (type?.code === 'section') {
+      baseData.coordinates = `${form.coordinateX},${form.coordinateY}`;
+      if (form.width > 0) baseData.width = form.width;
+      if (form.height > 0) baseData.height = form.height;
+    }
+
+    // Object: color + dimensions + coordinates
+    if (type?.code === 'object' || type?.code === 'transport_object') {
+      baseData.capacity = 0;
+      baseData.color = form.color || undefined;
+      if (form.width > 0) baseData.width = form.width;
+      if (form.height > 0) baseData.height = form.height;
+      // Position in empty space inside parent section
+      const parentChildren = childrenCache[form.parentId!] || [];
+      let maxBottomY = 0;
+      for (const child of parentChildren) {
+        const cc = parseCoordinates(child.coordinates);
+        const ch = child.height || 24;
+        if (cc.y + ch > maxBottomY) maxBottomY = cc.y + ch;
+      }
+      const offsetX = 8;
+      const offsetY = maxBottomY > 0 ? maxBottomY + 8 : 8;
+      baseData.coordinates = `${offsetX},${offsetY}`;
+    }
+
     if (form.editId) {
       updateMutation.mutate({ id: form.editId, data: baseData });
+    } else if (type?.code === 'transport_seat' && form.seatMode === 'grid' && !form.editId) {
+      // Grid seat creation (columns × rows)
+      const totalSeats = form.seatColumns * form.seatRows;
+      setMultipleCreating(true);
+      try {
+        // Find max existing seat number and rightmost occupied x
+        let maxSeatNum = 0;
+        let maxOccupiedX = 0;
+        const sectionChildren = childrenCache[form.parentId!] || [];
+        for (const child of sectionChildren) {
+          const num = parseInt(child.name, 10);
+          if (!isNaN(num) && num > maxSeatNum) maxSeatNum = num;
+          const coords = parseCoordinates(child.coordinates);
+          if (coords.x + 24 > maxOccupiedX) maxOccupiedX = coords.x + 24;
+        }
+        const seatSize = 24;
+        const seatGap = 4;
+        const padX = sectionChildren.length > 0 ? maxOccupiedX + seatGap : 8;
+        const padY = 8;
+        let created = 0;
+        for (let row = 0; row < form.seatRows; row++) {
+          for (let col = 0; col < form.seatColumns; col++) {
+            const seatNum = maxSeatNum + row * form.seatColumns + col + 1;
+            const cx = padX + col * (seatSize + seatGap);
+            const cy = padY + row * (seatSize + seatGap);
+            await resourceApi.create({
+              ...baseData,
+              name: `${seatNum}`,
+              capacity: 1,
+              order: seatNum,
+              coordinates: `${cx},${cy}`,
+            });
+            created++;
+          }
+        }
+        queryClient.invalidateQueries({ queryKey: ['resource-layout'] });
+        await refreshChildrenCache(form.parentId);
+        toast.success(`${created} ${t.venue.totalSeats.toLowerCase()} ${t.venue.resourceCreated.toLowerCase()}`);
+        closeForm();
+      } catch (error) {
+        toast.error(t.venue.createError);
+      } finally {
+        setMultipleCreating(false);
+      }
     } else if (isChair && form.count > 1) {
-      // Multiple chair creation
+      // Multiple chair/seat creation
       const baseName = form.name.trim() || t.venue.chair;
       setMultipleCreating(true);
       try {
@@ -584,8 +770,7 @@ export default function VenuePage() {
           await resourceApi.create(data);
         }
         queryClient.invalidateQueries({ queryKey: ['resource-layout'] });
-        clearChildrenCache(form.parentId);
-        setChildrenLoaded(false);
+        await refreshChildrenCache(form.parentId);
         toast.success(`${form.count} ${t.venue.chair.toLowerCase()} ${t.venue.resourceCreated.toLowerCase()}`);
         closeForm();
       } catch (error) {
@@ -636,8 +821,7 @@ export default function VenuePage() {
             toast.success(t.venue.resourceCreated);
           }
           queryClient.invalidateQueries({ queryKey: ['resource-layout'] });
-          clearChildrenCache(form.parentId);
-          setChildrenLoaded(false);
+          await refreshChildrenCache(form.parentId);
           closeForm();
         } else {
           toast.error(tableResult.error || t.venue.tableCreateError);
@@ -665,11 +849,18 @@ export default function VenuePage() {
     };
     const resource = findResource(resources);
     const children = childrenCache[deleteTarget.id] || resource?.children || [];
-    // Delete all children first (e.g. chairs before table)
+
+    if (children.length > 0) {
+      setDeleting(true);
+      toast.info(t.venue.deletingSection);
+    }
+
+    // Delete all children first (e.g. chairs/seats before section)
     for (const child of children) {
       try { await resourceApi.delete(child.id); } catch { /* ignore */ }
     }
     deleteMutation.mutate(deleteTarget.id);
+    setDeleting(false);
   };
 
   const isPending = createMutation.isPending || updateMutation.isPending || multipleCreating;
@@ -772,7 +963,7 @@ export default function VenuePage() {
                 <div
                   className="border-t bg-slate-50/50 p-2 space-y-2"
                   style={{
-                    maxHeight: type?.code === 'table' ? '200px' : type?.code === 'room' ? '400px' : '500px',
+                    maxHeight: type?.code === 'table' ? '200px' : type?.code === 'room' || type?.code === 'section' ? '400px' : '500px',
                     overflowY: 'auto',
                   }}
                 >
@@ -869,7 +1060,7 @@ export default function VenuePage() {
           h: resource.height,
           rotation: resource.rotation,
         });
-      } else if (type?.code === 'object' && parentRoomId) {
+      } else if ((type?.code === 'object' || type?.code === 'transport_object') && parentRoomId) {
         const objCoords = parseCoordinates(resource.coordinates);
         objects.push({
           id: rid,
@@ -893,6 +1084,7 @@ export default function VenuePage() {
 
   const legacyData = convertToLegacyFormat();
 
+
   return (
     <div className="flex flex-col h-full">
       <Header title={t.venue.title} description={t.venue.description} organizationStatus={orgStatus} lang={locale} />
@@ -909,7 +1101,7 @@ export default function VenuePage() {
             <TabsList>
               <TabsTrigger value="summary" className="gap-1.5 md:gap-2 text-xs md:text-sm">
                 <MapPin className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                {t.venue.floorPlan}
+                {isTransport ? t.venue.vehicleLayout : t.venue.floorPlan}
               </TabsTrigger>
               <TabsTrigger value="model" className="gap-1.5 md:gap-2 text-xs md:text-sm">
                 <Box className="h-3.5 w-3.5 md:h-4 md:w-4" />
@@ -922,11 +1114,13 @@ export default function VenuePage() {
                 {t.common.loading}
               </Button>
             ) : rootType ? (
-              <Button size="sm" onClick={() => openCreateForm(null, rootType.id)}>
-                <Plus className="h-4 w-4 mr-1 md:mr-2" />
-                <span className="hidden md:inline">{t.venue.addNew} {rootType.name}</span>
-                <span className="md:hidden">{rootType.name}</span>
-              </Button>
+              !isTransport ? (
+                <Button size="sm" onClick={() => openCreateForm(null, rootType.id)}>
+                  <Plus className="h-4 w-4 mr-1 md:mr-2" />
+                  <span className="hidden md:inline">{rootType.name} {t.venue.addSuffix}</span>
+                  <span className="md:hidden">{rootType.name}</span>
+                </Button>
+              ) : null
             ) : (
               <Button variant="outline" size="sm" disabled>
                 <Plus className="h-4 w-4 mr-2" />
@@ -948,34 +1142,49 @@ export default function VenuePage() {
                       <Building2 className="h-10 w-10 text-indigo-600" />
                     </div>
                     <h2 className="text-2xl font-bold text-slate-900 mb-3">
-                      {t.venue.createSeatingTitle}
+                      {isTransport ? t.venue.createVehicleLayoutTitle : t.venue.createSeatingTitle}
                     </h2>
                     <p className="text-slate-500 mb-6 leading-relaxed">
-                      {t.venue.createSeatingDesc}
+                      {isTransport ? t.venue.createVehicleLayoutDesc : t.venue.createSeatingDesc}
                     </p>
 
-                    <div className="grid grid-cols-3 gap-2 md:gap-4 mb-6 md:mb-8 w-full">
-                      <div className="flex flex-col items-center p-2 md:p-4 bg-slate-50 rounded-lg">
-                        <Layers className="h-5 w-5 md:h-6 md:w-6 text-indigo-500 mb-1 md:mb-2" />
-                        <span className="text-xs md:text-sm font-medium text-slate-700 text-center">{t.venue.addFloorStep}</span>
-                        <span className="text-[10px] md:text-xs text-slate-400 mt-1 text-center">{t.venue.addFloorStepDesc}</span>
+                    {isTransport ? (
+                      <div className="grid grid-cols-2 gap-2 md:gap-4 mb-6 md:mb-8 w-full">
+                        <div className="flex flex-col items-center p-2 md:p-4 bg-slate-50 rounded-lg">
+                          <Box className="h-5 w-5 md:h-6 md:w-6 text-indigo-500 mb-1 md:mb-2" />
+                          <span className="text-xs md:text-sm font-medium text-slate-700 text-center">{t.venue.addSectionStep}</span>
+                          <span className="text-[10px] md:text-xs text-slate-400 mt-1 text-center">{t.venue.addSectionStepDesc}</span>
+                        </div>
+                        <div className="flex flex-col items-center p-2 md:p-4 bg-slate-50 rounded-lg">
+                          <User className="h-5 w-5 md:h-6 md:w-6 text-amber-500 mb-1 md:mb-2" />
+                          <span className="text-xs md:text-sm font-medium text-slate-700 text-center">{t.venue.addSeatStep}</span>
+                          <span className="text-[10px] md:text-xs text-slate-400 mt-1 text-center">{t.venue.addSeatStepDesc}</span>
+                        </div>
                       </div>
-                      <div className="flex flex-col items-center p-2 md:p-4 bg-slate-50 rounded-lg">
-                        <Square className="h-5 w-5 md:h-6 md:w-6 text-blue-500 mb-1 md:mb-2" />
-                        <span className="text-xs md:text-sm font-medium text-slate-700 text-center">{t.venue.addRoomStep}</span>
-                        <span className="text-[10px] md:text-xs text-slate-400 mt-1 text-center">{t.venue.addRoomStepDesc}</span>
+                    ) : (
+                      <div className="grid grid-cols-3 gap-2 md:gap-4 mb-6 md:mb-8 w-full">
+                        <div className="flex flex-col items-center p-2 md:p-4 bg-slate-50 rounded-lg">
+                          <Layers className="h-5 w-5 md:h-6 md:w-6 text-indigo-500 mb-1 md:mb-2" />
+                          <span className="text-xs md:text-sm font-medium text-slate-700 text-center">{t.venue.addFloorStep}</span>
+                          <span className="text-[10px] md:text-xs text-slate-400 mt-1 text-center">{t.venue.addFloorStepDesc}</span>
+                        </div>
+                        <div className="flex flex-col items-center p-2 md:p-4 bg-slate-50 rounded-lg">
+                          <Square className="h-5 w-5 md:h-6 md:w-6 text-blue-500 mb-1 md:mb-2" />
+                          <span className="text-xs md:text-sm font-medium text-slate-700 text-center">{t.venue.addRoomStep}</span>
+                          <span className="text-[10px] md:text-xs text-slate-400 mt-1 text-center">{t.venue.addRoomStepDesc}</span>
+                        </div>
+                        <div className="flex flex-col items-center p-2 md:p-4 bg-slate-50 rounded-lg">
+                          <Circle className="h-5 w-5 md:h-6 md:w-6 text-amber-500 mb-1 md:mb-2" />
+                          <span className="text-xs md:text-sm font-medium text-slate-700 text-center">{t.venue.addTableStep}</span>
+                          <span className="text-[10px] md:text-xs text-slate-400 mt-1 text-center">{t.venue.addTableStepDesc}</span>
+                        </div>
                       </div>
-                      <div className="flex flex-col items-center p-2 md:p-4 bg-slate-50 rounded-lg">
-                        <Circle className="h-5 w-5 md:h-6 md:w-6 text-amber-500 mb-1 md:mb-2" />
-                        <span className="text-xs md:text-sm font-medium text-slate-700 text-center">{t.venue.addTableStep}</span>
-                        <span className="text-[10px] md:text-xs text-slate-400 mt-1 text-center">{t.venue.addTableStepDesc}</span>
-                      </div>
-                    </div>
+                    )}
 
                     {rootType ? (
-                      <Button size="lg" onClick={() => openCreateForm(null, rootType.id)} className="gap-2">
+                      <Button size="lg" onClick={() => isTransport ? openSectionCreateForm(rootType.id) : openCreateForm(null, rootType.id)} className="gap-2">
                         <Plus className="h-5 w-5" />
-                        {t.venue.startByAddingFloor}
+                        {isTransport ? t.venue.startByAddingSection : t.venue.startByAddingFloor}
                       </Button>
                     ) : (
                       <p className="text-sm text-red-500">
@@ -987,73 +1196,132 @@ export default function VenuePage() {
               </Card>
             ) : (
               <>
-                <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
-                  {/* Stats Cards */}
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1 md:p-6 md:pb-2">
-                      <CardTitle className="text-xs md:text-sm font-medium">{t.venue.totalFloors}</CardTitle>
-                      <Layers className="h-3.5 w-3.5 md:h-4 md:w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
-                      <div className="text-xl md:text-2xl font-bold">{resources.length}</div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1 md:p-6 md:pb-2">
-                      <CardTitle className="text-xs md:text-sm font-medium">{t.venue.totalRooms}</CardTitle>
-                      <Square className="h-3.5 w-3.5 md:h-4 md:w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
-                      <div className="text-xl md:text-2xl font-bold">
-                        {resources.reduce((acc, floor) => {
-                          const children = childrenCache[floor.id] || floor.children || [];
-                          return acc + children.length;
-                        }, 0)}
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1 md:p-6 md:pb-2">
-                      <CardTitle className="text-xs md:text-sm font-medium">{t.venue.totalTables}</CardTitle>
-                      <Circle className="h-3.5 w-3.5 md:h-4 md:w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
-                      <div className="text-xl md:text-2xl font-bold">
-                        {resources.reduce((acc, floor) => {
-                          const rooms = childrenCache[floor.id] || floor.children || [];
-                          return acc + rooms.reduce((roomAcc, room) => {
-                            const tables = childrenCache[room.id] || room.children || [];
-                            return roomAcc + tables.length;
-                          }, 0);
-                        }, 0)}
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1 md:p-6 md:pb-2">
-                      <CardTitle className="text-xs md:text-sm font-medium">{t.venue.totalCapacity}</CardTitle>
-                      <User className="h-3.5 w-3.5 md:h-4 md:w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
-                      <div className="text-xl md:text-2xl font-bold">
-                        {resources.reduce((acc, floor) => acc + floor.capacity, 0)} {t.venue.people}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
+                {isTransport ? (
+                  /* Transport Stats */
+                  <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-3">
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1 md:p-6 md:pb-2">
+                        <CardTitle className="text-xs md:text-sm font-medium">{t.venue.totalSections}</CardTitle>
+                        <Box className="h-3.5 w-3.5 md:h-4 md:w-4 text-muted-foreground" />
+                      </CardHeader>
+                      <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
+                        <div className="text-xl md:text-2xl font-bold">{resources.length}</div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1 md:p-6 md:pb-2">
+                        <CardTitle className="text-xs md:text-sm font-medium">{t.venue.totalSeats}</CardTitle>
+                        <User className="h-3.5 w-3.5 md:h-4 md:w-4 text-muted-foreground" />
+                      </CardHeader>
+                      <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
+                        <div className="text-xl md:text-2xl font-bold">
+                          {resources.reduce((acc, section) => {
+                            const seats = childrenCache[section.id] || section.children || [];
+                            return acc + seats.length;
+                          }, 0)}
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1 md:p-6 md:pb-2">
+                        <CardTitle className="text-xs md:text-sm font-medium">{t.venue.totalCapacity}</CardTitle>
+                        <User className="h-3.5 w-3.5 md:h-4 md:w-4 text-muted-foreground" />
+                      </CardHeader>
+                      <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
+                        <div className="text-xl md:text-2xl font-bold">
+                          {resources.reduce((acc, section) => acc + section.capacity, 0)} {t.venue.people}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                ) : (
+                  /* Restaurant Stats */
+                  <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1 md:p-6 md:pb-2">
+                        <CardTitle className="text-xs md:text-sm font-medium">{t.venue.totalFloors}</CardTitle>
+                        <Layers className="h-3.5 w-3.5 md:h-4 md:w-4 text-muted-foreground" />
+                      </CardHeader>
+                      <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
+                        <div className="text-xl md:text-2xl font-bold">{resources.length}</div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1 md:p-6 md:pb-2">
+                        <CardTitle className="text-xs md:text-sm font-medium">{t.venue.totalRooms}</CardTitle>
+                        <Square className="h-3.5 w-3.5 md:h-4 md:w-4 text-muted-foreground" />
+                      </CardHeader>
+                      <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
+                        <div className="text-xl md:text-2xl font-bold">
+                          {resources.reduce((acc, floor) => {
+                            const children = childrenCache[floor.id] || floor.children || [];
+                            return acc + children.length;
+                          }, 0)}
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1 md:p-6 md:pb-2">
+                        <CardTitle className="text-xs md:text-sm font-medium">{t.venue.totalTables}</CardTitle>
+                        <Circle className="h-3.5 w-3.5 md:h-4 md:w-4 text-muted-foreground" />
+                      </CardHeader>
+                      <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
+                        <div className="text-xl md:text-2xl font-bold">
+                          {resources.reduce((acc, floor) => {
+                            const rooms = childrenCache[floor.id] || floor.children || [];
+                            return acc + rooms.reduce((roomAcc, room) => {
+                              const tables = childrenCache[room.id] || room.children || [];
+                              return roomAcc + tables.length;
+                            }, 0);
+                          }, 0)}
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1 md:p-6 md:pb-2">
+                        <CardTitle className="text-xs md:text-sm font-medium">{t.venue.totalCapacity}</CardTitle>
+                        <User className="h-3.5 w-3.5 md:h-4 md:w-4 text-muted-foreground" />
+                      </CardHeader>
+                      <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
+                        <div className="text-xl md:text-2xl font-bold">
+                          {resources.reduce((acc, floor) => acc + floor.capacity, 0)} {t.venue.people}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
 
-                {/* Layout Editor — always mounted, handles its own loading */}
-                <div className="mt-4">
-                  <LayoutEditor
+                {/* Layout Editor — only for restaurants */}
+                {!isTransport && (
+                  <div className="mt-4">
+                    <LayoutEditor
+                      resources={sortedResources}
+                      resourceTypes={resourceTypes}
+                      childrenCache={childrenCache}
+                      onResourceCreated={() => { refetchLayout(); }}
+                      onResourceUpdated={() => { refetchLayout(); }}
+                      onResourceDeleted={() => { refetchLayout(); }}
+                      onReady={handleEditorReady}
+                    />
+                  </div>
+                )}
+
+                {/* Transport: 2D Section Canvas */}
+                {isTransport && (
+                  <TransportLayoutEditor
                     resources={sortedResources}
                     resourceTypes={resourceTypes}
                     childrenCache={childrenCache}
-                    onResourceCreated={() => { refetchLayout(); }}
-                    onResourceUpdated={() => { refetchLayout(); }}
-                    onResourceDeleted={() => { refetchLayout(); }}
-                    onReady={handleEditorReady}
+                    onResourceCreated={() => refetchLayout()}
+                    onResourceUpdated={() => refetchLayout()}
+                    onResourceDeleted={() => refetchLayout()}
+                    onOpenCreateForm={openCreateForm}
+                    onOpenSectionCreateForm={openSectionCreateForm}
+                    onOpenEditForm={openEditForm}
+                    onDeleteRequest={(target) => setDeleteTarget(target)}
+                    onChildrenCacheUpdate={setChildrenCache}
                   />
-                </div>
+                )}
               </>
             )}
           </TabsContent>
@@ -1066,7 +1334,7 @@ export default function VenuePage() {
                   <Pencil className="h-4 w-4 text-blue-600" />
                 </div>
                 <p className="text-sm text-blue-800">
-                  Düzenleme yapmak için Kat Planı sekmesine geçin.
+                  {isTransport ? t.venue.editInLayoutTab : t.venue.editInLayoutTab}
                 </p>
               </div>
             )}
@@ -1084,6 +1352,32 @@ export default function VenuePage() {
                     title={t.venue.noDataFor3D}
                     description={t.venue.noDataFor3DDesc}
                   />
+                ) : isTransport ? (
+                  <TransportModel3D
+                    sections={resources.map(r => {
+                      const coords = parseCoordinates(r.coordinates);
+                      return { id: r.id, name: r.name, x: coords.x, y: coords.y, w: r.width || 200, h: r.height || 150 };
+                    })}
+                    seats={resources.flatMap(r => {
+                      const children = childrenCache[r.id] || r.children || [];
+                      return children.map(c => {
+                        const ct = getTypeById(c.resourceTypeId);
+                        const coords = parseCoordinates(c.coordinates);
+                        const isObj = ct?.code === 'object' || ct?.code === 'transport_object';
+                        return {
+                          id: c.id,
+                          name: c.name,
+                          sectionId: r.id,
+                          x: coords.x,
+                          y: coords.y,
+                          isObject: isObj,
+                          color: c.color,
+                          width: c.width,
+                          height: c.height,
+                        };
+                      });
+                    })}
+                  />
                 ) : (
                   <VenueModel3D
                     floors={legacyData.floors}
@@ -1091,7 +1385,6 @@ export default function VenuePage() {
                     tables={legacyData.tables}
                     objects={legacyData.objects}
                     onTableClick={(table) => {
-                      // Find table in childrenCache
                       for (const floor of resources) {
                         const rooms = childrenCache[floor.id] || floor.children || [];
                         for (const room of rooms) {
@@ -1105,7 +1398,6 @@ export default function VenuePage() {
                       }
                     }}
                     onRoomClick={(room) => {
-                      // Find room in childrenCache
                       for (const floor of resources) {
                         const rooms = childrenCache[floor.id] || floor.children || [];
                         const foundRoom = rooms.find(r => String(r.id) === room.id);
@@ -1136,7 +1428,7 @@ export default function VenuePage() {
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label htmlFor="name">
-                  {t.venue.nameLabel} {form.resourceTypeId && getTypeById(form.resourceTypeId)?.code === 'chair' && !form.editId ? t.venue.optional : '*'}
+                  {t.venue.nameLabel} {form.resourceTypeId && (getTypeById(form.resourceTypeId)?.code === 'chair' || getTypeById(form.resourceTypeId)?.code === 'transport_seat') && !form.editId ? t.venue.optional : '*'}
                 </Label>
                 <Input
                   id="name"
@@ -1149,6 +1441,9 @@ export default function VenuePage() {
                       case 'room': return t.venue.roomNameExample;
                       case 'table': return t.venue.tableNameExample;
                       case 'chair': case 'seat': return t.venue.chairNameExample;
+                      case 'section': return t.venue.sectionNamePlaceholder;
+                      case 'transport_seat': return t.venue.seatNameExample;
+                      case 'object': case 'transport_object': return t.venue.objectNamePlaceholder;
                       default: return t.venue.resourceNamePlaceholder;
                     }
                   })()}
@@ -1179,8 +1474,8 @@ export default function VenuePage() {
                 </div>
               )}
 
-              {/* Capacity — visual picker for tables, number input for others */}
-              {form.resourceTypeId && getTypeById(form.resourceTypeId)?.code === 'table' ? (
+              {/* Capacity — hidden for section, transport_seat & object; visual picker for tables; number input for others */}
+              {form.resourceTypeId && ['section', 'transport_seat', 'object', 'transport_object'].includes(getTypeById(form.resourceTypeId)?.code || '') ? null : form.resourceTypeId && getTypeById(form.resourceTypeId)?.code === 'table' ? (
                 <div className="space-y-2">
                   <Label>{t.venue.personCount}</Label>
                   <div className="grid grid-cols-5 gap-2">
@@ -1263,32 +1558,164 @@ export default function VenuePage() {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="serviceStartAt">{t.venue.serviceStart}</Label>
-                  <Input
-                    id="serviceStartAt"
-                    type="time"
-                    value={form.serviceStartAt}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, serviceStartAt: e.target.value }))
-                    }
-                  />
+              {/* Service times — hidden for section, transport_seat & object */}
+              {form.resourceTypeId && !['section', 'transport_seat', 'object', 'transport_object'].includes(getTypeById(form.resourceTypeId)?.code || '') && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="serviceStartAt">{t.venue.serviceStart}</Label>
+                    <Input
+                      id="serviceStartAt"
+                      type="time"
+                      value={form.serviceStartAt}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, serviceStartAt: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="serviceEndAt">{t.venue.serviceEnd}</Label>
+                    <Input
+                      id="serviceEndAt"
+                      type="time"
+                      value={form.serviceEndAt}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, serviceEndAt: e.target.value }))
+                      }
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="serviceEndAt">{t.venue.serviceEnd}</Label>
-                  <Input
-                    id="serviceEndAt"
-                    type="time"
-                    value={form.serviceEndAt}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, serviceEndAt: e.target.value }))
-                    }
-                  />
-                </div>
-              </div>
+              )}
 
-              {/* Chair/Seat count for multiple creation */}
+              {/* Object: color picker + dimensions */}
+              {form.resourceTypeId && (getTypeById(form.resourceTypeId)?.code === 'object' || getTypeById(form.resourceTypeId)?.code === 'transport_object') && (
+                <>
+                  <div className="space-y-2">
+                    <Label>{t.venue.objectColor}</Label>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="color"
+                        value={form.color}
+                        onChange={(e) => setForm((prev) => ({ ...prev, color: e.target.value }))}
+                        className="w-10 h-10 rounded border cursor-pointer"
+                      />
+                      <span className="text-sm text-slate-500">{form.color}</span>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>{t.venue.objectWidth}</Label>
+                      <Input
+                        type="number"
+                        min={10}
+                        max={500}
+                        value={form.width || ''}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => setForm((prev) => ({ ...prev, width: Math.max(10, parseInt(e.target.value) || 10) }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{t.venue.objectHeight}</Label>
+                      <Input
+                        type="number"
+                        min={10}
+                        max={500}
+                        value={form.height || ''}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => setForm((prev) => ({ ...prev, height: Math.max(10, parseInt(e.target.value) || 10) }))}
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Transport seat: grid or single creation */}
+              {form.resourceTypeId && getTypeById(form.resourceTypeId)?.code === 'transport_seat' && !form.editId && (
+                <div className="space-y-3">
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant={form.seatMode === 'grid' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setForm((prev) => ({ ...prev, seatMode: 'grid' }))}
+                    >
+                      {t.venue.bulkSeatCreate}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={form.seatMode === 'single' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setForm((prev) => ({ ...prev, seatMode: 'single', count: 1 }))}
+                    >
+                      {t.venue.singleSeatCreate}
+                    </Button>
+                  </div>
+
+                  {form.seatMode === 'grid' ? (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label>{t.venue.seatColumns}</Label>
+                          <Input
+                            type="number"
+                            min={1}
+                            max={10}
+                            value={form.seatColumns || ''}
+                            onFocus={(e) => e.target.select()}
+                            onChange={(e) => setForm((prev) => ({ ...prev, seatColumns: Math.min(10, Math.max(1, parseInt(e.target.value) || 1)) }))}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>{t.venue.seatRows}</Label>
+                          <Input
+                            type="number"
+                            min={1}
+                            max={50}
+                            value={form.seatRows || ''}
+                            onFocus={(e) => e.target.select()}
+                            onChange={(e) => setForm((prev) => ({ ...prev, seatRows: Math.min(50, Math.max(1, parseInt(e.target.value) || 1)) }))}
+                          />
+                        </div>
+                      </div>
+                      {/* Grid preview */}
+                      <div className="bg-slate-50 rounded-lg p-3 border">
+                        <p className="text-xs text-slate-500 mb-2">{t.venue.seatPreview}: {form.seatColumns} × {form.seatRows} = {form.seatColumns * form.seatRows} {t.venue.seatUnit}</p>
+                        <div className="flex gap-1 justify-center overflow-x-auto py-1" style={{ maxHeight: '160px', overflowY: 'auto' }}>
+                          {Array.from({ length: form.seatColumns }).map((_, col) => (
+                            <div key={col} className="flex flex-col gap-1">
+                              {Array.from({ length: Math.min(form.seatRows, 15) }).map((_, row) => (
+                                <div
+                                  key={row}
+                                  className="w-6 h-6 rounded bg-indigo-100 border border-indigo-300 flex items-center justify-center"
+                                >
+                                  <span className="text-[8px] text-indigo-600 font-medium">{row * form.seatColumns + col + 1}</span>
+                                </div>
+                              ))}
+                              {form.seatRows > 15 && (
+                                <span className="text-[10px] text-slate-400 text-center">...</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Label>{t.venue.chairCountLabel}</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={50}
+                        value={form.count || ''}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => setForm((prev) => ({ ...prev, count: Math.min(50, Math.max(1, parseInt(e.target.value) || 1)) }))}
+                        className="w-24"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Chair/Seat count for multiple creation (restaurant) */}
               {form.resourceTypeId && (getTypeById(form.resourceTypeId)?.code === 'chair' || getTypeById(form.resourceTypeId)?.code === 'seat') && !form.editId && (
                 <div className="space-y-2">
                   <Label htmlFor="count">{t.venue.chairCountLabel}</Label>
@@ -1316,20 +1743,37 @@ export default function VenuePage() {
               )}
 
             </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={closeForm}>
-                {t.common.cancel}
-              </Button>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span tabIndex={0}>
-                    <Button type="submit" disabled={isPending}>
-                      {isPending ? t.common.loading : form.editId ? t.common.update : t.common.create}
-                    </Button>
-                  </span>
-                </TooltipTrigger>
-                {isPending && <TooltipContent>{t.tooltips.formSubmitting}</TooltipContent>}
-              </Tooltip>
+            <DialogFooter className="flex !justify-between">
+              {form.editId ? (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => {
+                    const name = form.name || '';
+                    closeForm();
+                    setDeleteTarget({ id: form.editId!, name });
+                  }}
+                >
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  {t.common.delete}
+                </Button>
+              ) : <div />}
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" onClick={closeForm}>
+                  {t.common.cancel}
+                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span tabIndex={0}>
+                      <Button type="submit" disabled={isPending}>
+                        {isPending ? t.common.loading : form.editId ? t.common.update : t.common.create}
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {isPending && <TooltipContent>{t.tooltips.formSubmitting}</TooltipContent>}
+                </Tooltip>
+              </div>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -1338,12 +1782,20 @@ export default function VenuePage() {
       {/* Delete Confirm */}
       <ConfirmDialog
         open={!!deleteTarget}
-        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        onOpenChange={(open) => !open && !deleting && setDeleteTarget(null)}
         title={t.venue.deleteResource}
-        description={`"${deleteTarget?.name}" ${t.venue.deleteResourceDesc}`}
+        description={(() => {
+          if (!deleteTarget) return '';
+          const children = childrenCache[deleteTarget.id] || [];
+          if (children.length > 0) {
+            return `"${deleteTarget.name}" ${t.venue.deleteWithChildrenDesc}`;
+          }
+          return `"${deleteTarget.name}" ${t.venue.deleteResourceDesc}`;
+        })()}
         confirmLabel={t.common.delete}
         onConfirm={handleDelete}
         variant="destructive"
+        loading={deleting}
       />
     </div>
   );
