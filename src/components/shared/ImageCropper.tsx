@@ -70,6 +70,10 @@ async function getCroppedImg(
   croppedCanvas.width = pixelCrop.width;
   croppedCanvas.height = pixelCrop.height;
 
+  if (!pixelCrop.width || !pixelCrop.height || !canvas.width || !canvas.height) {
+    throw new Error('Invalid crop dimensions');
+  }
+
   croppedCtx.drawImage(
     canvas,
     pixelCrop.x,

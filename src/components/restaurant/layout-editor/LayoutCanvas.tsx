@@ -102,13 +102,16 @@ export function LayoutCanvas({ state, dispatch }: LayoutCanvasProps) {
     [dispatch],
   );
 
+  // Prevent Konva crash when container is hidden (0×0), e.g. inside inactive forceMount tabs
+  const canRender = containerSize.width > 0 && containerSize.height > 0;
+
   return (
     <div
       ref={containerRef}
       className="flex-1 bg-white rounded-lg border overflow-hidden"
       style={{ minHeight: 600 }}
     >
-      <Stage
+      {canRender ? <Stage
         ref={stageRef}
         width={containerSize.width}
         height={containerSize.height}
@@ -180,7 +183,7 @@ export function LayoutCanvas({ state, dispatch }: LayoutCanvasProps) {
             />
           ))}
         </Layer>
-      </Stage>
+      </Stage> : null}
     </div>
   );
 }
