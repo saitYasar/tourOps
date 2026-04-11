@@ -18,7 +18,7 @@ interface LayoutCanvasProps {
 export function LayoutCanvas({ state, dispatch }: LayoutCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
-  const [containerSize, setContainerSize] = useState({ width: 800, height: 600 });
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
 
   // Fit canvas to container
   useEffect(() => {

@@ -2,12 +2,12 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { Building2, ArrowLeft, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useLanguage } from '@/contexts/LanguageContext';
-import { adminApi, type AdminQuickCreateOrganizationDto, type AdminQuickCreateOrganizationResponseDto } from '@/lib/api';
+import { adminApi, type AdminQuickCreateOrganizationDto, type AdminQuickCreateOrganizationResponseDto, type CategoryDto, type PaginatedResponse } from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,7 +19,16 @@ export default function QuickCreateOrganizationPage() {
   const a = t.admin as Record<string, string>;
 
   const [name, setName] = useState('');
+  const [categoryId, setCategoryId] = useState<number>(1);
   const [currency, setCurrency] = useState<'TRY' | 'EUR' | 'USD'>('TRY');
+
+  const { data: categoriesResult } = useQuery({
+    queryKey: ['admin-org-categories'],
+    queryFn: () => adminApi.getOrganizationCategories(),
+  });
+  const categories: CategoryDto[] = categoriesResult?.success
+    ? (categoriesResult.data as PaginatedResponse<CategoryDto>)?.data || []
+    : [];
 
   const createMutation = useMutation({
     mutationFn: (data: AdminQuickCreateOrganizationDto) =>
@@ -44,7 +53,7 @@ export default function QuickCreateOrganizationPage() {
       toast.error(`${t.tooltips.fillRequired}: ${a.nameLabel}`);
       return;
     }
-    createMutation.mutate({ name, currency });
+    createMutation.mutate({ name, categoryId, currency });
   };
 
   return (
@@ -78,6 +87,22 @@ export default function QuickCreateOrganizationPage() {
               onKeyDown={(e) => e.key === 'Enter' && !createMutation.isPending && handleSubmit()}
               autoFocus
             />
+          </div>
+
+          <div>
+            <label className="text-sm text-slate-600 mb-1.5 block font-medium">{a.categoryLabel}</label>
+            <Select value={String(categoryId)} onValueChange={(v) => setCategoryId(Number(v))}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map((cat) => (
+                  <SelectItem key={cat.id} value={String(cat.id)}>
+                    {cat.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div>

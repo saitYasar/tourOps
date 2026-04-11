@@ -187,6 +187,7 @@ export default function OrganizationSetupPage() {
   } = useForm<FormData>({
     resolver: zodResolver(organizationSchema),
     defaultValues: {
+      categoryId: 1,
       phoneCountryCode: 90,
     },
   });
