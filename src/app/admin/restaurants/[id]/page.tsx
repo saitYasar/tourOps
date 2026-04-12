@@ -2600,7 +2600,47 @@ function ResourcesTab({ orgId, categoryId }: { orgId: number; categoryId?: numbe
 
   // Local state wrapper for optimistic updates from TransportLayoutEditor
   const [localChildrenCache, setLocalChildrenCache] = useState(computedChildrenCache);
-  useEffect(() => { setLocalChildrenCache(computedChildrenCache); }, [computedChildrenCache]);
+  // When computed cache changes (after query refetch), merge with local cache:
+  // If local cache has layout data (coordinates) and the item count changed, re-fetch layout from API.
+  // If counts match, keep the richer (with coordinates) version.
+  useEffect(() => {
+    if (!isTransport) {
+      setLocalChildrenCache(computedChildrenCache);
+      return;
+    }
+    setLocalChildrenCache(prev => {
+      const next: Record<number, ResourceDto[]> = { ...computedChildrenCache };
+      const sectionsToRefetch: number[] = [];
+      for (const key of Object.keys(prev)) {
+        const numKey = Number(key);
+        const prevEntries = prev[numKey];
+        const computedEntries = next[numKey];
+        const prevHasCoords = prevEntries?.some(e => e.coordinates);
+        if (prevHasCoords && computedEntries) {
+          if (computedEntries.length === prevEntries.length) {
+            // Same count — keep layout-enriched data
+            next[numKey] = prevEntries;
+          } else {
+            // Count changed (add/delete) — need to re-fetch layout
+            sectionsToRefetch.push(numKey);
+          }
+        }
+      }
+      // Re-fetch layout data for sections where count changed
+      if (sectionsToRefetch.length > 0) {
+        for (const sectionId of sectionsToRefetch) {
+          resourceApi.getLayout(sectionId, orgId).then((result) => {
+            if (result.success && result.data) {
+              const children = Array.isArray(result.data) ? result.data : [];
+              setLocalChildrenCache(p => ({ ...p, [sectionId]: children }));
+            }
+          });
+        }
+      }
+      return next;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [computedChildrenCache, isTransport, orgId]);
 
   // Use local cache (which tracks optimistic updates from the transport editor)
   const childrenCache = localChildrenCache;
