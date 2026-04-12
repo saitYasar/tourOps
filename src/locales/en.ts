@@ -523,6 +523,7 @@ export const en = {
     seatNameExample: 'e.g. Seat (auto-numbered if left empty)',
     bulkSeatCreate: 'Bulk Create',
     singleSeatCreate: 'Single Add',
+    seatAutoNumberInfo: 'Seat names are automatically assigned in numerical order.',
     seatColumns: 'Columns',
     seatRows: 'Rows',
     seatPreview: 'Preview',

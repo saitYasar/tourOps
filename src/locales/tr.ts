@@ -523,6 +523,7 @@ export const tr = {
     seatNameExample: 'Örn: Koltuk (boş bırakılırsa otomatik numaralanır)',
     bulkSeatCreate: 'Toplu Oluştur',
     singleSeatCreate: 'Tekli Ekle',
+    seatAutoNumberInfo: 'Koltuk isimleri numara sırasına göre otomatik verilir.',
     seatColumns: 'Sütun Sayısı',
     seatRows: 'Satır Sayısı',
     seatPreview: 'Önizleme',

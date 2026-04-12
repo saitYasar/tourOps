@@ -1426,29 +1426,35 @@ export default function VenuePage() {
           </DialogHeader>
           <form onSubmit={handleSubmit}>
             <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">
-                  {t.venue.nameLabel} {form.resourceTypeId && (getTypeById(form.resourceTypeId)?.code === 'chair' || getTypeById(form.resourceTypeId)?.code === 'transport_seat') && !form.editId ? t.venue.optional : '*'}
-                </Label>
-                <Input
-                  id="name"
-                  value={form.name}
-                  onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-                  placeholder={(() => {
-                    const code = form.resourceTypeId ? getTypeById(form.resourceTypeId)?.code : '';
-                    switch (code) {
-                      case 'floor': return t.venue.floorNameExample;
-                      case 'room': return t.venue.roomNameExample;
-                      case 'table': return t.venue.tableNameExample;
-                      case 'chair': case 'seat': return t.venue.chairNameExample;
-                      case 'section': return t.venue.sectionNamePlaceholder;
-                      case 'transport_seat': return t.venue.seatNameExample;
-                      case 'object': case 'transport_object': return t.venue.objectNamePlaceholder;
-                      default: return t.venue.resourceNamePlaceholder;
-                    }
-                  })()}
-                />
-              </div>
+              {form.resourceTypeId && getTypeById(form.resourceTypeId)?.code === 'transport_seat' && !form.editId ? (
+                <p className="text-sm text-slate-500 bg-slate-50 rounded-lg px-3 py-2 border border-slate-200">
+                  {t.venue.seatAutoNumberInfo}
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  <Label htmlFor="name">
+                    {t.venue.nameLabel} {form.resourceTypeId && (getTypeById(form.resourceTypeId)?.code === 'chair' || getTypeById(form.resourceTypeId)?.code === 'transport_seat') && !form.editId ? t.venue.optional : '*'}
+                  </Label>
+                  <Input
+                    id="name"
+                    value={form.name}
+                    onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+                    placeholder={(() => {
+                      const code = form.resourceTypeId ? getTypeById(form.resourceTypeId)?.code : '';
+                      switch (code) {
+                        case 'floor': return t.venue.floorNameExample;
+                        case 'room': return t.venue.roomNameExample;
+                        case 'table': return t.venue.tableNameExample;
+                        case 'chair': case 'seat': return t.venue.chairNameExample;
+                        case 'section': return t.venue.sectionNamePlaceholder;
+                        case 'transport_seat': return t.venue.seatNameExample;
+                        case 'object': case 'transport_object': return t.venue.objectNamePlaceholder;
+                        default: return t.venue.resourceNamePlaceholder;
+                      }
+                    })()}
+                  />
+                </div>
+              )}
 
               {form.resourceTypeId && getTypeById(form.resourceTypeId)?.code === 'floor' && (
                 <div className="space-y-2">
@@ -1628,90 +1634,54 @@ export default function VenuePage() {
                 </>
               )}
 
-              {/* Transport seat: grid or single creation */}
+              {/* Transport seat: grid creation */}
               {form.resourceTypeId && getTypeById(form.resourceTypeId)?.code === 'transport_seat' && !form.editId && (
                 <div className="space-y-3">
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      variant={form.seatMode === 'grid' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setForm((prev) => ({ ...prev, seatMode: 'grid' }))}
-                    >
-                      {t.venue.bulkSeatCreate}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={form.seatMode === 'single' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setForm((prev) => ({ ...prev, seatMode: 'single', count: 1 }))}
-                    >
-                      {t.venue.singleSeatCreate}
-                    </Button>
-                  </div>
-
-                  {form.seatMode === 'grid' ? (
-                    <div className="space-y-3">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <Label>{t.venue.seatColumns}</Label>
-                          <Input
-                            type="number"
-                            min={1}
-                            max={10}
-                            value={form.seatColumns || ''}
-                            onFocus={(e) => e.target.select()}
-                            onChange={(e) => setForm((prev) => ({ ...prev, seatColumns: Math.min(10, Math.max(1, parseInt(e.target.value) || 1)) }))}
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <Label>{t.venue.seatRows}</Label>
-                          <Input
-                            type="number"
-                            min={1}
-                            max={50}
-                            value={form.seatRows || ''}
-                            onFocus={(e) => e.target.select()}
-                            onChange={(e) => setForm((prev) => ({ ...prev, seatRows: Math.min(50, Math.max(1, parseInt(e.target.value) || 1)) }))}
-                          />
-                        </div>
-                      </div>
-                      {/* Grid preview */}
-                      <div className="bg-slate-50 rounded-lg p-3 border">
-                        <p className="text-xs text-slate-500 mb-2">{t.venue.seatPreview}: {form.seatColumns} × {form.seatRows} = {form.seatColumns * form.seatRows} {t.venue.seatUnit}</p>
-                        <div className="flex gap-1 justify-center overflow-x-auto py-1" style={{ maxHeight: '160px', overflowY: 'auto' }}>
-                          {Array.from({ length: form.seatColumns }).map((_, col) => (
-                            <div key={col} className="flex flex-col gap-1">
-                              {Array.from({ length: Math.min(form.seatRows, 15) }).map((_, row) => (
-                                <div
-                                  key={row}
-                                  className="w-6 h-6 rounded bg-indigo-100 border border-indigo-300 flex items-center justify-center"
-                                >
-                                  <span className="text-[8px] text-indigo-600 font-medium">{row * form.seatColumns + col + 1}</span>
-                                </div>
-                              ))}
-                              {form.seatRows > 15 && (
-                                <span className="text-[10px] text-slate-400 text-center">...</span>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label>{t.venue.seatColumns}</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={10}
+                        value={form.seatColumns || ''}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => setForm((prev) => ({ ...prev, seatColumns: Math.min(10, Math.max(1, parseInt(e.target.value) || 1)) }))}
+                      />
                     </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <Label>{t.venue.chairCountLabel}</Label>
+                    <div className="space-y-1">
+                      <Label>{t.venue.seatRows}</Label>
                       <Input
                         type="number"
                         min={1}
                         max={50}
-                        value={form.count || ''}
+                        value={form.seatRows || ''}
                         onFocus={(e) => e.target.select()}
-                        onChange={(e) => setForm((prev) => ({ ...prev, count: Math.min(50, Math.max(1, parseInt(e.target.value) || 1)) }))}
-                        className="w-24"
+                        onChange={(e) => setForm((prev) => ({ ...prev, seatRows: Math.min(50, Math.max(1, parseInt(e.target.value) || 1)) }))}
                       />
                     </div>
-                  )}
+                  </div>
+                  {/* Grid preview */}
+                  <div className="bg-slate-50 rounded-lg p-3 border">
+                    <p className="text-xs text-slate-500 mb-2">{t.venue.seatPreview}: {form.seatColumns} × {form.seatRows} = {form.seatColumns * form.seatRows} {t.venue.seatUnit}</p>
+                    <div className="flex gap-1 justify-center overflow-x-auto py-1" style={{ maxHeight: '160px', overflowY: 'auto' }}>
+                      {Array.from({ length: form.seatColumns }).map((_, col) => (
+                        <div key={col} className="flex flex-col gap-1">
+                          {Array.from({ length: Math.min(form.seatRows, 15) }).map((_, row) => (
+                            <div
+                              key={row}
+                              className="w-6 h-6 rounded bg-indigo-100 border border-indigo-300 flex items-center justify-center"
+                            >
+                              <span className="text-[8px] text-indigo-600 font-medium">{row * form.seatColumns + col + 1}</span>
+                            </div>
+                          ))}
+                          {form.seatRows > 15 && (
+                            <span className="text-[10px] text-slate-400 text-center">...</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               )}
 

@@ -523,6 +523,7 @@ export const de = {
     seatNameExample: 'z.B. Sitz (automatisch nummeriert wenn leer)',
     bulkSeatCreate: 'Massenerstellen',
     singleSeatCreate: 'Einzeln hinzufügen',
+    seatAutoNumberInfo: 'Sitznamen werden automatisch in numerischer Reihenfolge vergeben.',
     seatColumns: 'Spalten',
     seatRows: 'Zeilen',
     seatPreview: 'Vorschau',
