@@ -1340,11 +1340,11 @@ function InteractiveMenuCategory({
                         <TooltipTrigger asChild>
                           <span tabIndex={0}>
                             <button
-                              className="w-8 h-8 sm:w-9 sm:h-9 rounded-full border border-stone-300 flex items-center justify-center hover:bg-stone-100 disabled:opacity-30 transition-colors"
+                              className="w-10 h-10 sm:w-11 sm:h-11 rounded-full border border-stone-300 flex items-center justify-center hover:bg-stone-100 disabled:opacity-30 transition-colors"
                               onClick={() => setItemQty(stopId, svc.id, qty - 1)}
                               disabled={qty === 0}
                             >
-                              <Minus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                              <Minus className="h-4 w-4 sm:h-5 sm:w-5" />
                             </button>
                           </span>
                         </TooltipTrigger>
@@ -1358,11 +1358,11 @@ function InteractiveMenuCategory({
                         {qty}
                       </span>
                       <button
-                        className="w-8 h-8 sm:w-9 sm:h-9 rounded-full border border-orange-300 bg-orange-50 flex items-center justify-center hover:bg-orange-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        className="w-10 h-10 sm:w-11 sm:h-11 rounded-full border border-orange-300 bg-orange-50 flex items-center justify-center hover:bg-orange-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                         onClick={() => setItemQty(stopId, svc.id, qty + 1)}
                         disabled={isOutOfStock || isStockLimitReached || limitReached}
                       >
-                        <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-orange-600" />
+                        <Plus className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600" />
                       </button>
                     </div>
                   )}
