@@ -1587,7 +1587,7 @@ export default function AdminToursPage() {
                                   </CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                  <AdminStopVenuePreview stopId={selectedStop.id} />
+                                  <AdminStopVenuePreview stopId={selectedStop.id} categoryId={selectedStop.organization?.categoryId} />
                                 </CardContent>
                               </Card>
                             )}

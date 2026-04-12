@@ -311,8 +311,21 @@ export default function CustomerTourDetailPage() {
     setNavigateToTableId(null);
   };
 
-  // Trace parent hierarchy for a chair through childrenCache
+  // Trace parent hierarchy for a chair/seat through childrenCache
   const findParentNames = (chairId: number): { floorName: string; roomName: string; tableName: string } => {
+    // Transport: section → seat (2 levels)
+    const activeStop = tableStopId ? tour?.stops?.find(s => s.id === tableStopId) : null;
+    if (activeStop?.organization?.categoryId === 2) {
+      for (const section of floors) {
+        const seats = childrenCache[section.id] ?? [];
+        if (seats.some(s => s.id === chairId)) {
+          const seat = seats.find(s => s.id === chairId);
+          return { floorName: section.name, roomName: '', tableName: seat?.name || '' };
+        }
+      }
+      return { floorName: '', roomName: '', tableName: '' };
+    }
+    // Restaurant: floor → room → table → chair (4 levels)
     for (const floor of floors) {
       const rooms = childrenCache[floor.id] ?? [];
       for (const room of rooms) {
@@ -1017,6 +1030,7 @@ export default function CustomerTourDetailPage() {
                 stopId={tableStopId!}
                 floors={floors}
                 childrenCache={childrenCache}
+                categoryId={tour?.stops?.find(s => s.id === tableStopId)?.organization?.categoryId}
                 onTableSelect={(tableResourceId) => {
                   setNavigateToTableId(tableResourceId);
                   // Scroll to 2D selector after 3D collapses
@@ -1038,6 +1052,7 @@ export default function CustomerTourDetailPage() {
                 currentClientId={clientProfile?.id}
                 navigateToTableId={navigateToTableId}
                 readOnly={tableStopId ? tour?.stops?.find(s => s.id === tableStopId)?.choicesStatus === 'approved' : false}
+                categoryId={tableStopId ? tour?.stops?.find(s => s.id === tableStopId)?.organization?.categoryId : undefined}
               />
               </>
             )}

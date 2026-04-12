@@ -38,6 +38,10 @@ export const COMBINATION_COLORS = [
 export function getResourceLabel(choice: AgencyStopChoicesDto): string {
   if (!choice.resourceChoice) return '';
   if (Array.isArray(choice.resourceChoice)) {
+    // Transport: transport_seat
+    const transportSeat = choice.resourceChoice.find((item: ClientResourceChoiceItemDto) => item.resourceTypeCode === 'transport_seat');
+    if (transportSeat) return transportSeat.resourceName;
+    // Restaurant: seat
     const seat = choice.resourceChoice.find((item: ClientResourceChoiceItemDto) => item.resourceTypeCode === 'seat');
     if (seat) return seat.resourceName;
     const last = choice.resourceChoice[choice.resourceChoice.length - 1];
@@ -63,9 +67,25 @@ function sortChoicesBySeat(choices: AgencyStopChoicesDto[]): AgencyStopChoicesDt
   return [...choices].sort((a, b) => getSeatSortKey(a) - getSeatSortKey(b));
 }
 
-/** Extract short table label: "Masa-1" / "masa 1" / "Masa-1" → "1", otherwise return full label */
+/** Detect if a choice is for a transport vehicle (section + transport_seat) */
+function isTransportChoice(choice: AgencyStopChoicesDto): boolean {
+  if (!choice.resourceChoice || !Array.isArray(choice.resourceChoice)) return false;
+  return choice.resourceChoice.some((item: ClientResourceChoiceItemDto) =>
+    item.resourceTypeCode === 'section' || item.resourceTypeCode === 'transport_seat'
+  );
+}
+
+/** Extract short table/section label */
 function getShortTableLabel(choice: AgencyStopChoicesDto): string {
   if (!choice.resourceChoice || !Array.isArray(choice.resourceChoice)) return '';
+  // Transport: look for section
+  const section = choice.resourceChoice.find((item: ClientResourceChoiceItemDto) => item.resourceTypeCode === 'section');
+  if (section) {
+    const name = section.resourceName || '';
+    const match = name.match(/(\d+)/);
+    return match ? match[1] : name;
+  }
+  // Restaurant: look for table
   const table = choice.resourceChoice.find((item: ClientResourceChoiceItemDto) => item.resourceTypeCode === 'table');
   if (!table) return '';
   const name = table.resourceName || '';
@@ -73,9 +93,17 @@ function getShortTableLabel(choice: AgencyStopChoicesDto): string {
   return match ? match[1] : name;
 }
 
-/** Extract short seat label: "Sandalye-3" / "sandalye 3" → "3", otherwise return full label */
+/** Extract short seat label */
 function getShortSeatLabel(choice: AgencyStopChoicesDto): string {
   if (!choice.resourceChoice || !Array.isArray(choice.resourceChoice)) return '';
+  // Transport: look for transport_seat
+  const transportSeat = choice.resourceChoice.find((item: ClientResourceChoiceItemDto) => item.resourceTypeCode === 'transport_seat');
+  if (transportSeat) {
+    const name = transportSeat.resourceName || '';
+    const match = name.match(/(\d+)/);
+    return match ? match[1] : name;
+  }
+  // Restaurant: look for seat
   const seat = choice.resourceChoice.find((item: ClientResourceChoiceItemDto) => item.resourceTypeCode === 'seat');
   if (!seat) return '';
   const name = seat.resourceName || '';
@@ -152,6 +180,7 @@ export function DetailedListReceipt({
   t: T;
 }) {
   const sortedChoices = sortChoicesBySeat(choices);
+  const isTransport = sortedChoices.length > 0 && isTransportChoice(sortedChoices[0]);
 
   const categoryOrderMap = new Map<string, number>();
   for (const choice of sortedChoices) {
@@ -221,8 +250,8 @@ export function DetailedListReceipt({
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
         <thead>
           <tr>
-            <th style={{ border: '1px solid #999', padding: '6px 8px', textAlign: 'center', backgroundColor: '#e2e8f0', minWidth: 36, fontWeight: 'bold' }}>{t.guests.tableNo}</th>
-            <th style={{ border: '1px solid #999', padding: '6px 8px', textAlign: 'center', backgroundColor: '#e2e8f0', minWidth: 36, fontWeight: 'bold' }}>{t.guests.seatNo}</th>
+            <th style={{ border: '1px solid #999', padding: '6px 8px', textAlign: 'center', backgroundColor: '#e2e8f0', minWidth: 36, fontWeight: 'bold' }}>{isTransport ? (t.guests.sectionNo || 'Bölüm') : t.guests.tableNo}</th>
+            <th style={{ border: '1px solid #999', padding: '6px 8px', textAlign: 'center', backgroundColor: '#e2e8f0', minWidth: 36, fontWeight: 'bold' }}>{isTransport ? (t.guests.seatNoTransport || 'Koltuk') : t.guests.seatNo}</th>
             <th style={{ border: '1px solid #999', padding: '6px 8px', textAlign: 'left', backgroundColor: '#e2e8f0', minWidth: 80, fontWeight: 'bold' }}>{t.guests.lastName}</th>
             <th style={{ border: '1px solid #999', padding: '6px 8px', textAlign: 'left', backgroundColor: '#e2e8f0', minWidth: 80, fontWeight: 'bold' }}>{t.guests.firstName}</th>
             {categoryNames.map((cat) => (
@@ -358,26 +387,17 @@ export function KitchenSummaryReceipt({
                         <th className="text-left py-1 font-medium">{t.guests.tableSeat}</th>
                         <th className="text-left py-1 font-medium">{t.guests.customer}</th>
                         <th className="text-center py-1 font-medium">{t.guests.quantity}</th>
+                        <th className="text-left py-1 font-medium">{t.guests.note}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {svc.entries.map((e, i) => (
-                        <React.Fragment key={i}>
-                          <tr className="border-b border-slate-100 last:border-b-0">
-                            <td className="py-1 font-medium text-slate-700">{e.seat || '—'}</td>
-                            <td className="py-1 text-slate-600">{e.name}</td>
-                            <td className="py-1 text-center text-slate-600">{e.qty}</td>
-                          </tr>
-                          {e.note && (
-                            <tr>
-                              <td colSpan={3} className="pb-1 pl-4">
-                                <span className="inline-block text-xs italic bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded">
-                                  {t.guests.note}: {e.note}
-                                </span>
-                              </td>
-                            </tr>
-                          )}
-                        </React.Fragment>
+                        <tr key={i} className="border-b border-slate-100 last:border-b-0">
+                          <td className="py-1 font-medium text-slate-700">{e.seat || '—'}</td>
+                          <td className="py-1 text-slate-600">{e.name}</td>
+                          <td className="py-1 text-center text-slate-600">{e.qty}</td>
+                          <td className="py-1 text-slate-500 italic">{e.note || ''}</td>
+                        </tr>
                       ))}
                     </tbody>
                   </table>
@@ -395,12 +415,14 @@ export function KitchenSummaryReceipt({
 // Table-Based Services (grouped by table)
 // ============================================
 
-/** Build a table label from resource choices (floor + room + table) */
+/** Build a table/section label from resource choices */
 function getTableLabel(choice: AgencyStopChoicesDto): string {
   if (!choice.resourceChoice || !Array.isArray(choice.resourceChoice)) return '';
   const parts: string[] = [];
   for (const item of choice.resourceChoice as ClientResourceChoiceItemDto[]) {
-    if (item.resourceTypeCode === 'floor' || item.resourceTypeCode === 'room' || item.resourceTypeCode === 'table') {
+    // Restaurant: floor, room, table
+    // Transport: section
+    if (['floor', 'room', 'table', 'section'].includes(item.resourceTypeCode)) {
       parts.push(`${item.resourceTypeName}: ${item.resourceName}`);
     }
   }
@@ -641,7 +663,12 @@ export function exportReceiptExcel(
     }
   }
   const categoryNames = Array.from(categoryOrderMap.keys());
-  const detailHeaders = [t.guests.tableNo, t.guests.seatNo, t.guests.lastName, t.guests.firstName, ...categoryNames, t.guests.note];
+  const isTransportExcel = sortedChoices.length > 0 && isTransportChoice(sortedChoices[0]);
+  const detailHeaders = [
+    isTransportExcel ? (t.guests.sectionNo || 'Bölüm') : t.guests.tableNo,
+    isTransportExcel ? (t.guests.seatNoTransport || 'Koltuk') : t.guests.seatNo,
+    t.guests.lastName, t.guests.firstName, ...categoryNames, t.guests.note,
+  ];
 
   type CellInfo = { v: string | number; colors?: string[] };
   const detailData: CellInfo[][] = [];

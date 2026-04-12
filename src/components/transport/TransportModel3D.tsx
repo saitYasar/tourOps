@@ -26,6 +26,17 @@ const SEAT_BACK_CLR = '#374151';
 const SEL_CLR = '#3b82f6';
 const FRAME_CLR = '#94a3b8';    // Metal çerçeve
 
+// Occupancy colors (matches VenueModel3D)
+const SKIN_CLR = '#f0c8a0';
+const MALE_CLR = '#2563eb';
+const MALE_SEAT = '#bfdbfe';
+const MALE_LABEL = '#1d4ed8';
+const MALE_SHIRT = '#3b82f6';
+const FEMALE_CLR = '#db2777';
+const FEMALE_SEAT = '#fbcfe8';
+const FEMALE_LABEL = '#be185d';
+const FEMALE_SHIRT = '#ec4899';
+
 // ═══════════════════════════════════════════════════════════
 // Types
 // ═══════════════════════════════════════════════════════════
@@ -36,6 +47,12 @@ interface TransportSection {
   y: number;
   w: number;
   h: number;
+}
+
+export interface SeatOccupant {
+  clientId: number;
+  clientName: string;
+  gender?: 'm' | 'f' | null;
 }
 
 interface TransportSeat {
@@ -53,6 +70,7 @@ interface TransportSeat {
 interface TransportModel3DProps {
   sections: TransportSection[];
   seats: TransportSeat[];
+  occupancy?: Record<number, SeatOccupant | null>;
   onSectionClick?: (sectionId: number) => void;
   onSeatClick?: (seatId: number) => void;
 }
@@ -64,6 +82,7 @@ interface SeatLayout3D {
   seat: TransportSeat;
   cx: number;
   cz: number;
+  occupant?: SeatOccupant | null;
 }
 
 interface SectionLayout3D {
@@ -79,7 +98,7 @@ interface SectionLayout3D {
 // ═══════════════════════════════════════════════════════════
 // Layout computation
 // ═══════════════════════════════════════════════════════════
-function computeLayout(sections: TransportSection[], seats: TransportSeat[]): SectionLayout3D[] {
+function computeLayout(sections: TransportSection[], seats: TransportSeat[], occupancy?: Record<number, SeatOccupant | null>): SectionLayout3D[] {
   if (!sections.length) return [];
 
   // Find bounding box of all sections
@@ -92,23 +111,26 @@ function computeLayout(sections: TransportSection[], seats: TransportSeat[]): Se
   }
   const totalW = maxX - minX || 1;
   const totalH = maxY - minY || 1;
-  const scale = 8 / Math.max(totalW, totalH);
+  const scale = 12 / Math.max(totalW, totalH);
   const offX = (minX + maxX) / 2;
   const offY = (minY + maxY) / 2;
 
+  const PAD = 0.6; // padding around seats inside section box
+
   return sections.map((section, i) => {
-    const sw = section.w * scale;
-    const sd = section.h * scale;
-    const cx = (section.x + section.w / 2 - offX) * scale;
-    const cz = (section.y + section.h / 2 - offY) * scale;
+    const sw = section.w * scale + PAD * 2;
+    const sd = section.h * scale + PAD * 2;
+    // Negate both axes so 2D layout matches 3D camera view (camera at +X,+Y,+Z looking at origin)
+    const cx = -(section.x + section.w / 2 - offX) * scale;
+    const cz = -(section.y + section.h / 2 - offY) * scale;
 
     // Get seats for this section
     const sectionSeats = seats.filter(s => s.sectionId === section.id);
     const seatLayouts: SeatLayout3D[] = sectionSeats.map(seat => {
       // Convert seat coordinates (relative to section) to 3D position (relative to section center)
-      const sx = (seat.x - section.w / 2) * scale;
-      const sz = (seat.y - section.h / 2) * scale;
-      return { seat, cx: sx, cz: sz };
+      const sx = -(seat.x - section.w / 2) * scale;
+      const sz = -(seat.y - section.h / 2) * scale;
+      return { seat, cx: sx, cz: sz, occupant: occupancy?.[seat.id] };
     });
 
     return {
@@ -189,8 +211,24 @@ function Seat3D({ layout, isSelected, visible }: {
   }
 
   // Transport seat — like bus/plane seat
-  const seatColor = isSelected ? SEL_CLR : hov ? '#6b7280' : SEAT_CLR;
-  const backColor = isSelected ? '#2563eb' : hov ? '#4b5563' : SEAT_BACK_CLR;
+  const occupant = layout.occupant;
+  const isOccupied = !!occupant;
+  const isFemale = occupant?.gender === 'f';
+
+  const seatColor = isOccupied
+    ? (isFemale ? FEMALE_SEAT : MALE_SEAT)
+    : isSelected ? SEL_CLR : hov ? '#6b7280' : SEAT_CLR;
+  const backColor = isOccupied
+    ? (isFemale ? FEMALE_CLR : MALE_CLR)
+    : isSelected ? '#2563eb' : hov ? '#4b5563' : SEAT_BACK_CLR;
+  const shirtColor = isFemale ? FEMALE_SHIRT : MALE_SHIRT;
+  const labelBg = isFemale ? FEMALE_LABEL : MALE_LABEL;
+
+  // Person measurements (seated on transport seat)
+  const torsoH = 0.28;
+  const headR = 0.06;
+  const torsoY = SEAT_H + torsoH / 2 + 0.02;
+  const headY = SEAT_H + torsoH + headR + 0.04;
 
   return (
     <group ref={ref} position={[cx, FLOOR_Y, cz]}
@@ -225,10 +263,51 @@ function Seat3D({ layout, isSelected, visible }: {
         <meshStandardMaterial color={FRAME_CLR} roughness={0.4} metalness={0.4} />
       </mesh>
 
+      {/* ─── Seated person figure ─── */}
+      {isOccupied && (
+        <group>
+          {/* Torso */}
+          <mesh position={[0, torsoY, 0]} castShadow>
+            <cylinderGeometry args={[0.07, 0.06, torsoH, 8]} />
+            <meshStandardMaterial color={shirtColor} roughness={0.7} />
+          </mesh>
+          {/* Head */}
+          <mesh position={[0, headY, 0]} castShadow>
+            <sphereGeometry args={[headR, 12, 10]} />
+            <meshStandardMaterial color={SKIN_CLR} roughness={0.6} />
+          </mesh>
+          {/* Left arm */}
+          <mesh position={[-0.09, torsoY - 0.02, 0]} castShadow rotation={[0, 0, 0.2]}>
+            <cylinderGeometry args={[0.02, 0.018, 0.18, 6]} />
+            <meshStandardMaterial color={shirtColor} roughness={0.7} />
+          </mesh>
+          {/* Right arm */}
+          <mesh position={[0.09, torsoY - 0.02, 0]} castShadow rotation={[0, 0, -0.2]}>
+            <cylinderGeometry args={[0.02, 0.018, 0.18, 6]} />
+            <meshStandardMaterial color={shirtColor} roughness={0.7} />
+          </mesh>
+          {/* Name label above head */}
+          <Html position={[0, headY + headR + 0.08, 0]} center distanceFactor={4} style={{ pointerEvents: 'none' }}>
+            <div style={{
+              background: labelBg, color: '#fff',
+              padding: '1px 6px', borderRadius: 4,
+              fontSize: 8, fontWeight: 700, whiteSpace: 'nowrap',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+              maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis',
+            }}>
+              {occupant!.clientName}
+            </div>
+          </Html>
+        </group>
+      )}
+
       {/* Seat number label */}
       <Html position={[0, SEAT_H + SEAT_BACK_H + 0.08, -SEAT_D / 2 + 0.02]} center distanceFactor={4} style={{ pointerEvents: 'none' }}>
         <div style={{
-          background: isSelected ? 'rgba(37,99,235,0.9)' : 'rgba(55,65,81,0.85)', color: '#fff',
+          background: isOccupied
+            ? (isFemale ? 'rgba(219,39,119,0.85)' : 'rgba(37,99,235,0.85)')
+            : isSelected ? 'rgba(37,99,235,0.9)' : 'rgba(55,65,81,0.85)',
+          color: '#fff',
           padding: '0px 4px', borderRadius: 3,
           fontSize: 7, fontWeight: 600, whiteSpace: 'nowrap',
         }}>
@@ -441,7 +520,7 @@ function Scene3D({ layout, viewMode, selectedSectionId, selectedSeatId, onSectio
 // ═══════════════════════════════════════════════════════════
 // Main component
 // ═══════════════════════════════════════════════════════════
-export function TransportModel3D({ sections, seats, onSectionClick, onSeatClick }: TransportModel3DProps) {
+export function TransportModel3D({ sections, seats, occupancy, onSectionClick, onSeatClick }: TransportModel3DProps) {
   const { t } = useLanguage();
   const [mounted, setMounted] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('overview');
@@ -450,7 +529,7 @@ export function TransportModel3D({ sections, seats, onSectionClick, onSeatClick 
 
   useEffect(() => { setMounted(true); }, []);
 
-  const layout = useMemo(() => computeLayout(sections, seats), [sections, seats]);
+  const layout = useMemo(() => computeLayout(sections, seats, occupancy), [sections, seats, occupancy]);
 
   // Auto-advance to section if only 1
   const autoRef = useRef(false);
@@ -480,6 +559,7 @@ export function TransportModel3D({ sections, seats, onSectionClick, onSeatClick 
   };
 
   const totalSeats = seats.filter(s => !s.isObject).length;
+  const occupiedCount = occupancy ? Object.values(occupancy).filter(Boolean).length : 0;
 
   if (!sections.length) {
     return (
@@ -545,7 +625,7 @@ export function TransportModel3D({ sections, seats, onSectionClick, onSeatClick 
           </Badge>
           <Badge variant="secondary" className="bg-white/90 backdrop-blur-sm gap-0.5 text-[10px] sm:text-xs px-1.5 sm:px-2">
             <Users className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-            {totalSeats} {t.venue.persons}
+            {occupiedCount}/{totalSeats} {t.venue.persons}
           </Badge>
         </div>
       </div>

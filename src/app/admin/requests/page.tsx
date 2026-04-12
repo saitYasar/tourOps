@@ -889,7 +889,7 @@ export default function AdminRequestsPage() {
 
                 {/* ── 3D Venue Tab ── */}
                 <TabsContent value="venue3d" className="flex-1 overflow-y-auto mt-4">
-                  <AdminStopVenuePreview stopId={selectedStop.id} />
+                  <AdminStopVenuePreview stopId={selectedStop.id} categoryId={selectedStop.organization?.categoryId} />
                 </TabsContent>
               </Tabs>
             </DialogContent>

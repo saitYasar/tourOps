@@ -1289,7 +1289,7 @@ export interface ApiTourStopDto {
   id: number;
   tourId: number;
   organizationId: number;
-  organization?: { id: number; name: string; address?: string };
+  organization?: { id: number; name: string; address?: string; categoryId?: number };
   description?: string;
   scheduledStartTime: string;
   scheduledEndTime: string;

@@ -1638,7 +1638,7 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
                                   </CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                  <AdminStopVenuePreview stopId={selectedStop.id} />
+                                  <AdminStopVenuePreview stopId={selectedStop.id} categoryId={selectedStop.organization?.categoryId} />
                                 </CardContent>
                               </Card>
                             )}
@@ -2776,14 +2776,16 @@ export default function AgencyDetailPage() {
   );
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-4">
+      {/* Back navigation */}
+      <Button variant="ghost" size="sm" className="-ml-2" onClick={() => router.push('/admin/agencies')}>
+        <ArrowLeft className="h-4 w-4 mr-1" />
+        {a.backToList}
+      </Button>
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          <Button variant="ghost" size="sm" className="shrink-0" onClick={() => router.push('/admin/agencies')}>
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            {a.backToList}
-          </Button>
           <div className="p-2.5 bg-blue-100 rounded-xl shrink-0">
             <Briefcase className="h-6 w-6 text-blue-600" />
           </div>

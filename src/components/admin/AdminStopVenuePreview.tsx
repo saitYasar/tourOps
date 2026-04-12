@@ -6,11 +6,17 @@ import { useQuery } from '@tanstack/react-query';
 import { apiClient, type ResourceDto } from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
 import type { TableOccupant } from '@/components/restaurant/VenueModel3D';
+import type { SeatOccupant } from '@/components/transport/TransportModel3D';
 import type { Floor, Room, Table } from '@/types';
 import dynamic from 'next/dynamic';
 
 const VenueModel3D = dynamic(
   () => import('@/components/restaurant/VenueModel3D').then(m => ({ default: m.VenueModel3D })),
+  { ssr: false, loading: () => <div className="h-[500px] bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl animate-pulse" /> },
+);
+
+const TransportModel3D = dynamic(
+  () => import('@/components/transport/TransportModel3D').then(m => ({ default: m.TransportModel3D })),
   { ssr: false, loading: () => <div className="h-[500px] bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl animate-pulse" /> },
 );
 
@@ -25,6 +31,7 @@ interface VenueObject {
 
 interface AdminStopVenuePreviewProps {
   stopId: number;
+  categoryId?: number;
 }
 
 // ── ErrorBoundary for Three.js Canvas crashes ──
@@ -188,7 +195,7 @@ function convertFromCache(
 
 // ── Main component ──
 
-export const AdminStopVenuePreview = React.memo(function AdminStopVenuePreview({ stopId }: AdminStopVenuePreviewProps) {
+export const AdminStopVenuePreview = React.memo(function AdminStopVenuePreview({ stopId, categoryId }: AdminStopVenuePreviewProps) {
   const { t } = useLanguage();
 
   const [cache, setCache] = useState<Record<number, ResourceDto[]>>({});
@@ -205,8 +212,24 @@ export const AdminStopVenuePreview = React.memo(function AdminStopVenuePreview({
   });
 
   const floors = floorResources ?? [];
+  // Detect transport: explicit categoryId or auto-detect from resource type codes
+  const isTransport = categoryId === 2 || floors.some(r => r.resourceType?.code === 'section');
 
-  // Progressive loading handlers
+  // Transport: auto-fetch all sections' children for 3D model
+  const transportLoaded = useRef(false);
+  React.useEffect(() => {
+    if (!isTransport || floors.length === 0 || transportLoaded.current) return;
+    transportLoaded.current = true;
+    for (const section of floors) {
+      if (!cacheRef.current[section.id]) {
+        fetchLayoutApi(stopId, section.id).then(children => {
+          setCache(prev => ({ ...prev, [section.id]: children }));
+        });
+      }
+    }
+  }, [isTransport, floors, stopId]);
+
+  // Progressive loading handlers (restaurant)
   const handleFloorSelect = useCallback(async (floorId: string) => {
     const numericId = Number(floorId);
     if (!numericId || cacheRef.current[numericId]) return;
@@ -243,15 +266,41 @@ export const AdminStopVenuePreview = React.memo(function AdminStopVenuePreview({
     }
   }, [stopId]);
 
-  // Convert to legacy model
+  // Convert to legacy model (restaurant)
   const { floors: mFloors, rooms, tables, objects, occupancy } = useMemo(
-    () => floors.length > 0
+    () => !isTransport && floors.length > 0
       ? convertFromCache(floors, cache)
       : { floors: [] as Floor[], rooms: [] as Room[], tables: [] as Table[], objects: [] as VenueObject[], occupancy: {} },
-    [floors, cache],
+    [floors, cache, isTransport],
   );
 
-  const hasFloors = mFloors.length > 0;
+  // Convert to transport model
+  const { tSections, tSeats, tOccupancy } = useMemo(() => {
+    if (!isTransport || floors.length === 0) return { tSections: [], tSeats: [], tOccupancy: {} as Record<number, SeatOccupant | null> };
+    const sections = floors.map(r => {
+      const c = parseCoords(r.coordinates);
+      return { id: r.id, name: r.name, x: c.x, y: c.y, w: r.width || 200, h: r.height || 150 };
+    });
+    const occ: Record<number, SeatOccupant | null> = {};
+    const seats = floors.flatMap(r => {
+      const children = cache[r.id] ?? [];
+      return children.map(ch => {
+        const c = parseCoords(ch.coordinates);
+        const isObj = ch.resourceType?.code === 'transport_object' || ch.resourceType?.code === 'object';
+        if (!isObj && ch.client) {
+          occ[ch.id] = {
+            clientId: ch.client.id,
+            clientName: `${ch.client.firstName} ${ch.client.lastName}`.trim(),
+            gender: ch.client.gender,
+          };
+        }
+        return { id: ch.id, name: ch.name, sectionId: r.id, x: c.x, y: c.y, isObject: isObj, color: ch.color || undefined, width: ch.width, height: ch.height };
+      });
+    });
+    return { tSections: sections, tSeats: seats, tOccupancy: occ };
+  }, [isTransport, floors, cache]);
+
+  const hasData = isTransport ? tSections.length > 0 : mFloors.length > 0;
 
   if (isLoading) {
     return (
@@ -264,7 +313,7 @@ export const AdminStopVenuePreview = React.memo(function AdminStopVenuePreview({
     );
   }
 
-  if (isError || !hasFloors) {
+  if (isError || !hasData) {
     return (
       <div className="h-[300px] flex flex-col items-center justify-center text-slate-400 text-sm gap-2">
         <Building2 className="h-8 w-8 text-slate-300" />
@@ -282,16 +331,24 @@ export const AdminStopVenuePreview = React.memo(function AdminStopVenuePreview({
       }
     >
       <div className="rounded-xl overflow-hidden border border-slate-200">
-        <VenueModel3D
-          floors={mFloors}
-          rooms={rooms}
-          tables={tables}
-          objects={objects}
-          occupancy={occupancy}
-          onFloorSelect={handleFloorSelect}
-          onRoomSelect={handleRoomSelect}
-          readOnly
-        />
+        {isTransport ? (
+          <TransportModel3D
+            sections={tSections}
+            seats={tSeats}
+            occupancy={tOccupancy}
+          />
+        ) : (
+          <VenueModel3D
+            floors={mFloors}
+            rooms={rooms}
+            tables={tables}
+            objects={objects}
+            occupancy={occupancy}
+            onFloorSelect={handleFloorSelect}
+            onRoomSelect={handleRoomSelect}
+            readOnly
+          />
+        )}
 
         {/* Legend */}
         <div className="flex flex-wrap gap-4 px-3 py-2 bg-slate-50 border-t text-xs">
@@ -304,7 +361,7 @@ export const AdminStopVenuePreview = React.memo(function AdminStopVenuePreview({
             <span className="text-slate-600">{t.customer?.seatOccupiedFemale || 'Dolu (Kadın)'}</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-full" style={{ background: '#6B4C35' }} />
+            <div className="w-3 h-3 rounded-full" style={{ background: isTransport ? '#4b5563' : '#6B4C35' }} />
             <span className="text-slate-600">{t.customer?.seatEmpty || 'Boş'}</span>
           </div>
         </div>
