@@ -2513,6 +2513,9 @@ interface AdminVenueFormState {
   color: string;
   width: number;
   height: number;
+  seatMode: 'single' | 'grid';
+  seatColumns: number;
+  seatRows: number;
 }
 
 const adminVenueInitialForm: AdminVenueFormState = {
@@ -2529,6 +2532,9 @@ const adminVenueInitialForm: AdminVenueFormState = {
   color: '#A3E635',
   width: 0,
   height: 0,
+  seatMode: 'grid',
+  seatColumns: 2,
+  seatRows: 10,
 };
 
 function ResourcesTab({ orgId, categoryId }: { orgId: number; categoryId?: number }) {
@@ -2749,6 +2755,9 @@ function ResourcesTab({ orgId, categoryId }: { orgId: number; categoryId?: numbe
       color: '#A3E635',
       width: isObject ? 30 : 0,
       height: isObject ? 20 : 0,
+      seatMode: 'grid',
+      seatColumns: 2,
+      seatRows: 10,
     });
   };
 
@@ -2767,6 +2776,9 @@ function ResourcesTab({ orgId, categoryId }: { orgId: number; categoryId?: numbe
       color: resource.color || '#A3E635',
       width: resource.width || 0,
       height: resource.height || 0,
+      seatMode: 'grid',
+      seatColumns: 2,
+      seatRows: 10,
     });
   };
 
@@ -2828,6 +2840,50 @@ function ResourcesTab({ orgId, categoryId }: { orgId: number; categoryId?: numbe
         if (form.height > 0) updateData.height = form.height;
       }
       updateMutation.mutate({ id: form.editId, data: updateData });
+    } else if (type?.code === 'transport_seat' && form.seatMode === 'grid' && !form.editId) {
+      // Grid seat creation (columns × rows) with coordinates
+      const totalSeats = form.seatColumns * form.seatRows;
+      setMultipleCreating(true);
+      try {
+        let maxSeatNum = 0;
+        let maxOccupiedX = 0;
+        const sectionChildren = childrenCache[form.parentId!] || [];
+        for (const child of sectionChildren) {
+          const num = parseInt(child.name, 10);
+          if (!isNaN(num) && num > maxSeatNum) maxSeatNum = num;
+          const coords = child.coordinates;
+          if (coords) {
+            const parts = typeof coords === 'string' ? coords.split(',') : Array.isArray(coords) ? coords : [];
+            const cx = Number(parts[0]) || 0;
+            if (cx + 24 > maxOccupiedX) maxOccupiedX = cx + 24;
+          }
+        }
+        const seatSize = 24;
+        const seatGap = 4;
+        const padX = sectionChildren.length > 0 ? maxOccupiedX + seatGap : 8;
+        const padY = 8;
+        for (let row = 0; row < form.seatRows; row++) {
+          for (let col = 0; col < form.seatColumns; col++) {
+            const seatNum = maxSeatNum + row * form.seatColumns + col + 1;
+            const cx = padX + col * (seatSize + seatGap);
+            const cy = padY + row * (seatSize + seatGap);
+            await adminApi.createOrgResource(orgId, {
+              ...baseData,
+              name: `${seatNum}`,
+              capacity: 1,
+              order: seatNum,
+              coordinates: `${cx},${cy}`,
+            });
+          }
+        }
+        queryClient.invalidateQueries({ queryKey: ['admin-org-resources', orgId] });
+        toast.success(`${totalSeats} ${t.venue.seatUnit} ${t.venue.resourceCreated.toLowerCase()}`);
+        closeForm();
+      } catch {
+        toast.error(t.venue.createError || t.venue.chairCreateError);
+      } finally {
+        setMultipleCreating(false);
+      }
     } else if (isChair && form.count > 1) {
       const baseName = form.name.trim() || t.venue.chair;
       setMultipleCreating(true);
@@ -3393,8 +3449,95 @@ function ResourcesTab({ orgId, categoryId }: { orgId: number; categoryId?: numbe
                 </div>
               )}
 
-              {/* Batch create for seats/chairs */}
-              {form.resourceTypeId && ['chair', 'seat', 'transport_seat'].includes(getTypeById(form.resourceTypeId)?.code || '') && !form.editId && (
+              {/* Transport seat: grid or single creation */}
+              {form.resourceTypeId && getTypeById(form.resourceTypeId)?.code === 'transport_seat' && !form.editId && (
+                <div className="space-y-3">
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant={form.seatMode === 'grid' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setForm((prev) => ({ ...prev, seatMode: 'grid' }))}
+                    >
+                      {t.venue.bulkSeatCreate}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={form.seatMode === 'single' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setForm((prev) => ({ ...prev, seatMode: 'single', count: 1 }))}
+                    >
+                      {t.venue.singleSeatCreate}
+                    </Button>
+                  </div>
+
+                  {form.seatMode === 'grid' ? (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label>{t.venue.seatColumns}</Label>
+                          <Input
+                            type="number"
+                            min={1}
+                            max={10}
+                            value={form.seatColumns || ''}
+                            onFocus={(e) => e.target.select()}
+                            onChange={(e) => setForm((prev) => ({ ...prev, seatColumns: Math.min(10, Math.max(1, parseInt(e.target.value) || 1)) }))}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>{t.venue.seatRows}</Label>
+                          <Input
+                            type="number"
+                            min={1}
+                            max={50}
+                            value={form.seatRows || ''}
+                            onFocus={(e) => e.target.select()}
+                            onChange={(e) => setForm((prev) => ({ ...prev, seatRows: Math.min(50, Math.max(1, parseInt(e.target.value) || 1)) }))}
+                          />
+                        </div>
+                      </div>
+                      {/* Grid preview */}
+                      <div className="bg-slate-50 rounded-lg p-3 border">
+                        <p className="text-xs text-slate-500 mb-2">{t.venue.seatPreview}: {form.seatColumns} × {form.seatRows} = {form.seatColumns * form.seatRows} {t.venue.seatUnit}</p>
+                        <div className="flex gap-1 justify-center overflow-x-auto py-1" style={{ maxHeight: '160px', overflowY: 'auto' }}>
+                          {Array.from({ length: form.seatColumns }).map((_, col) => (
+                            <div key={col} className="flex flex-col gap-1">
+                              {Array.from({ length: Math.min(form.seatRows, 15) }).map((_, row) => (
+                                <div
+                                  key={row}
+                                  className="w-6 h-6 rounded bg-indigo-100 border border-indigo-300 flex items-center justify-center"
+                                >
+                                  <span className="text-[8px] text-indigo-600 font-medium">{row * form.seatColumns + col + 1}</span>
+                                </div>
+                              ))}
+                              {form.seatRows > 15 && (
+                                <span className="text-[10px] text-slate-400 text-center">...</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Label>{t.venue.chairCountLabel}</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={50}
+                        value={form.count || ''}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => setForm((prev) => ({ ...prev, count: Math.min(50, Math.max(1, parseInt(e.target.value) || 1)) }))}
+                        className="w-24"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Batch create for chairs/seats (restaurant) */}
+              {form.resourceTypeId && ['chair', 'seat'].includes(getTypeById(form.resourceTypeId)?.code || '') && !form.editId && (
                 <div className="space-y-2">
                   <Label htmlFor="chairCount">{t.venue.chairCountLabel}</Label>
                   <div className="flex items-center gap-2">
