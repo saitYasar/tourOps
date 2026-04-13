@@ -165,6 +165,15 @@ export function TransportLayoutEditor({
     }
   }, [resources, apiAdapter, childrenCache, onChildrenCacheUpdate]);
 
+  // ── Debounced auto-save for property inputs ──
+  const propSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const debouncedSave = useCallback((id: number, data: UpdateResourceDto) => {
+    if (propSaveTimer.current) clearTimeout(propSaveTimer.current);
+    propSaveTimer.current = setTimeout(() => {
+      updateResource(id, data);
+    }, 500);
+  }, [updateResource]);
+
   // ── Canvas State ──
   const [sectionStates, setSectionStates] = useState<Record<number, { x: number; y: number; w: number; h: number }>>({});
   const [selectedSectionId, setSelectedSectionId] = useState<number | null>(null);
@@ -707,9 +716,7 @@ export function TransportLayoutEditor({
                         }
                         return updated;
                       });
-                    }}
-                    onBlur={() => {
-                      updateResource(selectedChild.id, { name: selectedChild.name });
+                      debouncedSave(selectedChild.id, { name: newName });
                     }}
                   />
                 </div>
@@ -755,9 +762,7 @@ export function TransportLayoutEditor({
                               }
                               return updated;
                             });
-                          }}
-                          onBlur={() => {
-                            updateResource(selectedChild.id, { width: selectedChild.width });
+                            debouncedSave(selectedChild.id, { width: val });
                           }}
                           className="h-8"
                           min={10}
@@ -779,9 +784,7 @@ export function TransportLayoutEditor({
                               }
                               return updated;
                             });
-                          }}
-                          onBlur={() => {
-                            updateResource(selectedChild.id, { height: selectedChild.height });
+                            debouncedSave(selectedChild.id, { height: val });
                           }}
                           className="h-8"
                           min={10}
