@@ -3831,7 +3831,7 @@ class ApiClient {
   }
 
   async deleteUser(id: number, lang: 'tr' | 'en' | 'de' = 'tr') {
-    return this.request<{ message: string }>(`/admin/users/${id}`, {
+    return this.request<{ message: string }>(`/users/${id}`, {
       method: 'DELETE',
     }, lang);
   }
