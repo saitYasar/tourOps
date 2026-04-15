@@ -296,8 +296,8 @@ export function StopVenuePreview({ stopId, floors: floorResources, childrenCache
         <IconComp className="h-4 w-4 text-orange-500" />
         <span className="flex-1 text-left">
           {expanded
-            ? ((t.venue as Record<string, string>)?.seatLayoutView || 'Koltuk Düzeni')
-            : ((t.venue as Record<string, string>)?.modelView || '3D Model')}
+            ? ((t.venue as Record<string, string>)?.switchToSeatLayout || 'Koltuk Düzenine Geç')
+            : ((t.venue as Record<string, string>)?.switchToModel || '3D Modele Geç')}
         </span>
         {expanded ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
       </button>

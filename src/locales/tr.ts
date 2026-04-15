@@ -449,6 +449,8 @@ export const tr = {
     listView: 'Liste Görünümü',
     modelView: '3D Model',
     seatLayoutView: 'Koltuk Düzeni',
+    switchToModel: '3D Modele Geç',
+    switchToSeatLayout: 'Koltuk Düzenine Geç',
     buildingModel: 'Bina Modeli',
     buildingModelDesc: 'Mekan yapısını 3 boyutlu olarak görüntüleyin',
     clickFloorForDetails: 'Kata tıklayarak detayları görün',

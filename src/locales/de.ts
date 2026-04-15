@@ -449,6 +449,8 @@ export const de = {
     listView: 'Listenansicht',
     modelView: '3D-Modell',
     seatLayoutView: 'Sitzplan',
+    switchToModel: 'Zum 3D-Modell wechseln',
+    switchToSeatLayout: 'Zum Sitzplan wechseln',
     buildingModel: 'Gebaudemodell',
     buildingModelDesc: 'Raumstruktur in 3D anzeigen',
     clickFloorForDetails: 'Klicken Sie auf eine Etage fur Details',
