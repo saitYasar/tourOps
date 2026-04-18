@@ -158,6 +158,7 @@ export default function AdminToursPage() {
   const [addStopOrgSearch, setAddStopOrgSearch] = useState('');
   const debouncedOrgSearch = useDebounce(addStopOrgSearch, 400);
   const [selectedOrgDetail, setSelectedOrgDetail] = useState<{ id: number; name: string; address?: string; email?: string; phone?: string; phoneCountryCode?: number } | null>(null);
+  const [stopDescription, setStopDescription] = useState('');
   const [stopStartTime, setStopStartTime] = useState('');
   const [stopEndTime, setStopEndTime] = useState('');
   const [stopShowPrice, setStopShowPrice] = useState(true);
@@ -395,6 +396,7 @@ export default function AdminToursPage() {
       invalidateTourDetail();
       setAddStopOpen(false);
       setSelectedOrgDetail(null);
+      setStopDescription('');
       setStopStartTime('');
       setStopEndTime('');
       setStopShowPrice(true);
@@ -497,6 +499,7 @@ export default function AdminToursPage() {
     addStopMutation.mutate({
       tourId: selectedTourId,
       organizationId: selectedOrgDetail.id,
+      description: stopDescription || undefined,
       scheduledStartTime: stopStartTime,
       scheduledEndTime: stopEndTime,
       showPriceToCustomer: stopShowPrice,
@@ -1840,6 +1843,7 @@ export default function AdminToursPage() {
         if (!open) {
           setAddStopOpen(false);
           setSelectedOrgDetail(null);
+          setStopDescription('');
           setStopStartTime('');
           setStopEndTime('');
           setStopShowPrice(true);
@@ -1983,6 +1987,17 @@ export default function AdminToursPage() {
                   onChange={(e) => setStopEndTime(e.target.value)}
                 />
               </div>
+            </div>
+
+            {/* Description */}
+            <div className="space-y-2">
+              <Label>{t.tours.tourDescription}</Label>
+              <Textarea
+                value={stopDescription}
+                onChange={(e) => setStopDescription(e.target.value)}
+                placeholder="Misafirlerinizin göreceği durak açıklaması"
+                rows={2}
+              />
             </div>
 
             {/* Show price toggle */}
