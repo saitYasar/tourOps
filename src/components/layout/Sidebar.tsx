@@ -21,6 +21,7 @@ import {
   LifeBuoy,
   Bell,
   Percent,
+  MessageSquareText,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -43,6 +44,7 @@ const agencyNavItems: NavItem[] = [
   { labelKey: 'clients', href: '/agency/clients', icon: User },
   { labelKey: 'photos', href: '/agency/photos', icon: Image },
   { labelKey: 'externalApi', href: '/agency/external-api', icon: Code2 },
+  { labelKey: 'tickets', href: '/agency/tickets', icon: MessageSquareText },
   { labelKey: 'support', href: '/agency/support', icon: LifeBuoy },
 ];
 
@@ -76,6 +78,7 @@ const adminNavItems: AdminNavItem[] = [
   { label: 'agencies', href: '/admin/agencies', icon: Briefcase },
   { label: 'notifications', href: '/admin/notifications', icon: Bell },
   { label: 'commissions', href: '/admin/commissions', icon: Percent },
+  { label: 'tickets', href: '/admin/tickets', icon: MessageSquareText },
 ];
 
 const roleBadgeColors: Record<UserRole, string> = {
@@ -127,6 +130,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     tourStops: t.admin.tourStops,
     notifications: t.admin.notifications,
     commissions: t.admin.commissions,
+    tickets: t.admin.tickets,
   };
 
   return (

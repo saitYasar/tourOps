@@ -48,6 +48,7 @@ import { LoadingState, ErrorState, LanguageSwitcher, ChoiceDeadlineCountdown, Se
 import { formatDate, formatShortDateTime } from '@/lib/dateUtils';
 import { toast } from 'sonner';
 import { CustomerVenueSelector } from '@/components/customer/CustomerVenueSelector';
+import { TicketSection } from '@/components/customer/TicketSection';
 import { StopVenuePreview } from '@/components/customer/StopVenuePreview';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -959,6 +960,9 @@ export default function CustomerTourDetailPage() {
             );
           })()}
         </div>
+
+        {/* Tickets */}
+        <TicketSection tourId={tourId} />
 
         {/* Gallery */}
         {tour.photos && tour.photos.length > 0 && (

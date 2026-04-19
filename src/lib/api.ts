@@ -1555,6 +1555,64 @@ export interface UpdateSystemCommissionDto {
 }
 
 // ============================================
+// Ticket Messaging Types
+// ============================================
+
+export type TicketCategory = 'complaint' | 'request' | 'suggestion';
+export type TicketStatus = 'open' | 'in_progress' | 'resolved' | 'closed';
+export type TicketSenderType = 'client' | 'agency_user' | 'system_admin';
+
+export interface TicketAttachmentDto {
+  key: string;
+  fileName: string;
+  mimeType: string;
+  size: number;
+  url: string;
+}
+
+export interface TicketMessageDto {
+  id: number;
+  ticketId: number;
+  senderType: TicketSenderType;
+  senderId: number;
+  content: string;
+  attachments: TicketAttachmentDto[] | null;
+  isRead: boolean;
+  readAt: string | null;
+  createdAt: string;
+}
+
+export interface TicketDto {
+  id: number;
+  tourId: number;
+  clientId: number;
+  agencyId: number;
+  category: TicketCategory;
+  status: TicketStatus;
+  subject: string;
+  createdAt: string;
+  updatedAt: string;
+  tour?: { id: number; tourName: string; tourCode: string; startDate?: string; endDate?: string };
+  client?: { id: number; firstName: string; lastName: string; email?: string };
+  agency?: { id: number; name: string };
+  messages?: TicketMessageDto[];
+  messagesMeta?: { page: number; limit: number; totalCount: number; totalPages: number };
+}
+
+export interface TicketListResponseDto {
+  data: TicketDto[];
+  meta: { page: number; limit: number; totalCount: number; totalPages: number };
+}
+
+export interface CreateTicketDto {
+  tourId: number;
+  category: TicketCategory;
+  subject: string;
+  content: string;
+  attachments?: File[];
+}
+
+// ============================================
 // API Client
 // ============================================
 
@@ -4524,6 +4582,144 @@ class ApiClient {
   async deleteSystemCommission(id: number, lang: 'tr' | 'en' | 'de' = 'tr') {
     return this.request<{ message: string }>(`/admin/system-commissions/${id}`, { method: 'DELETE' }, lang, true);
   }
+
+  // ============================================
+  // Ticket Messaging - Client Endpoints
+  // ============================================
+
+  private async requestFormData<T>(endpoint: string, formData: FormData, method: 'POST' | 'PUT' | 'PATCH' = 'POST', lang: 'tr' | 'en' | 'de' = 'tr'): Promise<T> {
+    const url = `${this.baseUrl}${endpoint}${endpoint.includes('?') ? '&' : '?'}lang=${lang}`;
+    const headers: HeadersInit = {};
+    const token = this.resolveToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    const response = await fetch(url, { method, headers, body: formData });
+    const jsonResponse = await response.json().catch(() => ({ message: 'Bir hata oluştu', statusCode: response.status }));
+    if (!response.ok) {
+      if (this.checkUnauthorized(response.status)) throw new Error('Oturum süresi doldu');
+      const errorMessage = jsonResponse.errorMessage?.client || jsonResponse.errorMessage?.system || jsonResponse.message || 'API isteği başarısız';
+      throw new Error(errorMessage);
+    }
+    return jsonResponse.data !== undefined ? jsonResponse.data as T : jsonResponse as T;
+  }
+
+  async clientCreateTicket(data: CreateTicketDto, lang: 'tr' | 'en' | 'de' = 'tr') {
+    const formData = new FormData();
+    formData.append('tourId', String(data.tourId));
+    formData.append('category', data.category);
+    formData.append('subject', data.subject);
+    formData.append('content', data.content);
+    if (data.attachments) {
+      data.attachments.forEach(file => formData.append('attachments', file));
+    }
+    return this.requestFormData<TicketDto>('/client/tickets', formData, 'POST', lang);
+  }
+
+  async clientGetTickets(params: { page?: number; limit?: number; tourId?: number; status?: TicketStatus; category?: TicketCategory } = {}, lang: 'tr' | 'en' | 'de' = 'tr') {
+    const query = new URLSearchParams();
+    if (params.page) query.append('page', String(params.page));
+    if (params.limit) query.append('limit', String(params.limit));
+    if (params.tourId) query.append('tourId', String(params.tourId));
+    if (params.status) query.append('status', params.status);
+    if (params.category) query.append('category', params.category);
+    const qs = query.toString();
+    return this.request<TicketListResponseDto>(`/client/tickets${qs ? `?${qs}` : ''}`, { method: 'GET' }, lang, !!qs);
+  }
+
+  async clientGetTicketById(id: number, messagePage = 1, messageLimit = 50, lang: 'tr' | 'en' | 'de' = 'tr') {
+    return this.request<TicketDto>(`/client/tickets/${id}?messagePage=${messagePage}&messageLimit=${messageLimit}`, { method: 'GET' }, lang);
+  }
+
+  async clientSendMessage(ticketId: number, content: string, attachments?: File[], lang: 'tr' | 'en' | 'de' = 'tr') {
+    const formData = new FormData();
+    formData.append('content', content);
+    if (attachments) {
+      attachments.forEach(file => formData.append('attachments', file));
+    }
+    return this.requestFormData<TicketMessageDto>(`/client/tickets/${ticketId}/messages`, formData, 'POST', lang);
+  }
+
+  async clientMarkMessagesRead(ticketId: number, lang: 'tr' | 'en' | 'de' = 'tr') {
+    return this.request<{ updated: number }>(`/client/tickets/${ticketId}/messages/read`, { method: 'PATCH' }, lang);
+  }
+
+  // ============================================
+  // Ticket Messaging - Agency Endpoints
+  // ============================================
+
+  async agencyGetTickets(params: { page?: number; limit?: number; tourId?: number; clientId?: number; status?: TicketStatus; category?: TicketCategory } = {}, lang: 'tr' | 'en' | 'de' = 'tr') {
+    const query = new URLSearchParams();
+    if (params.page) query.append('page', String(params.page));
+    if (params.limit) query.append('limit', String(params.limit));
+    if (params.tourId) query.append('tourId', String(params.tourId));
+    if (params.clientId) query.append('clientId', String(params.clientId));
+    if (params.status) query.append('status', params.status);
+    if (params.category) query.append('category', params.category);
+    const qs = query.toString();
+    return this.request<TicketListResponseDto>(`/agency/tickets${qs ? `?${qs}` : ''}`, { method: 'GET' }, lang, !!qs);
+  }
+
+  async agencyGetTicketById(id: number, messagePage = 1, messageLimit = 50, lang: 'tr' | 'en' | 'de' = 'tr') {
+    return this.request<TicketDto>(`/agency/tickets/${id}?messagePage=${messagePage}&messageLimit=${messageLimit}`, { method: 'GET' }, lang);
+  }
+
+  async agencyUpdateTicketStatus(id: number, status: TicketStatus, lang: 'tr' | 'en' | 'de' = 'tr') {
+    return this.request<TicketDto>(`/agency/tickets/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    }, lang);
+  }
+
+  async agencySendMessage(ticketId: number, content: string, attachments?: File[], lang: 'tr' | 'en' | 'de' = 'tr') {
+    const formData = new FormData();
+    formData.append('content', content);
+    if (attachments) {
+      attachments.forEach(file => formData.append('attachments', file));
+    }
+    return this.requestFormData<TicketMessageDto>(`/agency/tickets/${ticketId}/messages`, formData, 'POST', lang);
+  }
+
+  async agencyMarkMessagesRead(ticketId: number, lang: 'tr' | 'en' | 'de' = 'tr') {
+    return this.request<{ updated: number }>(`/agency/tickets/${ticketId}/messages/read`, { method: 'PATCH' }, lang);
+  }
+
+  // ============================================
+  // Ticket Messaging - Admin Endpoints
+  // ============================================
+
+  async adminGetTickets(params: { page?: number; limit?: number; agencyId?: number; tourId?: number; clientId?: number; status?: TicketStatus; category?: TicketCategory } = {}, lang: 'tr' | 'en' | 'de' = 'tr') {
+    const query = new URLSearchParams();
+    if (params.page) query.append('page', String(params.page));
+    if (params.limit) query.append('limit', String(params.limit));
+    if (params.agencyId) query.append('agencyId', String(params.agencyId));
+    if (params.tourId) query.append('tourId', String(params.tourId));
+    if (params.clientId) query.append('clientId', String(params.clientId));
+    if (params.status) query.append('status', params.status);
+    if (params.category) query.append('category', params.category);
+    const qs = query.toString();
+    return this.request<TicketListResponseDto>(`/admin/tickets${qs ? `?${qs}` : ''}`, { method: 'GET' }, lang, !!qs);
+  }
+
+  async adminGetTicketById(id: number, messagePage = 1, messageLimit = 50, lang: 'tr' | 'en' | 'de' = 'tr') {
+    return this.request<TicketDto>(`/admin/tickets/${id}?messagePage=${messagePage}&messageLimit=${messageLimit}`, { method: 'GET' }, lang);
+  }
+
+  async adminUpdateTicketStatus(id: number, status: TicketStatus, lang: 'tr' | 'en' | 'de' = 'tr') {
+    return this.request<TicketDto>(`/admin/tickets/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    }, lang);
+  }
+
+  async adminSendMessage(ticketId: number, content: string, attachments?: File[], lang: 'tr' | 'en' | 'de' = 'tr') {
+    const formData = new FormData();
+    formData.append('content', content);
+    if (attachments) {
+      attachments.forEach(file => formData.append('attachments', file));
+    }
+    return this.requestFormData<TicketMessageDto>(`/admin/tickets/${ticketId}/messages`, formData, 'POST', lang);
+  }
 }
 
 // Singleton instance
@@ -6821,6 +7017,141 @@ export const preReservationOrgApi = {
     try {
       await apiClient.requestOrgChoicesRevision(id, note, lang);
       return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+};
+
+// ============================================
+// Ticket Messaging API (wrapper functions)
+// ============================================
+
+export const ticketApi = {
+  // --- Client ---
+  async clientCreate(data: CreateTicketDto, lang: 'tr' | 'en' | 'de' = 'tr') {
+    try {
+      const response = await apiClient.clientCreateTicket(data, lang);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async clientGetList(params: { page?: number; limit?: number; tourId?: number; status?: TicketStatus; category?: TicketCategory } = {}, lang: 'tr' | 'en' | 'de' = 'tr') {
+    try {
+      const response = await apiClient.clientGetTickets(params, lang);
+      return { success: true, data: (response as any).data ?? response, meta: (response as any).meta };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async clientGetById(id: number, messagePage = 1, messageLimit = 50, lang: 'tr' | 'en' | 'de' = 'tr') {
+    try {
+      const response = await apiClient.clientGetTicketById(id, messagePage, messageLimit, lang);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async clientSendMessage(ticketId: number, content: string, attachments?: File[], lang: 'tr' | 'en' | 'de' = 'tr') {
+    try {
+      const response = await apiClient.clientSendMessage(ticketId, content, attachments, lang);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async clientMarkRead(ticketId: number, lang: 'tr' | 'en' | 'de' = 'tr') {
+    try {
+      const response = await apiClient.clientMarkMessagesRead(ticketId, lang);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  // --- Agency ---
+  async agencyGetList(params: { page?: number; limit?: number; tourId?: number; clientId?: number; status?: TicketStatus; category?: TicketCategory } = {}, lang: 'tr' | 'en' | 'de' = 'tr') {
+    try {
+      const response = await apiClient.agencyGetTickets(params, lang);
+      return { success: true, data: (response as any).data ?? response, meta: (response as any).meta };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async agencyGetById(id: number, messagePage = 1, messageLimit = 50, lang: 'tr' | 'en' | 'de' = 'tr') {
+    try {
+      const response = await apiClient.agencyGetTicketById(id, messagePage, messageLimit, lang);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async agencyUpdateStatus(id: number, status: TicketStatus, lang: 'tr' | 'en' | 'de' = 'tr') {
+    try {
+      const response = await apiClient.agencyUpdateTicketStatus(id, status, lang);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async agencySendMessage(ticketId: number, content: string, attachments?: File[], lang: 'tr' | 'en' | 'de' = 'tr') {
+    try {
+      const response = await apiClient.agencySendMessage(ticketId, content, attachments, lang);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async agencyMarkRead(ticketId: number, lang: 'tr' | 'en' | 'de' = 'tr') {
+    try {
+      const response = await apiClient.agencyMarkMessagesRead(ticketId, lang);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  // --- Admin ---
+  async adminGetList(params: { page?: number; limit?: number; agencyId?: number; tourId?: number; clientId?: number; status?: TicketStatus; category?: TicketCategory } = {}, lang: 'tr' | 'en' | 'de' = 'tr') {
+    try {
+      const response = await apiClient.adminGetTickets(params, lang);
+      return { success: true, data: (response as any).data ?? response, meta: (response as any).meta };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async adminGetById(id: number, messagePage = 1, messageLimit = 50, lang: 'tr' | 'en' | 'de' = 'tr') {
+    try {
+      const response = await apiClient.adminGetTicketById(id, messagePage, messageLimit, lang);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async adminUpdateStatus(id: number, status: TicketStatus, lang: 'tr' | 'en' | 'de' = 'tr') {
+    try {
+      const response = await apiClient.adminUpdateTicketStatus(id, status, lang);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async adminSendMessage(ticketId: number, content: string, attachments?: File[], lang: 'tr' | 'en' | 'de' = 'tr') {
+    try {
+      const response = await apiClient.adminSendMessage(ticketId, content, attachments, lang);
+      return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
