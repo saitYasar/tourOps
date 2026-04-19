@@ -48,6 +48,7 @@ import {
 import { LoadingState, AdminPagination } from '@/components/shared';
 import { toast } from 'sonner';
 import { formatShortDateTime } from '@/lib/dateUtils';
+import { useTicketSocket } from '@/hooks/useTicketSocket';
 
 // ============================================
 // Constants
@@ -267,6 +268,13 @@ function AdminTicketDetailDialog({
   const [files, setFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useTicketSocket({
+    ticketId,
+    detailKeyPrefix: 'admin-ticket-detail',
+    lang: apiLang,
+    listKeyPrefix: 'admin-tickets',
+  });
 
   const { data: ticketRes, isLoading } = useQuery({
     queryKey: ['admin-ticket-detail', ticketId, apiLang],

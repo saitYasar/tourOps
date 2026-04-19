@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   MessageSquareText,
@@ -54,6 +54,7 @@ import {
 import { LoadingState, AdminPagination } from '@/components/shared';
 import { toast } from 'sonner';
 import { formatShortDateTime } from '@/lib/dateUtils';
+import { useTicketSocket } from '@/hooks/useTicketSocket';
 
 // ============================================
 // Constants
@@ -269,6 +270,13 @@ function AgencyTicketDetailDialog({
   const [files, setFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useTicketSocket({
+    ticketId,
+    detailKeyPrefix: 'agency-ticket-detail',
+    lang: apiLang,
+    listKeyPrefix: 'agency-tickets',
+  });
 
   const { data: ticketRes, isLoading } = useQuery({
     queryKey: ['agency-ticket-detail', ticketId, apiLang],

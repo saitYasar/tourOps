@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   MessageSquareText,
@@ -37,6 +37,7 @@ import {
 } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { formatShortDateTime } from '@/lib/dateUtils';
+import { useTicketSocket } from '@/hooks/useTicketSocket';
 
 // ============================================
 // Helpers
@@ -407,6 +408,13 @@ function TicketDetailDialog({
   const [files, setFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useTicketSocket({
+    ticketId,
+    detailKeyPrefix: 'client-ticket-detail',
+    lang: apiLang,
+    listKeyPrefix: 'client-tickets',
+  });
 
   const { data: ticketRes, isLoading } = useQuery({
     queryKey: ['client-ticket-detail', ticketId, apiLang],
