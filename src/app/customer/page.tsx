@@ -23,6 +23,8 @@ import {
   Search,
   ChevronsLeft,
   ChevronsRight,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -802,6 +804,7 @@ function ProfileView({
   const [gender, setGender] = useState<'m' | 'f'>(profile.gender === 'f' ? 'f' : 'm');
   const [username, setUsername] = useState(profile.username || '');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [profilePhoto, setProfilePhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(profile.profilePhoto || null);
 
@@ -1015,16 +1018,27 @@ function ProfileView({
               <Label htmlFor="profilePassword" className="text-sm font-medium text-slate-700">
                 {t.auth.password}
               </Label>
-              <Input
-                id="profilePassword"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••"
-                className="h-11 rounded-xl"
-                minLength={6}
-                maxLength={100}
-              />
+              <div className="relative">
+                <Input
+                  id="profilePassword"
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••"
+                  className="h-11 rounded-xl pr-10"
+                  minLength={6}
+                  maxLength={100}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-9 w-9 text-slate-400 hover:text-slate-600 z-10"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
             </div>
 
             {/* Email (read only) */}

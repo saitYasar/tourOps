@@ -549,8 +549,9 @@ export function CustomerVenueSelector({
       const gender = occupant?.gender; // 'm' | 'f' | null | undefined
       const isMale = isOccupiedByOther && gender === 'm';
       const isFemale = isOccupiedByOther && gender === 'f';
-      // Extract short label: just the number or last part of the name
-      const shortLabel = chair.name.replace(/^.*[-–]\s*/, '').replace(/^(Yer|Seat|Sandalye|Koltuk)\s*/i, '') || chair.name;
+      // Use 1-based index within this table (each table starts from 1)
+      const seatIndex = chairResources.findIndex(c => c.id === chair.id);
+      const shortLabel = String(seatIndex + 1);
 
       // Color scheme based on gender
       const occupiedBorder = isFemale ? 'border-pink-300' : 'border-blue-300';
