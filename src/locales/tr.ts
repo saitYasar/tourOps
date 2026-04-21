@@ -40,6 +40,7 @@ export const tr = {
   auth: {
     login: 'Giriş Yap',
     logout: 'Çıkış Yap',
+    logoutConfirm: 'Çıkış yapmak istediğinize emin misiniz?',
     register: 'Kayıt Ol',
     email: 'Email',
     password: 'Şifre',
@@ -1583,6 +1584,7 @@ export const tr = {
     firstName: 'ADI',
     uncategorized: 'Diğer',
     serviceSeats: 'alan sandalyeler',
+    serviceTables: 'alan masalar',
     tableBasedServices: 'Masa Bazlı Servisler',
     exportExcel: 'Excel İndir',
     reservationInfo: 'Rezervasyon Bilgileri',

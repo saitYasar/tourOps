@@ -40,6 +40,7 @@ export const en = {
   auth: {
     login: 'Login',
     logout: 'Logout',
+    logoutConfirm: 'Are you sure you want to logout?',
     register: 'Register',
     email: 'Email',
     password: 'Password',
@@ -1571,6 +1572,7 @@ export const en = {
     firstName: 'FIRST NAME',
     uncategorized: 'Other',
     serviceSeats: 'ordered by seats',
+    serviceTables: 'ordered by tables',
     tableBasedServices: 'Table Based Services',
     exportExcel: 'Export Excel',
     reservationInfo: 'Reservation Details',

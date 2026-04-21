@@ -226,8 +226,10 @@ export function DetailedListReceipt({
   }
 
   const serviceSeatMap = new Map<string, { seats: string[]; color: string }>();
+  const serviceTableMap = new Map<string, { tables: string[]; color: string }>();
   for (const choice of sortedChoices) {
     const seatLabel = getResourceLabel(choice);
+    const tableLabel = getTableLabel(choice);
     for (const sc of choice.serviceChoices || []) {
       const title = (sc.service?.title || `#${sc.serviceId}`).toUpperCase();
       if (!serviceSeatMap.has(title)) {
@@ -236,6 +238,14 @@ export function DetailedListReceipt({
       const entry = serviceSeatMap.get(title)!;
       const label = seatLabel || `#${choice.clientId}`;
       if (!entry.seats.includes(label)) entry.seats.push(label);
+
+      if (tableLabel) {
+        if (!serviceTableMap.has(title)) {
+          serviceTableMap.set(title, { tables: [], color: globalFoodColorMap.get(title) || '#e2e8f0' });
+        }
+        const tableEntry = serviceTableMap.get(title)!;
+        if (!tableEntry.tables.includes(tableLabel)) tableEntry.tables.push(tableLabel);
+      }
     }
   }
 
@@ -314,6 +324,26 @@ export function DetailedListReceipt({
               <span style={{ fontWeight: 'bold', minWidth: 'fit-content' }}>{title}</span>
               <span style={{ color: '#64748b' }}>{t.guests.serviceSeats}:</span>
               <span style={{ fontWeight: 500 }}>{seats.join(', ')}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {serviceTableMap.size > 0 && (
+        <div style={{ marginTop: '1.5rem' }}>
+          {Array.from(serviceTableMap.entries()).map(([title, { tables, color }]) => (
+            <div
+              key={title}
+              style={{
+                display: 'flex', alignItems: 'baseline', gap: '8px',
+                padding: '6px 10px', marginBottom: '4px',
+                borderLeft: `4px solid ${color}`, backgroundColor: `${color}22`,
+                borderRadius: '0 4px 4px 0', fontSize: '0.8rem',
+              }}
+            >
+              <span style={{ fontWeight: 'bold', minWidth: 'fit-content' }}>{title}</span>
+              <span style={{ color: '#64748b' }}>{t.guests.serviceTables}:</span>
+              <span style={{ fontWeight: 500 }}>{tables.join(', ')}</span>
             </div>
           ))}
         </div>

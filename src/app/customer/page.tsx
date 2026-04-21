@@ -47,6 +47,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { LoadingState, ErrorState } from '@/components/shared';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { formatDate } from '@/lib/dateUtils';
 import { toast } from 'sonner';
 
@@ -61,6 +62,7 @@ export default function CustomerDashboard() {
   const queryClient = useQueryClient();
   const [notifOpen, setNotifOpen] = useState(false);
   const [selectedNotif, setSelectedNotif] = useState<PanelNotificationDto | null>(null);
+  const [logoutOpen, setLogoutOpen] = useState(false);
   const [toursTab, setToursTab] = useState<'active' | 'past'>('active');
   const [activeToursPage, setActiveToursPage] = useState(1);
   const [pastToursPage, setPastToursPage] = useState(1);
@@ -322,11 +324,21 @@ export default function CustomerDashboard() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={handleLogout}
+                onClick={() => setLogoutOpen(true)}
                 className="text-slate-500 hover:text-red-600 h-8 w-8 sm:h-9 sm:w-9"
               >
                 <LogOut className="h-4 w-4" />
               </Button>
+              <ConfirmDialog
+                open={logoutOpen}
+                onOpenChange={setLogoutOpen}
+                title={t.auth.logout}
+                description={t.auth.logoutConfirm}
+                confirmLabel={t.auth.logout}
+                cancelLabel={t.common.cancel}
+                onConfirm={handleLogout}
+                variant="destructive"
+              />
             </div>
           </div>
         </div>
@@ -518,7 +530,7 @@ function DashboardView({
               )}
             </div>
             <div className="min-w-0">
-              <h2 className="text-lg sm:text-2xl font-bold truncate">{t.customer.welcome}, {profile.firstName}!</h2>
+              <h2 className="text-lg sm:text-2xl font-bold truncate">{t.customer.welcome}, {profile.firstName} {profile.lastName}!</h2>
               <p className="text-white/80 text-xs sm:text-sm">{t.customer.readyForAdventure}</p>
             </div>
           </div>
