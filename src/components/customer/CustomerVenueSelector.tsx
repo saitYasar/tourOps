@@ -549,9 +549,7 @@ export function CustomerVenueSelector({
       const gender = occupant?.gender; // 'm' | 'f' | null | undefined
       const isMale = isOccupiedByOther && gender === 'm';
       const isFemale = isOccupiedByOther && gender === 'f';
-      // Use 1-based index within this table (each table starts from 1)
-      const seatIndex = chairResources.findIndex(c => c.id === chair.id);
-      const shortLabel = String(seatIndex + 1);
+      const shortLabel = chair.name;
 
       // Color scheme based on gender
       const occupiedBorder = isFemale ? 'border-pink-300' : 'border-blue-300';
