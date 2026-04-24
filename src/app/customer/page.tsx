@@ -23,6 +23,8 @@ import {
   Search,
   ChevronsLeft,
   ChevronsRight,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -47,6 +49,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { LoadingState, ErrorState } from '@/components/shared';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { formatDate } from '@/lib/dateUtils';
 import { toast } from 'sonner';
 
@@ -61,6 +64,7 @@ export default function CustomerDashboard() {
   const queryClient = useQueryClient();
   const [notifOpen, setNotifOpen] = useState(false);
   const [selectedNotif, setSelectedNotif] = useState<PanelNotificationDto | null>(null);
+  const [logoutOpen, setLogoutOpen] = useState(false);
   const [toursTab, setToursTab] = useState<'active' | 'past'>('active');
   const [activeToursPage, setActiveToursPage] = useState(1);
   const [pastToursPage, setPastToursPage] = useState(1);
@@ -322,11 +326,21 @@ export default function CustomerDashboard() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={handleLogout}
+                onClick={() => setLogoutOpen(true)}
                 className="text-slate-500 hover:text-red-600 h-8 w-8 sm:h-9 sm:w-9"
               >
                 <LogOut className="h-4 w-4" />
               </Button>
+              <ConfirmDialog
+                open={logoutOpen}
+                onOpenChange={setLogoutOpen}
+                title={t.auth.logout}
+                description={t.auth.logoutConfirm}
+                confirmLabel={t.auth.logout}
+                cancelLabel={t.common.cancel}
+                onConfirm={handleLogout}
+                variant="destructive"
+              />
             </div>
           </div>
         </div>
@@ -518,7 +532,7 @@ function DashboardView({
               )}
             </div>
             <div className="min-w-0">
-              <h2 className="text-lg sm:text-2xl font-bold truncate">{t.customer.welcome}, {profile.firstName}!</h2>
+              <h2 className="text-lg sm:text-2xl font-bold truncate">{t.customer.welcome}, {profile.firstName} {profile.lastName}!</h2>
               <p className="text-white/80 text-xs sm:text-sm">{t.customer.readyForAdventure}</p>
             </div>
           </div>
@@ -790,6 +804,7 @@ function ProfileView({
   const [gender, setGender] = useState<'m' | 'f'>(profile.gender === 'f' ? 'f' : 'm');
   const [username, setUsername] = useState(profile.username || '');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [profilePhoto, setProfilePhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(profile.profilePhoto || null);
 
@@ -1003,16 +1018,27 @@ function ProfileView({
               <Label htmlFor="profilePassword" className="text-sm font-medium text-slate-700">
                 {t.auth.password}
               </Label>
-              <Input
-                id="profilePassword"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••"
-                className="h-11 rounded-xl"
-                minLength={6}
-                maxLength={100}
-              />
+              <div className="relative">
+                <Input
+                  id="profilePassword"
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••"
+                  className="h-11 rounded-xl pr-10"
+                  minLength={6}
+                  maxLength={100}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-9 w-9 text-slate-400 hover:text-slate-600 z-10"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
             </div>
 
             {/* Email (read only) */}

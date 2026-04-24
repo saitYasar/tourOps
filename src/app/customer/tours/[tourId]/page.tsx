@@ -1344,11 +1344,11 @@ function InteractiveMenuCategory({
                         <TooltipTrigger asChild>
                           <span tabIndex={0}>
                             <button
-                              className="w-10 h-10 sm:w-11 sm:h-11 rounded-full border border-stone-300 flex items-center justify-center hover:bg-stone-100 disabled:opacity-30 transition-colors"
+                              className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-stone-600 text-white flex items-center justify-center shadow-md hover:bg-stone-700 hover:shadow-lg active:scale-95 disabled:opacity-30 disabled:hover:scale-100 disabled:hover:shadow-md transition-all duration-150"
                               onClick={() => setItemQty(stopId, svc.id, qty - 1)}
                               disabled={qty === 0}
                             >
-                              <Minus className="h-4 w-4 sm:h-5 sm:w-5" />
+                              <Minus className="h-5 w-5 sm:h-6 sm:w-6" />
                             </button>
                           </span>
                         </TooltipTrigger>
@@ -1362,11 +1362,11 @@ function InteractiveMenuCategory({
                         {qty}
                       </span>
                       <button
-                        className="w-10 h-10 sm:w-11 sm:h-11 rounded-full border border-orange-300 bg-orange-50 flex items-center justify-center hover:bg-orange-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-orange-500 text-white flex items-center justify-center shadow-md hover:bg-orange-600 hover:shadow-lg active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-md transition-all duration-150"
                         onClick={() => setItemQty(stopId, svc.id, qty + 1)}
                         disabled={isOutOfStock || isStockLimitReached || limitReached}
                       >
-                        <Plus className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600" />
+                        <Plus className="h-5 w-5 sm:h-6 sm:w-6" />
                       </button>
                     </div>
                   )}

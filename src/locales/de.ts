@@ -40,6 +40,7 @@ export const de = {
   auth: {
     login: 'Anmelden',
     logout: 'Abmelden',
+    logoutConfirm: 'Sind Sie sicher, dass Sie sich abmelden möchten?',
     register: 'Registrieren',
     email: 'E-Mail',
     password: 'Passwort',
@@ -1571,6 +1572,7 @@ export const de = {
     firstName: 'VORNAME',
     uncategorized: 'Sonstige',
     serviceSeats: 'bestellt von Sitzplätzen',
+    serviceTables: 'bestellt von Tischen',
     tableBasedServices: 'Tischbasierte Dienstleistungen',
     exportExcel: 'Excel herunterladen',
     reservationInfo: 'Reservierungsdetails',

@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -29,6 +30,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { LanguageSwitcher } from '@/components/shared';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import type { UserRole } from '@/types';
 
 interface NavItem {
@@ -100,6 +102,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const { t } = useLanguage();
+  const [logoutOpen, setLogoutOpen] = useState(false);
 
   if (!user) return null;
 
@@ -273,11 +276,22 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
               ? "bg-orange-800/50 border-orange-600 text-white hover:bg-orange-700 hover:text-white"
               : "bg-slate-800 border-slate-600 text-white hover:bg-slate-700 hover:text-white"
           )}
-          onClick={logout}
+          onClick={() => setLogoutOpen(true)}
         >
           <LogOut className="h-4 w-4 mr-2" />
           {t.auth.logout}
         </Button>
+
+        <ConfirmDialog
+          open={logoutOpen}
+          onOpenChange={setLogoutOpen}
+          title={t.auth.logout}
+          description={t.auth.logoutConfirm}
+          confirmLabel={t.auth.logout}
+          cancelLabel={t.common.cancel}
+          onConfirm={logout}
+          variant="destructive"
+        />
       </div>
     </>
   );
