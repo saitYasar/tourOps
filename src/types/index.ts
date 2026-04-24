@@ -102,6 +102,12 @@ export interface Room extends BaseEntity {
   height?: number;
 }
 
+export interface TableChild {
+  id: number;
+  name: string;
+  order: number;
+}
+
 export interface Table extends BaseEntity {
   roomId: string;
   restaurantId: string;
@@ -109,6 +115,7 @@ export interface Table extends BaseEntity {
   capacity: number;
   order: number;
   isWindowSide?: boolean;
+  children?: TableChild[];
   // Layout editor coordinates (pixels)
   x?: number;
   y?: number;

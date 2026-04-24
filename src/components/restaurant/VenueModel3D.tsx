@@ -405,7 +405,7 @@ const FEMALE_SEAT = '#fbcfe8';   // pink-200
 const FEMALE_LABEL = '#be185d';  // pink-700
 const FEMALE_SHIRT = '#ec4899';  // pink-500
 
-function Chair3D({ position, rotation, occupant, seatNumber }: { position: [number, number, number]; rotation: number; occupant?: TableOccupant | null; seatNumber?: number }) {
+function Chair3D({ position, rotation, occupant, seatNumber }: { position: [number, number, number]; rotation: number; occupant?: TableOccupant | null; seatNumber?: string | number }) {
   const isOccupied = !!occupant;
   const isFemale = occupant?.gender === 'f';
   const seatColor = isOccupied ? (isFemale ? FEMALE_SEAT : MALE_SEAT) : CHAIR_CLR;
@@ -516,19 +516,19 @@ function Table3DObj({
   const isWindow = !!table.isWindowSide;
   const color = isSelected ? SEL_CLR : hov ? '#a07850' : WOOD;
 
+  const chairCount = table.children?.length ?? table.capacity;
+
   const chairs = useMemo(() => {
     const pos: { x: number; z: number; a: number }[] = [];
     if (isRound) {
       const r = Math.max(w, d) / 2 + CHAIR_SZ * 0.8;
-      for (let i = 0; i < table.capacity; i++) {
-        const angle = (i / table.capacity) * Math.PI * 2;
+      for (let i = 0; i < chairCount; i++) {
+        const angle = (i / chairCount) * Math.PI * 2;
         pos.push({ x: Math.cos(angle) * r, z: Math.sin(angle) * r, a: angle + Math.PI });
       }
     } else {
-      // Interleave sides: odd indices (1,3,5…) → side A, even indices (2,4,6…) → side B
-      // This matches the real layout where seats 1&2 face each other, 3&4 face each other, etc.
-      const sA = Math.ceil(table.capacity / 2);
-      const sB = table.capacity - sA;
+      const sA = Math.ceil(chairCount / 2);
+      const sB = chairCount - sA;
       const sideA: { x: number; z: number; a: number }[] = [];
       const sideB: { x: number; z: number; a: number }[] = [];
       for (let i = 0; i < sA; i++) {
@@ -539,9 +539,8 @@ function Table3DObj({
         const sp = w / (sB + 1);
         sideB.push({ x: sp * (i + 1) - w / 2, z: d / 2 + CHAIR_SZ * 0.8, a: Math.PI });
       }
-      // Interleave: seat1→sideA[0], seat2→sideB[0], seat3→sideA[1], seat4→sideB[1], …
       let aIdx = 0, bIdx = 0;
-      for (let i = 0; i < table.capacity; i++) {
+      for (let i = 0; i < chairCount; i++) {
         if (i % 2 === 0 && aIdx < sideA.length) {
           pos.push(sideA[aIdx++]);
         } else if (bIdx < sideB.length) {
@@ -552,7 +551,7 @@ function Table3DObj({
       }
     }
     return pos;
-  }, [table.capacity, w, d, isRound]);
+  }, [chairCount, w, d, isRound]);
 
   return (
     <group
@@ -623,7 +622,7 @@ function Table3DObj({
         </group>
       )}
       {chairs.map((ch, i) => (
-        <Chair3D key={i} position={[ch.x, 0, ch.z]} rotation={ch.a} occupant={occupants?.[i] ?? null} seatNumber={i + 1} />
+        <Chair3D key={i} position={[ch.x, 0, ch.z]} rotation={ch.a} occupant={occupants?.[i] ?? null} seatNumber={table.children?.[i]?.name ?? String(i + 1)} />
       ))}
       {isSelected && <pointLight position={[0, TABLE_H + 0.4, 0]} color={SEL_CLR} intensity={3} distance={2} />}
       {visible && (

@@ -156,13 +156,17 @@ function convertFromCache(
 
         if (isTableResource(child)) {
           const tc = parseCoords(child.coordinates);
+          const tableChildren = cache[child.id] ?? [];
           tables.push({
             id: cid, name: child.name, roomId: rid, capacity: child.capacity,
             order: child.order, restaurantId: '1', createdAt: now, updatedAt: now,
             x: tc.x, y: tc.y, w: child.width, h: child.height, rotation: child.rotation,
+            children: tableChildren.length > 0
+              ? tableChildren.map(c => ({ id: c.id, name: c.name, order: c.order }))
+              : undefined,
           });
 
-          const chairs = cache[child.id] ?? [];
+          const chairs = tableChildren;
           if (chairs.length > 0) {
             const occ: (TableOccupant | null)[] = chairs.map(chair => {
               if (chair.client) {

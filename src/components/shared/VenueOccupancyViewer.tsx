@@ -96,6 +96,9 @@ function convertResourcesToLegacy(resources: ResourceDto[]) {
         order: resource.order, restaurantId: '1',
         createdAt: resource.createdAt || now, updatedAt: resource.updatedAt || now,
         x: coords.x, y: coords.y, w: resource.width, h: resource.height, rotation: resource.rotation,
+        children: children.length > 0
+          ? children.map(c => ({ id: c.id, name: c.name, order: c.order }))
+          : undefined,
       });
     } else if (type?.code === 'object' && parentRoomId) {
       const coords = parseCoordinates(resource.coordinates);

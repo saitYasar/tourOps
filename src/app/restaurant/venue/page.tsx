@@ -403,16 +403,42 @@ export default function VenuePage() {
 
           for (let ri = 0; ri < children.length; ri++) {
             const room = children[ri];
+            let roomTables: ResourceDto[];
             if (room.children && room.children.length > 0) {
-              newCache[room.id] = room.children.map(t => ({ ...t, parentId: t.parentId ?? room.id }));
+              roomTables = room.children.map(t => ({ ...t, parentId: t.parentId ?? room.id }));
+              newCache[room.id] = roomTables;
             } else if (!room.children) {
               await wait(500);
               const tables = await fetchWithRetry(
                 () => resourceApi.getChildren(room.id),
                 `getChildren(room=${room.id} "${room.name}")`
               );
-              if (tables && tables.length > 0) {
-                newCache[room.id] = tables.map(t => ({ ...t, parentId: t.parentId ?? room.id }));
+              roomTables = tables ? tables.map(t => ({ ...t, parentId: t.parentId ?? room.id })) : [];
+              if (roomTables.length > 0) {
+                newCache[room.id] = roomTables;
+              }
+            } else {
+              roomTables = [];
+            }
+
+            // Fetch chairs for each table that allows children
+            const tablesWithChildren = roomTables.filter(t => {
+              const tType = t.resourceType || resourceTypes.find(rt => rt.id === t.resourceTypeId);
+              return tType?.allowsChildren;
+            });
+            for (let ti = 0; ti < tablesWithChildren.length; ti++) {
+              const table = tablesWithChildren[ti];
+              if (table.children && table.children.length > 0) {
+                newCache[table.id] = table.children.map(c => ({ ...c, parentId: c.parentId ?? table.id }));
+              } else {
+                await wait(300);
+                const chairs = await fetchWithRetry(
+                  () => resourceApi.getChildren(table.id),
+                  `getChildren(table=${table.id} "${table.name}")`
+                );
+                if (chairs && chairs.length > 0) {
+                  newCache[table.id] = chairs.map(c => ({ ...c, parentId: c.parentId ?? table.id }));
+                }
               }
             }
           }
@@ -423,7 +449,7 @@ export default function VenuePage() {
     } finally {
       setChildrenLoadingInProgress(false);
     }
-  }, [resources, orgCategoryId]);
+  }, [resources, orgCategoryId, resourceTypes]);
 
   // Load all children AFTER LayoutEditor finishes its initial API calls (avoids concurrent requests)
   const [editorReady, setEditorReady] = useState(false);
@@ -995,7 +1021,7 @@ export default function VenuePage() {
     const now = new Date().toISOString();
     const floors: Array<{ id: string; name: string; order: number; restaurantId: string; createdAt: string; updatedAt: string }> = [];
     const rooms: Array<{ id: string; name: string; floorId: string; order: number; restaurantId: string; createdAt: string; updatedAt: string; x?: number; y?: number; width?: number; height?: number }> = [];
-    const tables: Array<{ id: string; name: string; roomId: string; capacity: number; order: number; restaurantId: string; createdAt: string; updatedAt: string; x?: number; y?: number; w?: number; h?: number; rotation?: number }> = [];
+    const tables: Array<{ id: string; name: string; roomId: string; capacity: number; order: number; restaurantId: string; createdAt: string; updatedAt: string; x?: number; y?: number; w?: number; h?: number; rotation?: number; children?: Array<{ id: number; name: string; order: number }> }> = [];
     const objects: Array<{ id: string; name: string; kind: 'window' | 'wall' | 'column' | 'free'; color?: string; roomId: string; x?: number; y?: number; w?: number; h?: number; rotation?: number }> = [];
 
     const detectKind = (name: string): 'window' | 'wall' | 'column' | 'free' => {
@@ -1045,6 +1071,7 @@ export default function VenuePage() {
         children.forEach(child => processResource(child, parentFloorId, rid));
       } else if (type?.code === 'table' && parentRoomId) {
         const tableCoords = parseCoordinates(resource.coordinates);
+        const tableChildren = childrenCache[resource.id] ?? resource.children ?? [];
         tables.push({
           id: rid,
           name: resource.name,
@@ -1059,6 +1086,9 @@ export default function VenuePage() {
           w: resource.width,
           h: resource.height,
           rotation: resource.rotation,
+          children: tableChildren.length > 0
+            ? tableChildren.map(c => ({ id: c.id, name: c.name, order: c.order }))
+            : undefined,
         });
       } else if ((type?.code === 'object' || type?.code === 'transport_object') && parentRoomId) {
         const objCoords = parseCoordinates(resource.coordinates);
