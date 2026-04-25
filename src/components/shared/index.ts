@@ -14,4 +14,5 @@ export { ChoiceDeadlineCountdown } from './ChoiceDeadlineCountdown';
 export { ServiceDetailDialog } from './ServiceDetailDialog';
 export { VenueOccupancyViewer } from './VenueOccupancyViewer';
 export { OrgMenuPreviewDialog } from './OrgMenuPreviewDialog';
+export { InteractiveMenuCategory, MenuBottomBar } from './InteractiveMenu';
 // LocationPicker must be imported dynamically due to Leaflet SSR issues

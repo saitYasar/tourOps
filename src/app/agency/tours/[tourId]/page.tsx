@@ -45,6 +45,7 @@ import {
   Printer,
   FileSpreadsheet,
   Download,
+  UtensilsCrossed,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -52,7 +53,7 @@ import dynamic from 'next/dynamic';
 
 import { tourApi, tourStopApi, apiClient, agencyApi } from '@/lib/api';
 import { getCurrencySymbol } from '@/lib/utils';
-import type { ApiTourDto, ApiTourStopDto, CreateTourStopPayload, UpdateTourPayload, ServiceRequestDto, OrganizationPublicDto, TourClientDto, AgencyClientDto, AgencyStopChoicesDto, AgencyStopServiceSummaryDto, CategoryDto, LocationDto, CreateAgencyClientDto, ClientStopMenuCategoryDto, ClientStopMenuServiceDto, SelectionLimit } from '@/lib/api';
+import type { ApiTourDto, ApiTourStopDto, CreateTourStopPayload, UpdateTourPayload, ServiceRequestDto, OrganizationPublicDto, TourClientDto, AgencyClientDto, AgencyStopChoicesDto, AgencyStopServiceSummaryDto, CategoryDto, LocationDto, CreateAgencyClientDto, ClientStopMenuCategoryDto, ClientStopMenuServiceDto, ClientServiceChoiceDto, ClientStopChoicesDto, SelectionLimit } from '@/lib/api';
 import { ServiceDetailDialog } from '@/components/shared/ServiceDetailDialog';
 import { formatDate, formatShortDateTime } from '@/lib/dateUtils';
 
@@ -111,6 +112,7 @@ import {
   LoadingState, EmptyState, ErrorState, TourStatusBadge, ConfirmDialog,
   CompactReceipt, DetailedListReceipt, KitchenSummaryReceipt, ReceiptTableServices, ReceiptServiceSummary,
   handleReceiptPrint, exportReceiptExcel, ChoiceDeadlineCountdown,
+  InteractiveMenuCategory, MenuBottomBar,
 } from '@/components/shared';
 import type { ReceiptTemplate } from '@/components/shared';
 import { DialogDescription } from '@/components/ui/dialog';
@@ -279,6 +281,14 @@ export default function TourDetailPage() {
   const [receiptTemplate, setReceiptTemplate] = useState<ReceiptTemplate>('compact');
   const printRef = useRef<HTMLDivElement>(null);
 
+  // Menu edit dialog state
+  const [menuEditTarget, setMenuEditTarget] = useState<{ stopId: number; clientId: number; clientName: string } | null>(null);
+  const [menuSelectedItems, setMenuSelectedItems] = useState<Record<number, number>>({});
+  const [menuServiceChoiceIds, setMenuServiceChoiceIds] = useState<Record<number, number>>({});
+  const [menuNotes, setMenuNotes] = useState<Record<number, string>>({});
+  const [menuInitialQty, setMenuInitialQty] = useState<Record<number, number>>({});
+  const menuNoteTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
   const refreshTab = (tab: string) => {
     setRefreshingTab(tab);
     const keys: (string | number)[][] = [];
@@ -425,6 +435,118 @@ export default function TourDetailPage() {
     },
     enabled: !!choicesStopId,
   });
+
+  // Menu edit: fetch menu categories for the stop
+  const { data: menuEditCategories, isLoading: menuEditLoading } = useQuery({
+    queryKey: ['agency-stop-menu-edit', menuEditTarget?.stopId, apiLang],
+    queryFn: () => apiClient.getStopMenu(menuEditTarget!.stopId, apiLang),
+    enabled: !!menuEditTarget,
+  });
+
+  // Menu edit: extract client choices from already-loaded stopChoices
+  useEffect(() => {
+    if (!menuEditTarget || !stopChoices) return;
+    const clientData = stopChoices.find((c: AgencyStopChoicesDto) => {
+      const cId = c.clientId ?? (c as any).client?.id;
+      return cId === menuEditTarget.clientId;
+    });
+    const sc = clientData?.serviceChoices || [];
+    const items: Record<number, number> = {};
+    const ids: Record<number, number> = {};
+    const notes: Record<number, string> = {};
+    for (const c of sc) {
+      const svcId = c.serviceId ?? c.service?.id;
+      if (!svcId) continue;
+      items[svcId] = c.quantity;
+      ids[svcId] = c.id;
+      if (c.note) notes[svcId] = c.note;
+    }
+    setMenuSelectedItems(items);
+    setMenuServiceChoiceIds(ids);
+    setMenuNotes(notes);
+    setMenuInitialQty({ ...items });
+  }, [menuEditTarget, stopChoices]);
+
+  const menuEditGetItemQty = useCallback((_stopId: number, serviceId: number) => menuSelectedItems[serviceId] ?? 0, [menuSelectedItems]);
+  const menuEditGetItemNote = useCallback((_stopId: number, serviceId: number) => menuNotes[serviceId] ?? '', [menuNotes]);
+
+  const menuEditGetMenuTotal = useCallback((_stopId: number, categories: ClientStopMenuCategoryDto[]) => {
+    let total = 0;
+    const walk = (cats: ClientStopMenuCategoryDto[]) => {
+      for (const cat of cats) {
+        for (const svc of cat.services || []) {
+          const qty = menuSelectedItems[svc.id] ?? 0;
+          if (qty > 0) total += qty * Number(svc.basePrice || 0);
+        }
+        if (cat.child_service_categories) walk(cat.child_service_categories);
+      }
+    };
+    walk(categories);
+    return total;
+  }, [menuSelectedItems]);
+
+  const menuEditTotalItemCount = useCallback(() => {
+    return Object.values(menuSelectedItems).reduce((sum, q) => sum + q, 0);
+  }, [menuSelectedItems]);
+
+  const menuEditGetInitialQty = useCallback((_stopId: number, serviceId: number) => menuInitialQty[serviceId] ?? 0, [menuInitialQty]);
+
+  const menuEditSetItemQty = useCallback(async (_stopId: number, serviceId: number, qty: number) => {
+    if (!menuEditTarget) return;
+    const newQty = Math.max(0, qty);
+    const existingChoiceId = menuServiceChoiceIds[serviceId];
+
+    if (existingChoiceId) {
+      const result = await agencyApi.updateServiceChoiceForClient(existingChoiceId, { quantity: newQty, note: menuNotes[serviceId] || undefined }, apiLang);
+      if (!result.success) {
+        toast.error(result.error || t.customer.menuUpdateError);
+        return;
+      }
+      if (newQty === 0) {
+        setMenuSelectedItems(prev => { const n = { ...prev }; delete n[serviceId]; return n; });
+        setMenuServiceChoiceIds(prev => { const n = { ...prev }; delete n[serviceId]; return n; });
+        setMenuNotes(prev => { const n = { ...prev }; delete n[serviceId]; return n; });
+      } else {
+        setMenuSelectedItems(prev => ({ ...prev, [serviceId]: newQty }));
+      }
+    } else if (newQty > 0) {
+      const result = await agencyApi.createServiceChoiceForClient(menuEditTarget.stopId, menuEditTarget.clientId, { serviceId, note: menuNotes[serviceId] || undefined }, apiLang);
+      if (!result.success) {
+        toast.error(result.error || t.customer.menuSaveError);
+        return;
+      }
+      if (result.data) {
+        setMenuSelectedItems(prev => ({ ...prev, [serviceId]: (result.data as ClientServiceChoiceDto).quantity ?? 1 }));
+        setMenuServiceChoiceIds(prev => ({ ...prev, [serviceId]: (result.data as ClientServiceChoiceDto).id }));
+      }
+    }
+  }, [menuEditTarget, menuServiceChoiceIds, menuNotes, apiLang, t]);
+
+  const menuEditSetItemNote = useCallback((_stopId: number, serviceId: number, note: string) => {
+    setMenuNotes(prev => ({ ...prev, [serviceId]: note }));
+    const key = `${serviceId}`;
+    if (menuNoteTimersRef.current[key]) clearTimeout(menuNoteTimersRef.current[key]);
+    menuNoteTimersRef.current[key] = setTimeout(async () => {
+      const choiceId = menuServiceChoiceIds[serviceId];
+      if (!choiceId) return;
+      const result = await agencyApi.updateServiceChoiceForClient(choiceId, { note }, apiLang);
+      if (!result.success) {
+        toast.error(result.error || t.customer.noteSaveError);
+      }
+    }, 800);
+  }, [menuServiceChoiceIds, apiLang, t]);
+
+  const closeMenuEditDialog = useCallback(() => {
+    setMenuEditTarget(null);
+    setMenuSelectedItems({});
+    setMenuServiceChoiceIds({});
+    setMenuNotes({});
+    setMenuInitialQty({});
+    Object.values(menuNoteTimersRef.current).forEach(clearTimeout);
+    menuNoteTimersRef.current = {};
+    queryClient.invalidateQueries({ queryKey: ['agency-stop-choices', choicesStopId, apiLang] });
+    queryClient.invalidateQueries({ queryKey: ['agency-stop-service-summary', choicesStopId, apiLang] });
+  }, [queryClient, choicesStopId, apiLang]);
 
   // Note: layout endpoint is client-only (/client/tours/stops/{stopId}/layout), not available for agencies
 
@@ -2024,9 +2146,28 @@ export default function TourDetailPage() {
                                       )}
 
                                       {/* Service choices */}
-                                      {choice.serviceChoices && choice.serviceChoices.length > 0 && (
-                                        <div>
-                                          <p className="text-xs font-medium text-slate-500 mb-1">{t.tours.service}</p>
+                                      <div>
+                                        <div className="flex items-center justify-between mb-1">
+                                          <p className="text-xs font-medium text-slate-500">{t.tours.service}</p>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-6 px-2 text-xs gap-1 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              const cId = choice.clientId ?? choice.client?.id;
+                                              if (!cId) return;
+                                              const cName = choice.client
+                                                ? `${choice.client.firstName || ''} ${choice.client.lastName || ''}`.trim()
+                                                : choice.clientName || `#${cId}`;
+                                              setMenuEditTarget({ stopId: choicesStopId!, clientId: cId, clientName: cName });
+                                            }}
+                                          >
+                                            <UtensilsCrossed className="h-3 w-3" />
+                                            {t.customer.editMenuAction}
+                                          </Button>
+                                        </div>
+                                        {choice.serviceChoices && choice.serviceChoices.length > 0 ? (
                                           <div className="space-y-1">
                                             {choice.serviceChoices.map((sc) => (
                                               <div key={sc.id} className="flex items-center justify-between text-sm bg-white rounded p-2 border">
@@ -2034,14 +2175,16 @@ export default function TourDetailPage() {
                                                 <div className="flex items-center gap-3 text-slate-600">
                                                   <span>{sc.quantity}x</span>
                                                   {sc.service?.basePrice != null && (
-                                                    <span className="font-medium">{(Number(sc.service.basePrice) * sc.quantity).toFixed(2)} {getCurrencySymbol(sc.service?.currency)}</span>
+                                                    <span className="font-medium">{(Number(sc.service.basePrice) * sc.quantity).toFixed(2)} {getCurrencySymbol(sc.service?.currency || serviceSummary?.currency || serviceSummary?.services?.[0]?.currency)}</span>
                                                   )}
                                                 </div>
                                               </div>
                                             ))}
                                           </div>
-                                        </div>
-                                      )}
+                                        ) : (
+                                          <p className="text-xs text-slate-400">{t.tours.noChoices}</p>
+                                        )}
+                                      </div>
 
                                       {!choice.resourceChoice && (!choice.serviceChoices || choice.serviceChoices.length === 0) && (
                                         <p className="text-sm text-slate-400 text-center">{t.tours.noChoices}</p>
@@ -3233,6 +3376,56 @@ export default function TourDetailPage() {
         onOpenChange={(open) => { if (!open) setMenuDetailService(null); }}
         t={t}
       />
+
+      {/* Menu Edit Dialog */}
+      <Dialog open={!!menuEditTarget} onOpenChange={(open) => { if (!open) closeMenuEditDialog(); }}>
+        <DialogContent className="sm:max-w-lg max-h-[95vh] sm:max-h-[85vh] min-h-[60vh] sm:min-h-[50vh] w-[95vw] sm:w-auto flex flex-col">
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle className="flex items-center gap-2">
+              <UtensilsCrossed className="h-5 w-5 text-orange-500" />
+              {menuEditTarget?.clientName} — {t.customer.editMenuAction}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto pr-1">
+            {menuEditLoading ? (
+              <LoadingState message={t.common.loading} />
+            ) : !menuEditCategories || menuEditCategories.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-slate-500">{t.customer.noMenu}</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {menuEditCategories.map((cat) => (
+                  <InteractiveMenuCategory
+                    key={cat.id}
+                    category={cat}
+                    t={t}
+                    showPrice
+                    stopId={menuEditTarget!.stopId}
+                    getItemQty={menuEditGetItemQty}
+                    setItemQty={menuEditSetItemQty}
+                    getItemNote={menuEditGetItemNote}
+                    setItemNote={menuEditSetItemNote}
+                    getInitialQty={menuEditGetInitialQty}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+          {menuEditTarget && menuEditCategories && menuEditCategories.length > 0 && (
+            <MenuBottomBar
+              stopId={menuEditTarget.stopId}
+              categories={menuEditCategories}
+              showPrice
+              maxSpendLimit={stops?.find(s => s.id === menuEditTarget.stopId)?.maxSpendLimit}
+              getMenuTotal={menuEditGetMenuTotal}
+              menuTotalItemCount={menuEditTotalItemCount}
+              t={t}
+              onSave={closeMenuEditDialog}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

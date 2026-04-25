@@ -4102,6 +4102,28 @@ class ApiClient {
     });
   }
 
+  async getAdminClientChoices(stopId: number, clientId: number, lang: 'tr' | 'en' | 'de' = 'tr') {
+    return this.request<ClientStopChoicesDto>(`/admin/tour-stops/${stopId}/clients/${clientId}/choices`, {
+      method: 'GET',
+    }, lang);
+  }
+
+  async createAdminServiceChoice(stopId: number, clientId: number, data: CreateServiceChoiceDto, lang: 'tr' | 'en' | 'de' = 'tr') {
+    return this.request<ClientServiceChoiceDto>(`/admin/tour-stops/${stopId}/clients/${clientId}/service-choice`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }, lang);
+  }
+
+  async updateAdminServiceChoice(serviceChoiceId: number, data: UpdateServiceChoiceDto, lang: 'tr' | 'en' | 'de' = 'tr') {
+    return this.request<ClientServiceChoiceDto>(`/admin/tour-stops/service-choices/${serviceChoiceId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }, lang);
+  }
+
   // ============================================
   // Tour Stop - Public
   // ============================================
@@ -4437,6 +4459,28 @@ class ApiClient {
   async getAgencyStopServiceSummary(stopId: number, lang: 'tr' | 'en' | 'de' = 'tr') {
     return this.request<AgencyStopServiceSummaryDto>(`/agency/tours/stops/${stopId}/service-summary`, {
       method: 'GET',
+    }, lang);
+  }
+
+  async getAgencyClientChoices(stopId: number, clientId: number, lang: 'tr' | 'en' | 'de' = 'tr') {
+    return this.request<ClientStopChoicesDto>(`/tour-stops/${stopId}/clients/${clientId}/choices`, {
+      method: 'GET',
+    }, lang);
+  }
+
+  async createAgencyServiceChoice(stopId: number, clientId: number, data: CreateServiceChoiceDto, lang: 'tr' | 'en' | 'de' = 'tr') {
+    return this.request<ClientServiceChoiceDto>(`/tour-stops/${stopId}/clients/${clientId}/service-choice`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }, lang);
+  }
+
+  async updateAgencyServiceChoice(serviceChoiceId: number, data: UpdateServiceChoiceDto, lang: 'tr' | 'en' | 'de' = 'tr') {
+    return this.request<ClientServiceChoiceDto>(`/tour-stops/service-choices/${serviceChoiceId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
     }, lang);
   }
 
@@ -5471,6 +5515,33 @@ export const agencyApi = {
       return { success: false, error: (error as Error).message };
     }
   },
+
+  async getClientChoices(stopId: number, clientId: number, lang: 'tr' | 'en' | 'de' = 'tr') {
+    try {
+      const response = await apiClient.getAgencyClientChoices(stopId, clientId, lang);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async createServiceChoiceForClient(stopId: number, clientId: number, data: CreateServiceChoiceDto, lang: 'tr' | 'en' | 'de' = 'tr') {
+    try {
+      const response = await apiClient.createAgencyServiceChoice(stopId, clientId, data, lang);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async updateServiceChoiceForClient(serviceChoiceId: number, data: UpdateServiceChoiceDto, lang: 'tr' | 'en' | 'de' = 'tr') {
+    try {
+      const response = await apiClient.updateAgencyServiceChoice(serviceChoiceId, data, lang);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
 };
 
 // ============================================
@@ -6458,6 +6529,33 @@ export const adminApi = {
     }
   },
 
+  async getClientChoices(stopId: number, clientId: number, lang: 'tr' | 'en' | 'de' = 'tr') {
+    try {
+      const response = await apiClient.getAdminClientChoices(stopId, clientId, lang);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async createServiceChoiceForClient(stopId: number, clientId: number, data: CreateServiceChoiceDto, lang: 'tr' | 'en' | 'de' = 'tr') {
+    try {
+      const response = await apiClient.createAdminServiceChoice(stopId, clientId, data, lang);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async updateServiceChoiceForClient(serviceChoiceId: number, data: UpdateServiceChoiceDto, lang: 'tr' | 'en' | 'de' = 'tr') {
+    try {
+      const response = await apiClient.updateAdminServiceChoice(serviceChoiceId, data, lang);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
   // ============================================
   // Notifications
   // ============================================
@@ -6889,6 +6987,7 @@ export const tourStopApi = {
       return { success: false, error: (error as Error).message };
     }
   },
+
 };
 
 // ============================================
