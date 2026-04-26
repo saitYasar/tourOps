@@ -879,6 +879,13 @@ export const tr = {
     statusPublished: 'Yayında',
     statusCancelled: 'İptal',
     statusCompleted: 'Tamamlandı',
+    // Password change
+    changePassword: 'Şifre Değiştir',
+    newPassword: 'Yeni Şifre',
+    newPasswordPlaceholder: 'Yeni şifreyi girin',
+    passwordChanged: 'Şifre başarıyla değiştirildi',
+    passwordChangeFailed: 'Şifre değiştirilemedi',
+    changing: 'Değiştiriliyor...',
   },
   restaurant: {
     title: 'İşletme Paneli',

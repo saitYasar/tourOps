@@ -878,6 +878,13 @@ export const de = {
     statusPublished: 'Veröffentlicht',
     statusCancelled: 'Abgesagt',
     statusCompleted: 'Abgeschlossen',
+    // Password change
+    changePassword: 'Passwort ändern',
+    newPassword: 'Neues Passwort',
+    newPasswordPlaceholder: 'Neues Passwort eingeben',
+    passwordChanged: 'Passwort erfolgreich geändert',
+    passwordChangeFailed: 'Passwort konnte nicht geändert werden',
+    changing: 'Wird geändert...',
   },
   restaurant: {
     title: 'Organisations-Panel',

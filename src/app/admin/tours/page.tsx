@@ -9,6 +9,8 @@ import {
   Image as ImageIcon,
   Users,
   Eye,
+  EyeOff,
+  KeyRound,
   Building2,
   MapPin,
   Clock,
@@ -124,6 +126,10 @@ export default function AdminToursPage() {
   const [batchFile, setBatchFile] = useState<File | null>(null);
   const [batchPreview, setBatchPreview] = useState<string[][]>([]);
   const batchFileRef = useRef<HTMLInputElement>(null);
+  const [passwordTarget, setPasswordTarget] = useState<{ clientId: number; name: string; username?: string } | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [newPasswordError, setNewPasswordError] = useState('');
   const [choicesStopId, setChoicesStopId] = useState<number | null>(null);
   const [expandedClientId, setExpandedClientId] = useState<number | null>(null);
   const [receiptOpen, setReceiptOpen] = useState(false);
@@ -487,6 +493,25 @@ export default function AdminToursPage() {
     setBatchFile(null);
     setBatchPreview([]);
   };
+
+  const changePasswordMutation = useMutation({
+    mutationFn: ({ clientId, newPassword }: { clientId: number; newPassword: string }) =>
+      adminApi.changeClientPassword(clientId, newPassword),
+    onSuccess: (result) => {
+      if (result.success) {
+        toast.success(t.invitations.passwordChanged);
+        setPasswordTarget(null);
+        setNewPassword('');
+        setNewPasswordError('');
+        setShowNewPassword(false);
+      } else {
+        toast.error(result.error || t.invitations.passwordChangeFailed);
+      }
+    },
+    onError: () => {
+      toast.error(t.invitations.passwordChangeFailed);
+    },
+  });
 
   const batchImportMutation = useMutation({
     mutationFn: async ({ file }: { file: File }) => {
@@ -1188,6 +1213,9 @@ export default function AdminToursPage() {
                                 )}
                                 <div className="text-left">
                                   <span className="font-medium">{name}</span>
+                                  {client?.username && (
+                                    <code className="text-[11px] text-slate-400 ml-2 bg-slate-100 px-1.5 py-0.5 rounded">{client.username}</code>
+                                  )}
                                   {client?.email && (
                                     <span className="text-xs text-slate-400 ml-2">{client.email}</span>
                                   )}
@@ -1212,6 +1240,24 @@ export default function AdminToursPage() {
                                     <Send className="h-3.5 w-3.5" />
                                   </button>
                                 )}
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <button
+                                      type="button"
+                                      className="h-6 w-6 flex items-center justify-center rounded text-amber-600 hover:text-amber-800 hover:bg-amber-50"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setPasswordTarget({ clientId: p.clientId, name, username: client?.username });
+                                        setNewPassword('');
+                                        setNewPasswordError('');
+                                        setShowNewPassword(false);
+                                      }}
+                                    >
+                                      <KeyRound className="h-3.5 w-3.5" />
+                                    </button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top">{t.invitations.changePassword}</TooltipContent>
+                                </Tooltip>
                                 <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                               </div>
                             </button>
@@ -2550,6 +2596,88 @@ export default function AdminToursPage() {
               t={t}
               onSave={closeMenuEditDialog}
             />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Change Password Dialog */}
+      <Dialog open={!!passwordTarget} onOpenChange={(open) => { if (!open) { setPasswordTarget(null); setNewPassword(''); setNewPasswordError(''); setShowNewPassword(false); } }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <KeyRound className="h-5 w-5 text-amber-600" />
+              {t.invitations.changePassword}
+            </DialogTitle>
+          </DialogHeader>
+          {passwordTarget && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 p-2.5 bg-slate-50 rounded-lg">
+                <div className="h-8 w-8 rounded-full bg-violet-100 text-violet-600 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                  {passwordTarget.name.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <p className="font-medium text-sm">{passwordTarget.name}</p>
+                  {passwordTarget.username && <p className="text-xs text-slate-500">{passwordTarget.username}</p>}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>{t.invitations.newPassword}</Label>
+                <div className="relative">
+                  <Input
+                    type={showNewPassword ? 'text' : 'password'}
+                    value={newPassword}
+                    onChange={(e) => { setNewPassword(e.target.value); setNewPasswordError(''); }}
+                    placeholder={t.invitations.newPasswordPlaceholder}
+                    className={`pr-10 ${newPasswordError ? 'border-red-500' : ''}`}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (newPassword.length < 6) {
+                          setNewPasswordError(t.invitations.passwordMinLength);
+                          return;
+                        }
+                        changePasswordMutation.mutate({ clientId: passwordTarget.clientId, newPassword });
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                  >
+                    {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                {newPasswordError && <p className="text-xs text-red-500">{newPasswordError}</p>}
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => { setPasswordTarget(null); setNewPassword(''); setNewPasswordError(''); setShowNewPassword(false); }}>
+                  {t.common.cancel}
+                </Button>
+                <Button
+                  disabled={changePasswordMutation.isPending}
+                  onClick={() => {
+                    if (newPassword.length < 6) {
+                      setNewPasswordError(t.invitations.passwordMinLength);
+                      return;
+                    }
+                    changePasswordMutation.mutate({ clientId: passwordTarget.clientId, newPassword });
+                  }}
+                >
+                  {changePasswordMutation.isPending ? (
+                    <>
+                      <span className="animate-spin mr-2">&#9696;</span>
+                      {t.invitations.changing}
+                    </>
+                  ) : (
+                    <>
+                      <KeyRound className="h-4 w-4 mr-2" />
+                      {t.invitations.changePassword}
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </div>
           )}
         </DialogContent>
       </Dialog>

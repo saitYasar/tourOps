@@ -878,6 +878,13 @@ export const en = {
     statusPublished: 'Published',
     statusCancelled: 'Cancelled',
     statusCompleted: 'Completed',
+    // Password change
+    changePassword: 'Change Password',
+    newPassword: 'New Password',
+    newPasswordPlaceholder: 'Enter new password',
+    passwordChanged: 'Password changed successfully',
+    passwordChangeFailed: 'Failed to change password',
+    changing: 'Changing...',
   },
   restaurant: {
     title: 'Organization Panel',

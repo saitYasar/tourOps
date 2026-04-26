@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2, User, Search, Users, Eye, EyeOff, Navigation, Calendar, Hash, UserPlus, FileSpreadsheet, Upload, X, MessageCircle, Download, FileText, Send, ChevronDown } from 'lucide-react';
+import { Plus, Trash2, User, Search, Users, Eye, EyeOff, Navigation, Calendar, Hash, UserPlus, FileSpreadsheet, Upload, X, MessageCircle, Download, FileText, Send, ChevronDown, KeyRound } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { agencyApi, tourApi, type AgencyClientDto, type CreateAgencyClientDto } from '@/lib/api';
@@ -73,6 +73,10 @@ export default function AgencyClientsPage() {
   const [batchSelectedTourName, setBatchSelectedTourName] = useState('');
   const batchFileRef = useRef<HTMLInputElement>(null);
   const [photoPreview, setPhotoPreview] = useState<{ url: string; name: string } | null>(null);
+  const [passwordTarget, setPasswordTarget] = useState<AgencyClientDto | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [newPasswordError, setNewPasswordError] = useState('');
 
   // Fetch agency data for status badge
   const { data: agencyResult } = useQuery({
@@ -183,6 +187,25 @@ export default function AgencyClientsPage() {
     },
     onError: () => {
       toast.error(t.invitations.clientDeleteFailed);
+    },
+  });
+
+  const changePasswordMutation = useMutation({
+    mutationFn: ({ clientId, newPassword }: { clientId: number; newPassword: string }) =>
+      agencyApi.changeClientPassword(clientId, newPassword),
+    onSuccess: (result) => {
+      if (result.success) {
+        toast.success(t.invitations.passwordChanged);
+        setPasswordTarget(null);
+        setNewPassword('');
+        setNewPasswordError('');
+        setShowNewPassword(false);
+      } else {
+        toast.error(result.error || t.invitations.passwordChangeFailed);
+      }
+    },
+    onError: () => {
+      toast.error(t.invitations.passwordChangeFailed);
     },
   });
 
@@ -674,6 +697,24 @@ export default function AgencyClientsPage() {
                                 <UserPlus className="h-4 w-4 mr-1" />
                                 <span className="text-xs">{t.invitations.addToTour}</span>
                               </Button>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 w-8 p-0 text-amber-600 hover:text-amber-800 hover:bg-amber-50"
+                                    onClick={() => {
+                                      setPasswordTarget(client);
+                                      setNewPassword('');
+                                      setNewPasswordError('');
+                                      setShowNewPassword(false);
+                                    }}
+                                  >
+                                    <KeyRound className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top">{t.invitations.changePassword}</TooltipContent>
+                              </Tooltip>
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -1291,6 +1332,88 @@ export default function AgencyClientsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Change Password Dialog */}
+      <Dialog open={!!passwordTarget} onOpenChange={(open) => { if (!open) { setPasswordTarget(null); setNewPassword(''); setNewPasswordError(''); setShowNewPassword(false); } }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <KeyRound className="h-5 w-5 text-amber-600" />
+              {t.invitations.changePassword}
+            </DialogTitle>
+          </DialogHeader>
+          {passwordTarget && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 p-2.5 bg-slate-50 rounded-lg">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-sky-500 to-blue-500 flex items-center justify-center text-white font-medium text-xs flex-shrink-0">
+                  {getInitials(passwordTarget.client?.firstName, passwordTarget.client?.lastName)}
+                </div>
+                <div>
+                  <p className="font-medium text-sm">{passwordTarget.client?.firstName} {passwordTarget.client?.lastName}</p>
+                  <p className="text-xs text-slate-500">{passwordTarget.client?.username}</p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>{t.invitations.newPassword}</Label>
+                <div className="relative">
+                  <Input
+                    type={showNewPassword ? 'text' : 'password'}
+                    value={newPassword}
+                    onChange={(e) => { setNewPassword(e.target.value); setNewPasswordError(''); }}
+                    placeholder={t.invitations.newPasswordPlaceholder}
+                    className={`pr-10 ${newPasswordError ? 'border-red-500' : ''}`}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (newPassword.length < 6) {
+                          setNewPasswordError(t.invitations.passwordMinLength);
+                          return;
+                        }
+                        changePasswordMutation.mutate({ clientId: passwordTarget.clientId, newPassword });
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                  >
+                    {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                {newPasswordError && <p className="text-xs text-red-500">{newPasswordError}</p>}
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => { setPasswordTarget(null); setNewPassword(''); setNewPasswordError(''); setShowNewPassword(false); }}>
+                  {t.common.cancel}
+                </Button>
+                <Button
+                  disabled={changePasswordMutation.isPending}
+                  onClick={() => {
+                    if (newPassword.length < 6) {
+                      setNewPasswordError(t.invitations.passwordMinLength);
+                      return;
+                    }
+                    changePasswordMutation.mutate({ clientId: passwordTarget.clientId, newPassword });
+                  }}
+                >
+                  {changePasswordMutation.isPending ? (
+                    <>
+                      <span className="animate-spin mr-2">&#9696;</span>
+                      {t.invitations.changing}
+                    </>
+                  ) : (
+                    <>
+                      <KeyRound className="h-4 w-4 mr-2" />
+                      {t.invitations.changePassword}
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Photo Preview Popup */}
       {photoPreview && (
         <div

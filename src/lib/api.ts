@@ -2494,6 +2494,20 @@ class ApiClient {
     return res.json();
   }
 
+  async changeAgencyClientPassword(clientId: number, newPassword: string) {
+    return this.request<{ message: string }>(`/clients/${clientId}/password/agency`, {
+      method: 'PUT',
+      body: JSON.stringify({ newPassword }),
+    }, 'tr', true);
+  }
+
+  async changeAdminClientPassword(clientId: number, newPassword: string) {
+    return this.request<{ message: string }>(`/clients/${clientId}/password/admin`, {
+      method: 'PUT',
+      body: JSON.stringify({ newPassword }),
+    }, 'tr', true);
+  }
+
   async deleteAgencyClient(clientId: number) {
     return this.request<{ message: string }>(`/agencies/clients/${clientId}`, {
       method: 'DELETE',
@@ -5476,6 +5490,16 @@ export const agencyApi = {
     }
   },
 
+  // Change client password
+  async changeClientPassword(clientId: number, newPassword: string) {
+    try {
+      await apiClient.changeAgencyClientPassword(clientId, newPassword);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
   // Delete client
   async deleteClient(clientId: number) {
     try {
@@ -5724,6 +5748,16 @@ export const adminApi = {
     try {
       const response = await apiClient.adminVerifyOtp({ email, otp });
       return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  // Change client password (admin)
+  async changeClientPassword(clientId: number, newPassword: string) {
+    try {
+      await apiClient.changeAdminClientPassword(clientId, newPassword);
+      return { success: true };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
