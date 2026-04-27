@@ -104,7 +104,7 @@ import {
 import {
   LoadingState, EmptyState, ConfirmDialog, TourStatusBadge, AdminPagination,
   ChoiceDeadlineCountdown,
-  CompactReceipt, DetailedListReceipt, KitchenSummaryReceipt, ReceiptTableServices, ReceiptServiceSummary,
+  CompactReceipt, CompactReceiptNoPrice, DetailedListReceipt, KitchenSummaryReceipt, ServiceSummaryReceipt, ReceiptTableServices, ReceiptServiceSummary,
   handleReceiptPrint, exportReceiptExcel, OrgMenuPreviewDialog,
 } from '@/components/shared';
 import type { ReceiptTemplate } from '@/components/shared';
@@ -2088,8 +2088,10 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
           <div className="flex flex-wrap gap-2 mb-4">
             {([
               { key: 'compact' as ReceiptTemplate, label: t.guests.compactReceipt },
+              { key: 'compact-noprice' as ReceiptTemplate, label: t.guests.compactReceiptNoPrice },
               { key: 'detailed' as ReceiptTemplate, label: t.guests.detailedList },
               { key: 'kitchen' as ReceiptTemplate, label: t.guests.kitchenSummary },
+              { key: 'service-summary' as ReceiptTemplate, label: t.guests.serviceSummaryReceipt },
             ]).map((tmpl) => (
               <Button
                 key={tmpl.key}
@@ -2105,11 +2107,17 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
             {receiptTourInfo && receiptTemplate === 'compact' && (
               <CompactReceipt choices={choicesArr} orgName={choicesOrgName} t={t} tourInfo={receiptTourInfo} />
             )}
+            {receiptTourInfo && receiptTemplate === 'compact-noprice' && (
+              <CompactReceiptNoPrice choices={choicesArr} orgName={choicesOrgName} t={t} tourInfo={receiptTourInfo} />
+            )}
             {receiptTourInfo && receiptTemplate === 'detailed' && (
               <DetailedListReceipt choices={choicesArr} orgName={choicesOrgName} t={t} tourInfo={receiptTourInfo} />
             )}
             {receiptTourInfo && receiptTemplate === 'kitchen' && (
               <KitchenSummaryReceipt choices={choicesArr} orgName={choicesOrgName} t={t} tourInfo={receiptTourInfo} />
+            )}
+            {receiptTourInfo && receiptTemplate === 'service-summary' && (
+              <ServiceSummaryReceipt tourInfo={receiptTourInfo} serviceSummary={serviceSummary} orgName={choicesOrgName} t={t} />
             )}
           </div>
           <div className="flex gap-2 justify-end mt-4">
