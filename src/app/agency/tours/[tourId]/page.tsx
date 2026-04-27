@@ -110,7 +110,7 @@ import {
 } from '@/components/ui/select';
 import {
   LoadingState, EmptyState, ErrorState, TourStatusBadge, ConfirmDialog,
-  CompactReceipt, DetailedListReceipt, KitchenSummaryReceipt, ReceiptTableServices, ReceiptServiceSummary,
+  CompactReceipt, CompactReceiptNoPrice, DetailedListReceipt, KitchenSummaryReceipt, ServiceSummaryReceipt, ReceiptTableServices, ReceiptServiceSummary,
   handleReceiptPrint, exportReceiptExcel, ChoiceDeadlineCountdown,
   InteractiveMenuCategory, MenuBottomBar,
 } from '@/components/shared';
@@ -2278,17 +2278,19 @@ export default function TourDetailPage() {
           </DialogHeader>
 
           {/* Template selector */}
-          <div className="flex gap-2 mb-4">
+          <div className="flex gap-2 mb-4 flex-wrap">
             {([
               { key: 'compact' as ReceiptTemplate, label: t.guests.compactReceipt, desc: t.guests.compactReceiptDesc },
+              { key: 'compact-noprice' as ReceiptTemplate, label: t.guests.compactReceiptNoPrice, desc: t.guests.compactReceiptNoPriceDesc },
               { key: 'detailed' as ReceiptTemplate, label: t.guests.detailedList, desc: t.guests.detailedListDesc },
               { key: 'kitchen' as ReceiptTemplate, label: t.guests.kitchenSummary, desc: t.guests.kitchenSummaryDesc },
+              { key: 'service-summary' as ReceiptTemplate, label: t.guests.serviceSummaryReceipt, desc: t.guests.serviceSummaryReceiptDesc },
             ]).map((tmpl) => (
               <button
                 key={tmpl.key}
                 type="button"
                 onClick={() => setReceiptTemplate(tmpl.key)}
-                className={`flex-1 p-3 rounded-lg border text-left transition-colors ${
+                className={`flex-1 p-3 rounded-lg border text-left transition-colors min-w-[140px] ${
                   receiptTemplate === tmpl.key
                     ? 'bg-slate-100 border-slate-400 ring-1 ring-slate-400'
                     : 'bg-white border-slate-200 hover:bg-slate-50'
@@ -2307,14 +2309,24 @@ export default function TourDetailPage() {
                 {receiptTemplate === 'compact' && (
                   <CompactReceipt tourInfo={receiptTourInfo} choices={choicesArr} orgName={choicesOrgName} t={t} />
                 )}
+                {receiptTemplate === 'compact-noprice' && (
+                  <CompactReceiptNoPrice tourInfo={receiptTourInfo} choices={choicesArr} orgName={choicesOrgName} t={t} />
+                )}
                 {receiptTemplate === 'detailed' && (
                   <DetailedListReceipt tourInfo={receiptTourInfo} choices={choicesArr} orgName={choicesOrgName} t={t} />
                 )}
                 {receiptTemplate === 'kitchen' && (
                   <KitchenSummaryReceipt tourInfo={receiptTourInfo} choices={choicesArr} orgName={choicesOrgName} t={t} />
                 )}
-                <ReceiptTableServices choices={choicesArr} t={t} />
-                <ReceiptServiceSummary serviceSummary={serviceSummary} t={t} />
+                {receiptTemplate === 'service-summary' && (
+                  <ServiceSummaryReceipt tourInfo={receiptTourInfo} serviceSummary={serviceSummary} orgName={choicesOrgName} t={t} />
+                )}
+                {receiptTemplate !== 'service-summary' && (
+                  <>
+                    <ReceiptTableServices choices={choicesArr} t={t} />
+                    <ReceiptServiceSummary serviceSummary={serviceSummary} t={t} />
+                  </>
+                )}
               </>
             )}
           </div>

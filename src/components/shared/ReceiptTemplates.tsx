@@ -10,7 +10,7 @@ import type { useLanguage } from '@/contexts/LanguageContext';
 // ============================================
 // Types
 // ============================================
-export type ReceiptTemplate = 'compact' | 'detailed' | 'kitchen';
+export type ReceiptTemplate = 'compact' | 'compact-noprice' | 'detailed' | 'kitchen' | 'service-summary';
 
 export interface ReceiptTourInfo {
   tourName?: string;
@@ -111,10 +111,88 @@ function getShortSeatLabel(choice: AgencyStopChoicesDto): string {
   return match ? match[1] : name;
 }
 
+/** Extract table/section resource name (e.g. "Masa 1") */
+function getTableResourceName(choice: AgencyStopChoicesDto): string {
+  if (!choice.resourceChoice || !Array.isArray(choice.resourceChoice)) return '';
+  const table = choice.resourceChoice.find((item: ClientResourceChoiceItemDto) => item.resourceTypeCode === 'table');
+  if (table) return table.resourceName || '';
+  const section = choice.resourceChoice.find((item: ClientResourceChoiceItemDto) => item.resourceTypeCode === 'section');
+  if (section) return section.resourceName || '';
+  return '';
+}
+
 // ============================================
 // Compact Receipt (80mm thermal)
 // ============================================
 export function CompactReceipt({
+  tourInfo,
+  choices,
+  orgName,
+  t,
+}: {
+  tourInfo: ReceiptTourInfo;
+  choices: AgencyStopChoicesDto[];
+  orgName: string;
+  t: T;
+}) {
+  return (
+    <div className="font-mono text-xs" style={{ width: '80mm' }}>
+      <div className="text-center border-b border-dashed pb-2 mb-2">
+        <p className="font-bold text-sm">{orgName}</p>
+        {tourInfo.agencyName && <p className="font-semibold">{tourInfo.agencyName}</p>}
+        <p>{tourInfo.tourName}</p>
+        <p>{formatShortDateTime(tourInfo.stopStartDate || tourInfo.startDate)} - {formatShortDateTime(tourInfo.stopEndDate)}</p>
+        <p className="text-[10px] mt-1">{t.guests.printedAt}: {new Date().toLocaleString()}</p>
+      </div>
+      {sortChoicesBySeat(choices).map((choice, idx) => {
+        const clientName = choice.client
+          ? `${choice.client.firstName || ''} ${choice.client.lastName || ''}`.trim()
+          : choice.clientName || `#${choice.clientId}`;
+        const resourceLabel = choice.resourceChoice
+          ? Array.isArray(choice.resourceChoice)
+            ? choice.resourceChoice.map((item: ClientResourceChoiceItemDto) => `${item.resourceTypeName}: ${item.resourceName}`).join(' · ')
+            : (choice.resourceChoice.resource?.name || '')
+          : '';
+        let personTotal = 0;
+        let currency = '';
+        for (const sc of choice.serviceChoices || []) {
+          if (sc.service?.basePrice != null) {
+            personTotal += (sc.quantity || 1) * Number(sc.service.basePrice);
+            if (!currency) currency = getCurrencySymbol(sc.service?.currency);
+          }
+        }
+        return (
+          <div key={`${choice.clientId}-${idx}`} className="border-b border-dashed py-1.5">
+            <p className="font-bold">{clientName}</p>
+            {resourceLabel && <p className="text-[10px]">{resourceLabel}</p>}
+            {choice.serviceChoices?.map((sc) => (
+              <div key={sc.id} className="flex justify-between">
+                <span>{sc.service?.title || `#${sc.serviceId}`}</span>
+                {sc.service?.basePrice != null && (
+                  <span>{sc.quantity} x {Number(sc.service.basePrice).toFixed(2)} {currency}</span>
+                )}
+              </div>
+            ))}
+            {choice.serviceChoices?.filter((sc) => sc.note).map((sc) => (
+              <p key={`note-${sc.id}`} className="text-[10px] italic">* {sc.note}</p>
+            ))}
+            {personTotal > 0 && (
+              <div className="flex justify-between font-bold border-t border-dotted mt-1 pt-1">
+                <span>{t.guests.total}</span>
+                <span>{personTotal.toFixed(2)} {currency}</span>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ============================================
+// Compact Receipt No Price (80mm thermal, without prices)
+// ============================================
+export function CompactReceiptNoPrice({
   tourInfo,
   choices,
   orgName,
@@ -148,11 +226,8 @@ export function CompactReceipt({
             <p className="font-bold">{clientName}</p>
             {resourceLabel && <p className="text-[10px]">{resourceLabel}</p>}
             {choice.serviceChoices?.map((sc) => (
-              <div key={sc.id} className="flex justify-between">
-                <span>{sc.service?.title || `#${sc.serviceId}`}</span>
-                {sc.service?.basePrice != null && (
-                  <span>{sc.quantity} x {Number(sc.service.basePrice).toFixed(2)} {getCurrencySymbol(sc.service?.currency)}</span>
-                )}
+              <div key={sc.id}>
+                <span>{sc.quantity > 1 ? `${sc.quantity} x ` : ''}{sc.service?.title || `#${sc.serviceId}`}</span>
               </div>
             ))}
             {choice.serviceChoices?.filter((sc) => sc.note).map((sc) => (
@@ -226,10 +301,10 @@ export function DetailedListReceipt({
   }
 
   const serviceSeatMap = new Map<string, { seats: string[]; color: string }>();
-  const serviceTableMap = new Map<string, { tables: string[]; color: string }>();
+  const serviceTableCountMap = new Map<string, { tableCounts: Map<string, number>; color: string }>();
   for (const choice of sortedChoices) {
     const seatLabel = getResourceLabel(choice);
-    const tableLabel = getTableLabel(choice);
+    const tableName = getTableResourceName(choice);
     for (const sc of choice.serviceChoices || []) {
       const title = (sc.service?.title || `#${sc.serviceId}`).toUpperCase();
       if (!serviceSeatMap.has(title)) {
@@ -239,12 +314,12 @@ export function DetailedListReceipt({
       const label = seatLabel || `#${choice.clientId}`;
       if (!entry.seats.includes(label)) entry.seats.push(label);
 
-      if (tableLabel) {
-        if (!serviceTableMap.has(title)) {
-          serviceTableMap.set(title, { tables: [], color: globalFoodColorMap.get(title) || '#e2e8f0' });
+      if (tableName) {
+        if (!serviceTableCountMap.has(title)) {
+          serviceTableCountMap.set(title, { tableCounts: new Map(), color: globalFoodColorMap.get(title) || '#e2e8f0' });
         }
-        const tableEntry = serviceTableMap.get(title)!;
-        if (!tableEntry.tables.includes(tableLabel)) tableEntry.tables.push(tableLabel);
+        const tableEntry = serviceTableCountMap.get(title)!;
+        tableEntry.tableCounts.set(tableName, (tableEntry.tableCounts.get(tableName) || 0) + (sc.quantity || 1));
       }
     }
   }
@@ -329,9 +404,9 @@ export function DetailedListReceipt({
         </div>
       )}
 
-      {serviceTableMap.size > 0 && (
+      {serviceTableCountMap.size > 0 && (
         <div style={{ marginTop: '1.5rem' }}>
-          {Array.from(serviceTableMap.entries()).map(([title, { tables, color }]) => (
+          {Array.from(serviceTableCountMap.entries()).map(([title, { tableCounts, color }]) => (
             <div
               key={title}
               style={{
@@ -342,8 +417,10 @@ export function DetailedListReceipt({
               }}
             >
               <span style={{ fontWeight: 'bold', minWidth: 'fit-content' }}>{title}</span>
-              <span style={{ color: '#64748b' }}>{t.guests.serviceTables}:</span>
-              <span style={{ fontWeight: 500 }}>{tables.join(', ')}</span>
+              <span style={{ color: '#64748b' }}>=</span>
+              <span style={{ fontWeight: 500 }}>
+                {Array.from(tableCounts.entries()).map(([table, count]) => `${table} (${count})`).join(', ')}
+              </span>
             </div>
           ))}
         </div>
@@ -501,6 +578,93 @@ export function ReceiptTableServices({
 }
 
 // ============================================
+// Service Summary Receipt (standalone page)
+// ============================================
+export function ServiceSummaryReceipt({
+  tourInfo,
+  serviceSummary,
+  orgName,
+  t,
+}: {
+  tourInfo: ReceiptTourInfo;
+  serviceSummary: AgencyStopServiceSummaryDto | null | undefined;
+  orgName: string;
+  t: T;
+}) {
+  if (!serviceSummary?.services?.length) {
+    return (
+      <div style={{ fontSize: '0.875rem', maxWidth: '210mm' }}>
+        <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+          <h2 style={{ fontWeight: 'bold', fontSize: '1.25rem', margin: '0 0 4px 0' }}>{orgName}</h2>
+          {tourInfo.agencyName && <p style={{ margin: '2px 0', fontWeight: 600 }}>{tourInfo.agencyName}</p>}
+          <p style={{ margin: '2px 0' }}>{tourInfo.tourName} — {formatShortDateTime(tourInfo.stopStartDate || tourInfo.startDate)} - {formatShortDateTime(tourInfo.stopEndDate)}</p>
+          <p style={{ margin: '2px 0', fontSize: '0.75rem', color: '#64748b' }}>{t.guests.printedAt}: {new Date().toLocaleString()}</p>
+        </div>
+        <p style={{ textAlign: 'center', color: '#64748b', padding: '2rem 0' }}>{t.guests.noChoices}</p>
+      </div>
+    );
+  }
+
+  const currSymbol = getCurrencySymbol(serviceSummary.currency || serviceSummary.services[0]?.currency);
+  const systemCommissionRate = (serviceSummary as Record<string, unknown>).systemCommissionRate;
+  const systemCommissionAmount = (serviceSummary as Record<string, unknown>).systemCommissionAmount;
+
+  return (
+    <div style={{ fontSize: '0.875rem', maxWidth: '210mm' }}>
+      <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+        <h2 style={{ fontWeight: 'bold', fontSize: '1.25rem', margin: '0 0 4px 0' }}>{orgName}</h2>
+        {tourInfo.agencyName && <p style={{ margin: '2px 0', fontWeight: 600 }}>{tourInfo.agencyName}</p>}
+        <p style={{ margin: '2px 0' }}>{tourInfo.tourName} — {formatShortDateTime(tourInfo.stopStartDate || tourInfo.startDate)} - {formatShortDateTime(tourInfo.stopEndDate)}</p>
+        <p style={{ margin: '2px 0', fontSize: '0.75rem', color: '#64748b' }}>{t.guests.printedAt}: {new Date().toLocaleString()}</p>
+      </div>
+      <h3 style={{ fontWeight: 'bold', fontSize: '0.95rem', marginBottom: '0.5rem' }}>{t.guests.serviceSummary}</h3>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+        <thead>
+          <tr>
+            <th style={{ border: '1px solid #999', padding: '6px 8px', textAlign: 'left', backgroundColor: '#e2e8f0', fontWeight: 'bold' }}>{t.guests.service}</th>
+            <th style={{ border: '1px solid #999', padding: '6px 8px', textAlign: 'center', backgroundColor: '#e2e8f0', fontWeight: 'bold' }}>{t.guests.quantity}</th>
+            <th style={{ border: '1px solid #999', padding: '6px 8px', textAlign: 'right', backgroundColor: '#e2e8f0', fontWeight: 'bold' }}>{t.tours.unitPrice}</th>
+            <th style={{ border: '1px solid #999', padding: '6px 8px', textAlign: 'right', backgroundColor: '#e2e8f0', fontWeight: 'bold' }}>{t.tours.totalPrice}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {serviceSummary.services.map((item, idx) => (
+            <tr key={idx}>
+              <td style={{ border: '1px solid #ccc', padding: '5px 8px' }}>{item.serviceName || item.service?.title || ''}</td>
+              <td style={{ border: '1px solid #ccc', padding: '5px 8px', textAlign: 'center' }}>{item.totalQuantity}</td>
+              <td style={{ border: '1px solid #ccc', padding: '5px 8px', textAlign: 'right' }}>{Number(item.unitPrice).toFixed(2)} {currSymbol}</td>
+              <td style={{ border: '1px solid #ccc', padding: '5px 8px', textAlign: 'right', fontWeight: 500 }}>{Number(item.totalPrice).toFixed(2)} {currSymbol}</td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr style={{ borderTop: '2px solid #333' }}>
+            <td colSpan={3} style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 'bold' }}>{t.tours.grandTotal}</td>
+            <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 'bold', fontSize: '1rem' }}>{Number(serviceSummary.grandTotal).toFixed(2)} {currSymbol}</td>
+          </tr>
+          {serviceSummary.commissionRate != null && serviceSummary.commissionAmount != null && (
+            <tr>
+              <td colSpan={3} style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 500, color: '#ea580c' }}>
+                {t.tours.agencyCommission} %{serviceSummary.commissionRate}
+              </td>
+              <td style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 600, color: '#ea580c' }}>{Number(serviceSummary.commissionAmount).toFixed(2)} {currSymbol}</td>
+            </tr>
+          )}
+          {systemCommissionRate != null && systemCommissionAmount != null && (
+            <tr>
+              <td colSpan={3} style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 500, color: '#7c3aed' }}>
+                {t.tours.systemCommission} %{String(systemCommissionRate)}
+              </td>
+              <td style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 600, color: '#7c3aed' }}>{Number(systemCommissionAmount as number).toFixed(2)} {currSymbol}</td>
+            </tr>
+          )}
+        </tfoot>
+      </table>
+    </div>
+  );
+}
+
+// ============================================
 // Service Summary (for print output)
 // ============================================
 export function ReceiptServiceSummary({
@@ -613,6 +777,9 @@ export function handleReceiptPrint(printRef: React.RefObject<HTMLDivElement | nu
     .py-0\\.5 { padding-top: 0.125rem; padding-bottom: 0.125rem; }
     .pb-1 { padding-bottom: 0.25rem; }
     .pl-4 { padding-left: 1rem; }
+    .pt-1 { padding-top: 0.25rem; }
+    .border-t { border-top: 1px solid #ccc; }
+    .border-dotted { border-top-style: dotted; }
     .flex { display: flex; }
     .justify-between { justify-content: space-between; }
     .gap-2 { gap: 0.5rem; }
