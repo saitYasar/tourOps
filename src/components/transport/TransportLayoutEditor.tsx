@@ -140,14 +140,15 @@ export function TransportLayoutEditor({
 
     // 2) Load children for each section (seats with coordinates)
     for (const section of resources) {
-      if (layoutLoadedRef.current.children.has(section.id)) continue;
-
       const existing = childrenCache[section.id];
       const hasCoords = existing?.length && existing.some(c => c.coordinates);
+
       if (hasCoords) {
         layoutLoadedRef.current.children.add(section.id);
         continue;
       }
+
+      if (layoutLoadedRef.current.children.has(section.id) && !existing?.length) continue;
 
       layoutLoadedRef.current.children.add(section.id);
 

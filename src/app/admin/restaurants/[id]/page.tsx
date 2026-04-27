@@ -2618,15 +2618,13 @@ function ResourcesTab({ orgId, categoryId }: { orgId: number; categoryId?: numbe
         const prevHasCoords = prevEntries?.some(e => e.coordinates);
         if (prevHasCoords && computedEntries) {
           if (computedEntries.length === prevEntries.length) {
-            // Same count — keep layout-enriched data
             next[numKey] = prevEntries;
           } else {
-            // Count changed (add/delete) — need to re-fetch layout
             sectionsToRefetch.push(numKey);
+            next[numKey] = prevEntries;
           }
         }
       }
-      // Re-fetch layout data for sections where count changed
       if (sectionsToRefetch.length > 0) {
         for (const sectionId of sectionsToRefetch) {
           resourceApi.getLayout(sectionId, orgId).then((result) => {
@@ -2893,8 +2891,13 @@ function ResourcesTab({ orgId, categoryId }: { orgId: number; categoryId?: numbe
           if (!isNaN(num) && num > maxSeatNum) maxSeatNum = num;
           const coords = child.coordinates;
           if (coords) {
-            const parts = typeof coords === 'string' ? coords.split(',') : Array.isArray(coords) ? coords : [];
-            const cx = Number(parts[0]) || 0;
+            let cx = 0;
+            if (typeof coords === 'string') {
+              const parts = coords.split(',');
+              if (parts.length === 2) cx = parseFloat(parts[0]) || 0;
+            } else if (Array.isArray(coords) && coords.length === 2) {
+              cx = typeof coords[0] === 'string' ? parseFloat(coords[0]) : Number(coords[0]) || 0;
+            }
             if (cx + 24 > maxOccupiedX) maxOccupiedX = cx + 24;
           }
         }
@@ -2917,6 +2920,11 @@ function ResourcesTab({ orgId, categoryId }: { orgId: number; categoryId?: numbe
           }
         }
         queryClient.invalidateQueries({ queryKey: ['admin-org-resources', orgId] });
+        const layoutResult = await resourceApi.getLayout(form.parentId!, orgId);
+        if (layoutResult.success && layoutResult.data) {
+          const children = Array.isArray(layoutResult.data) ? layoutResult.data : [];
+          setLocalChildrenCache(p => ({ ...p, [form.parentId!]: children }));
+        }
         toast.success(`${totalSeats} ${t.venue.seatUnit} ${t.venue.resourceCreated.toLowerCase()}`);
         closeForm();
       } catch {
