@@ -232,11 +232,11 @@ export default function CustomerDashboard() {
         <div className="max-w-5xl mx-auto px-3 sm:px-6">
           <div className="flex items-center justify-between h-14 sm:h-16">
             {/* Logo */}
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-xl bg-gradient-to-r from-sky-500 to-orange-500">
-                <Compass className="h-5 w-5 text-white" />
+            <div className="flex items-center gap-2.5">
+              <div className="p-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-orange-500 shadow-md">
+                <Compass className="h-6 w-6 text-white" />
               </div>
-              <span className="font-bold text-lg text-slate-800">{t.common.appName}</span>
+              <span className="font-extrabold text-xl text-slate-800">{t.common.appName}</span>
             </div>
 
             {/* Nav Tabs */}
@@ -325,11 +325,11 @@ export default function CustomerDashboard() {
               </div>
               <Button
                 variant="ghost"
-                size="icon"
                 onClick={() => setLogoutOpen(true)}
-                className="text-slate-500 hover:text-red-600 h-8 w-8 sm:h-9 sm:w-9"
+                className="text-slate-500 hover:text-red-600 hover:bg-red-50 h-8 sm:h-9 px-2 sm:px-3 gap-1.5 text-xs sm:text-sm"
               >
                 <LogOut className="h-4 w-4" />
+                <span>{t.auth.logout}</span>
               </Button>
               <ConfirmDialog
                 open={logoutOpen}

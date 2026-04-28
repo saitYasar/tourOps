@@ -122,9 +122,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (!user && !isPublicPath) {
       // Giris yapilmamis ve public olmayan sayfa
-      // Admin sayfasi icin admin login'e, digerleri icin normal login'e yonlendir
       if (isAdminPath) {
         router.replace('/login/admin');
+      } else if (isCustomerPath) {
+        router.replace('/login/customer');
       } else {
         router.replace('/login');
       }
