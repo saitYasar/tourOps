@@ -2897,8 +2897,6 @@ function ResourcesTab({ orgId, categoryId }: { orgId: number; categoryId?: numbe
             if (typeof coords === 'string') {
               const parts = coords.split(',');
               if (parts.length === 2) cx = parseFloat(parts[0]) || 0;
-            } else if (Array.isArray(coords) && coords.length === 2) {
-              cx = typeof coords[0] === 'string' ? parseFloat(coords[0]) : Number(coords[0]) || 0;
             }
             if (cx + 24 > maxOccupiedX) maxOccupiedX = cx + 24;
           }
