@@ -26,6 +26,7 @@ export interface TransportLayoutEditorProps {
   onOpenSectionCreateForm: (resourceTypeId: number) => void;
   onOpenEditForm: (resource: ResourceDto) => void;
   onDeleteRequest: (target: { id: number; name: string }) => void;
+  onBulkDeleteRequest?: (sectionId: number, seats: ResourceDto[]) => void;
   onChildrenCacheUpdate: (updater: (prev: Record<number, ResourceDto[]>) => Record<number, ResourceDto[]>) => void;
   apiAdapter?: {
     update: (id: number, data: UpdateResourceDto) => Promise<{ success: boolean; data?: ResourceDto; error?: string }>;
@@ -70,6 +71,7 @@ export function TransportLayoutEditor({
   onOpenSectionCreateForm,
   onOpenEditForm,
   onDeleteRequest,
+  onBulkDeleteRequest,
   onChildrenCacheUpdate,
   apiAdapter,
 }: TransportLayoutEditorProps) {
@@ -222,6 +224,17 @@ export function TransportLayoutEditor({
       return next;
     });
   }, [resources]);
+
+  // Clear stale seat selection when children change (e.g. after bulk delete)
+  useEffect(() => {
+    if (selectedSeatIds.size === 0 || !selectedSectionId) return;
+    const children = childrenCache[selectedSectionId] || [];
+    const childIds = new Set(children.map(c => c.id));
+    const stillValid = new Set([...selectedSeatIds].filter(id => childIds.has(id)));
+    if (stillValid.size !== selectedSeatIds.size) {
+      setSelectedSeatIds(stillValid);
+    }
+  }, [childrenCache, selectedSectionId, selectedSeatIds]);
 
   // ── Global mouse handlers for drag/resize/seat-drag/pan/select-rect ──
   useEffect(() => {
@@ -429,35 +442,56 @@ export function TransportLayoutEditor({
   return (
     <div className="mt-4 space-y-2">
       {/* Toolbar: actions + zoom */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          {/* Koltuk Ekle */}
-          {selectedSectionId && (() => {
-            const seatType = resourceTypes.find((rt) => rt.code === 'transport_seat');
-            if (!seatType) return null;
-            return (
-              <Button size="sm" variant="outline" onClick={() => onOpenCreateForm(selectedSectionId, seatType.id)}>
-                <Plus className="h-4 w-4 mr-1" />
-                {seatType.name} {t.venue.addSuffix}
-              </Button>
-            );
-          })()}
-          {/* Obje Ekle */}
-          {selectedSectionId && objectType && (
-            <Button size="sm" variant="outline" onClick={() => onOpenCreateForm(selectedSectionId, objectType.id)}>
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Koltuk Ekle */}
+        {selectedSectionId && (() => {
+          const seatType = resourceTypes.find((rt) => rt.code === 'transport_seat');
+          if (!seatType) return null;
+          return (
+            <Button size="sm" variant="outline" onClick={() => onOpenCreateForm(selectedSectionId, seatType.id)}>
               <Plus className="h-4 w-4 mr-1" />
-              {objectType.name} {t.venue.addSuffix}
+              <span className="hidden sm:inline">{seatType.name} {t.venue.addSuffix}</span>
+              <span className="sm:hidden">{seatType.name}</span>
             </Button>
-          )}
-          {/* Bölüm Ekle */}
-          {rootType && (
-            <Button size="sm" onClick={() => onOpenSectionCreateForm(rootType.id)}>
-              <Plus className="h-4 w-4 mr-1" />
-              {rootType.name} {t.venue.addSuffix}
-            </Button>
-          )}
-        </div>
-        <div className="flex items-center gap-1">
+          );
+        })()}
+        {/* Obje Ekle */}
+        {selectedSectionId && objectType && (
+          <Button size="sm" variant="outline" onClick={() => onOpenCreateForm(selectedSectionId, objectType.id)}>
+            <Plus className="h-4 w-4 mr-1" />
+            <span className="hidden sm:inline">{objectType.name} {t.venue.addSuffix}</span>
+            <span className="sm:hidden">{objectType.name}</span>
+          </Button>
+        )}
+        {/* Bölüm Ekle */}
+        {rootType && (
+          <Button size="sm" onClick={() => onOpenSectionCreateForm(rootType.id)}>
+            <Plus className="h-4 w-4 mr-1" />
+            <span className="hidden sm:inline">{rootType.name} {t.venue.addSuffix}</span>
+            <span className="sm:hidden">{rootType.name}</span>
+          </Button>
+        )}
+        {/* Seçilenleri Sil */}
+        {selectedSectionId && selectedSeatIds.size > 0 && onBulkDeleteRequest && (
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={() => {
+              const children = childrenCache[selectedSectionId] || [];
+              const selectedSeats = children.filter((c) => selectedSeatIds.has(c.id));
+              if (selectedSeats.length > 0) {
+                onBulkDeleteRequest(selectedSectionId, selectedSeats);
+              }
+            }}
+          >
+            <Trash2 className="h-4 w-4 mr-1" />
+            <span className="hidden sm:inline">{t.venue.deleteSelected}</span>
+            <span className="sm:hidden">{t.common.delete}</span>
+            {' '}({selectedSeatIds.size})
+          </Button>
+        )}
+        {/* Zoom — pushed to end */}
+        <div className="flex items-center gap-1 ml-auto">
           <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCanvasZoom((prev) => Math.min(3, prev + 0.2))} title={t.venue.zoomIn}>
             <ZoomIn className="h-4 w-4" />
           </Button>
@@ -484,16 +518,16 @@ export function TransportLayoutEditor({
               const children = childrenCache[res.id] || res.children || [];
               const s = sectionStates[res.id];
               return (
-                <div className="flex items-center justify-between border-b px-3 py-2 bg-slate-50">
-                  <div className="flex items-center gap-2">
-                    <Box className="h-4 w-4 text-indigo-500" />
-                    <span className="font-medium text-sm">{res.name}</span>
+                <div className="flex items-center justify-between border-b px-3 py-2 bg-slate-50 min-w-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Box className="h-4 w-4 text-indigo-500 shrink-0" />
+                    <span className="font-medium text-sm truncate">{res.name}</span>
                     {s && (
-                      <Badge variant="outline" className="text-[10px]">
+                      <Badge variant="outline" className="text-[10px] hidden sm:inline-flex">
                         {s.w} × {s.h}
                       </Badge>
                     )}
-                    <span className="text-xs text-slate-400">
+                    <span className="text-xs text-slate-400 shrink-0">
                       ({children.length} {t.venue.totalSeats.toLowerCase()})
                     </span>
                   </div>

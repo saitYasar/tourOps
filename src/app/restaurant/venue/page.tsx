@@ -184,6 +184,8 @@ export default function VenuePage() {
   const [form, setForm] = useState<FormState>(initialForm);
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [bulkDeleteTarget, setBulkDeleteTarget] = useState<{ sectionId: number; seats: ResourceDto[] } | null>(null);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [multipleCreating, setMultipleCreating] = useState(false);
   const [childrenLoaded, setChildrenLoaded] = useState(false);
   const [childrenLoadingInProgress, setChildrenLoadingInProgress] = useState(false);
@@ -889,6 +891,33 @@ export default function VenuePage() {
     setDeleting(false);
   };
 
+  const handleBulkDelete = async () => {
+    if (!bulkDeleteTarget) return;
+    const ids = bulkDeleteTarget.seats.map(s => s.id);
+    setBulkDeleting(true);
+    try {
+      const result = await resourceApi.bulkDelete(ids);
+      if (result.success && result.data) {
+        const { deleted, errors } = result.data;
+        if (deleted.length > 0) {
+          toast.success(`${deleted.length} ${t.venue.bulkDeleteSuccess}`);
+        }
+        if (errors.length > 0) {
+          toast.error(`${errors.length} ${t.venue.bulkDeletePartial}`);
+        }
+      } else {
+        toast.error(result.error || t.venue.deleteError);
+      }
+      queryClient.invalidateQueries({ queryKey: ['resource-layout'] });
+      await refreshChildrenCache(bulkDeleteTarget.sectionId);
+    } catch {
+      toast.error(t.venue.deleteError);
+    } finally {
+      setBulkDeleting(false);
+      setBulkDeleteTarget(null);
+    }
+  };
+
   const isPending = createMutation.isPending || updateMutation.isPending || multipleCreating;
 
   // Get first level type (usually "floor")
@@ -1349,6 +1378,7 @@ export default function VenuePage() {
                     onOpenSectionCreateForm={openSectionCreateForm}
                     onOpenEditForm={openEditForm}
                     onDeleteRequest={(target) => setDeleteTarget(target)}
+                    onBulkDeleteRequest={(sectionId, seats) => setBulkDeleteTarget({ sectionId, seats })}
                     onChildrenCacheUpdate={setChildrenCache}
                   />
                 )}
@@ -1796,6 +1826,20 @@ export default function VenuePage() {
         onConfirm={handleDelete}
         variant="destructive"
         loading={deleting}
+      />
+
+      {/* Bulk Delete Confirm */}
+      <ConfirmDialog
+        open={!!bulkDeleteTarget}
+        onOpenChange={(open) => !open && !bulkDeleting && setBulkDeleteTarget(null)}
+        title={t.venue.bulkDeleteTitle}
+        description={bulkDeleteTarget
+          ? `${t.venue.bulkDeleteDesc}\n\n${bulkDeleteTarget.seats.map(s => s.name).join(', ')}`
+          : ''}
+        confirmLabel={`${t.common.delete} (${bulkDeleteTarget?.seats.length || 0})`}
+        onConfirm={handleBulkDelete}
+        variant="destructive"
+        loading={bulkDeleting}
       />
     </div>
   );
