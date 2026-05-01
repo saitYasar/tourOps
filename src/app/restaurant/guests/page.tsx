@@ -51,7 +51,7 @@ import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import {
   LoadingState, EmptyState, ErrorState,
-  CompactReceipt, CompactReceiptNoPrice, DetailedListReceipt, KitchenSummaryReceipt, ServiceSummaryReceipt, ReceiptTableServices, ReceiptServiceSummary,
+  CompactReceipt, DetailedListReceipt, TableBasedListReceipt, KitchenSummaryReceipt, ServiceSummaryReceipt, ReceiptTableServices, ReceiptServiceSummary,
   handleReceiptPrint, exportReceiptExcel, ChoiceDeadlineCountdown,
 } from '@/components/shared';
 import type { ReceiptTemplate } from '@/components/shared';
@@ -93,6 +93,7 @@ export default function RestaurantGuestsPage() {
   // Receipt dialog
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [receiptTemplate, setReceiptTemplate] = useState<ReceiptTemplate>('compact');
+  const [showPrices, setShowPrices] = useState(true);
 
   // Organization info
   const { data: orgResult } = useQuery({
@@ -729,12 +730,27 @@ export default function RestaurantGuestsPage() {
             <DialogDescription>{t.guests.receiptTemplate}</DialogDescription>
           </DialogHeader>
 
+          {/* Price toggle */}
+          <div className="flex justify-end mb-2">
+            <button
+              type="button"
+              onClick={() => setShowPrices(!showPrices)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors ${
+                showPrices
+                  ? 'bg-green-50 border-green-300 text-green-700'
+                  : 'bg-slate-50 border-slate-300 text-slate-600'
+              }`}
+            >
+              {showPrices ? `💰 ${t.guests.showPrices}` : `🚫 ${t.guests.hidePrices}`}
+            </button>
+          </div>
+
           {/* Template selector */}
           <div className="flex gap-2 mb-4 flex-wrap">
             {([
               { key: 'compact' as ReceiptTemplate, label: t.guests.compactReceipt, desc: t.guests.compactReceiptDesc },
-              { key: 'compact-noprice' as ReceiptTemplate, label: t.guests.compactReceiptNoPrice, desc: t.guests.compactReceiptNoPriceDesc },
               { key: 'detailed' as ReceiptTemplate, label: t.guests.detailedList, desc: t.guests.detailedListDesc },
+              { key: 'table-based' as ReceiptTemplate, label: t.guests.tableBasedList, desc: t.guests.tableBasedListDesc },
               { key: 'kitchen' as ReceiptTemplate, label: t.guests.kitchenSummary, desc: t.guests.kitchenSummaryDesc },
               { key: 'service-summary' as ReceiptTemplate, label: t.guests.serviceSummaryReceipt, desc: t.guests.serviceSummaryReceiptDesc },
             ]).map((tmpl) => (
@@ -759,24 +775,24 @@ export default function RestaurantGuestsPage() {
             {selectedReservation && (
               <>
                 {receiptTemplate === 'compact' && (
-                  <CompactReceipt tourInfo={tourInfo} choices={choices} orgName={orgName} t={t} />
-                )}
-                {receiptTemplate === 'compact-noprice' && (
-                  <CompactReceiptNoPrice tourInfo={tourInfo} choices={choices} orgName={orgName} t={t} />
+                  <CompactReceipt tourInfo={tourInfo} choices={choices} orgName={orgName} t={t} showPrices={showPrices} />
                 )}
                 {receiptTemplate === 'detailed' && (
                   <DetailedListReceipt tourInfo={tourInfo} choices={choices} orgName={orgName} t={t} />
+                )}
+                {receiptTemplate === 'table-based' && (
+                  <TableBasedListReceipt tourInfo={tourInfo} choices={choices} orgName={orgName} t={t} />
                 )}
                 {receiptTemplate === 'kitchen' && (
                   <KitchenSummaryReceipt tourInfo={tourInfo} choices={choices} orgName={orgName} t={t} />
                 )}
                 {receiptTemplate === 'service-summary' && (
-                  <ServiceSummaryReceipt tourInfo={tourInfo} serviceSummary={serviceSummary} orgName={orgName} t={t} />
+                  <ServiceSummaryReceipt tourInfo={tourInfo} serviceSummary={serviceSummary} orgName={orgName} t={t} showPrices={showPrices} />
                 )}
                 {receiptTemplate !== 'service-summary' && (
                   <>
                     <ReceiptTableServices choices={choices} t={t} />
-                    <ReceiptServiceSummary serviceSummary={serviceSummary} t={t} />
+                    <ReceiptServiceSummary serviceSummary={serviceSummary} t={t} showPrices={showPrices} />
                   </>
                 )}
               </>

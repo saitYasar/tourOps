@@ -263,20 +263,22 @@ export default function CustomerDashboard() {
 
             {/* Right actions */}
             <div className="flex items-center gap-1 sm:gap-2">
-              <LanguageSwitcher />
+              <LanguageSwitcher compact />
               <div className="relative" ref={notifRef}>
                 <Button
                   variant="ghost"
-                  size="icon"
-                  className="relative text-slate-500 h-8 w-8 sm:h-9 sm:w-9"
+                  className="relative text-slate-500 h-auto px-2 py-1 flex flex-col items-center gap-0.5"
                   onClick={() => setNotifOpen(!notifOpen)}
                 >
-                  <Bell className="h-4 w-4" />
-                  {clientUnreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center">
-                      {clientUnreadCount > 9 ? '9+' : clientUnreadCount}
-                    </span>
-                  )}
+                  <div className="relative">
+                    <Bell className="h-4 w-4" />
+                    {clientUnreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center">
+                        {clientUnreadCount > 9 ? '9+' : clientUnreadCount}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[10px] leading-tight">{t.notifications.title}</span>
                 </Button>
                 {notifOpen && (
                   <div className="absolute right-0 top-full mt-2 w-72 sm:w-80 bg-white border rounded-lg shadow-lg z-50 max-h-80 sm:max-h-96 overflow-y-auto">
@@ -325,11 +327,11 @@ export default function CustomerDashboard() {
               </div>
               <Button
                 variant="ghost"
-                size="icon"
                 onClick={() => setLogoutOpen(true)}
-                className="text-slate-500 hover:text-red-600 h-8 w-8 sm:h-9 sm:w-9"
+                className="text-slate-500 hover:text-red-600 h-auto px-2 py-1 flex flex-col items-center gap-0.5"
               >
                 <LogOut className="h-4 w-4" />
+                <span className="text-[10px] leading-tight">{t.auth.logout}</span>
               </Button>
               <ConfirmDialog
                 open={logoutOpen}

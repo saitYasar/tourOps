@@ -104,7 +104,7 @@ import {
 import {
   LoadingState, EmptyState, ConfirmDialog, TourStatusBadge, AdminPagination,
   ChoiceDeadlineCountdown,
-  CompactReceipt, CompactReceiptNoPrice, DetailedListReceipt, KitchenSummaryReceipt, ServiceSummaryReceipt, ReceiptTableServices, ReceiptServiceSummary,
+  CompactReceipt, DetailedListReceipt, TableBasedListReceipt, KitchenSummaryReceipt, ServiceSummaryReceipt, ReceiptTableServices, ReceiptServiceSummary,
   handleReceiptPrint, exportReceiptExcel, OrgMenuPreviewDialog,
 } from '@/components/shared';
 import type { ReceiptTemplate } from '@/components/shared';
@@ -174,6 +174,7 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
   const [expandedClientId, setExpandedClientId] = useState<number | null>(null);
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [receiptTemplate, setReceiptTemplate] = useState<ReceiptTemplate>('compact');
+  const [showPrices, setShowPrices] = useState(true);
   const printRef = useRef<HTMLDivElement>(null);
 
   // Lightbox state
@@ -2085,11 +2086,26 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
           <DialogHeader>
             <DialogTitle>{t.guests.printReceipt}</DialogTitle>
           </DialogHeader>
+          {/* Price toggle */}
+          <div className="flex justify-end mb-2">
+            <button
+              type="button"
+              onClick={() => setShowPrices(!showPrices)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors ${
+                showPrices
+                  ? 'bg-green-50 border-green-300 text-green-700'
+                  : 'bg-slate-50 border-slate-300 text-slate-600'
+              }`}
+            >
+              {showPrices ? `💰 ${t.guests.showPrices}` : `🚫 ${t.guests.hidePrices}`}
+            </button>
+          </div>
+
           <div className="flex flex-wrap gap-2 mb-4">
             {([
               { key: 'compact' as ReceiptTemplate, label: t.guests.compactReceipt },
-              { key: 'compact-noprice' as ReceiptTemplate, label: t.guests.compactReceiptNoPrice },
               { key: 'detailed' as ReceiptTemplate, label: t.guests.detailedList },
+              { key: 'table-based' as ReceiptTemplate, label: t.guests.tableBasedList },
               { key: 'kitchen' as ReceiptTemplate, label: t.guests.kitchenSummary },
               { key: 'service-summary' as ReceiptTemplate, label: t.guests.serviceSummaryReceipt },
             ]).map((tmpl) => (
@@ -2105,19 +2121,19 @@ function AgencyToursTab({ agencyId }: { agencyId: number }) {
           </div>
           <div ref={printRef}>
             {receiptTourInfo && receiptTemplate === 'compact' && (
-              <CompactReceipt choices={choicesArr} orgName={choicesOrgName} t={t} tourInfo={receiptTourInfo} />
-            )}
-            {receiptTourInfo && receiptTemplate === 'compact-noprice' && (
-              <CompactReceiptNoPrice choices={choicesArr} orgName={choicesOrgName} t={t} tourInfo={receiptTourInfo} />
+              <CompactReceipt choices={choicesArr} orgName={choicesOrgName} t={t} tourInfo={receiptTourInfo} showPrices={showPrices} />
             )}
             {receiptTourInfo && receiptTemplate === 'detailed' && (
               <DetailedListReceipt choices={choicesArr} orgName={choicesOrgName} t={t} tourInfo={receiptTourInfo} />
+            )}
+            {receiptTourInfo && receiptTemplate === 'table-based' && (
+              <TableBasedListReceipt choices={choicesArr} orgName={choicesOrgName} t={t} tourInfo={receiptTourInfo} />
             )}
             {receiptTourInfo && receiptTemplate === 'kitchen' && (
               <KitchenSummaryReceipt choices={choicesArr} orgName={choicesOrgName} t={t} tourInfo={receiptTourInfo} />
             )}
             {receiptTourInfo && receiptTemplate === 'service-summary' && (
-              <ServiceSummaryReceipt tourInfo={receiptTourInfo} serviceSummary={serviceSummary} orgName={choicesOrgName} t={t} />
+              <ServiceSummaryReceipt tourInfo={receiptTourInfo} serviceSummary={serviceSummary} orgName={choicesOrgName} t={t} showPrices={showPrices} />
             )}
           </div>
           <div className="flex gap-2 justify-end mt-4">
