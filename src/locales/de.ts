@@ -752,6 +752,7 @@ export const de = {
     noLayout: 'Kein Layout gefunden',
     selectTableFirst: 'Bitte wählen Sie zuerst einen Tisch',
     tableSaveError: 'Tischauswahl konnte nicht gespeichert werden',
+    tableSaved: 'Sitzplatzauswahl gespeichert',
     menuUpdateError: 'Menüauswahl konnte nicht aktualisiert werden',
     menuSaveError: 'Menüauswahl konnte nicht gespeichert werden',
     spendLimitExceeded: 'Sie haben das maximale Auswahllimit erreicht. Sie können nur Änderungen innerhalb Ihrer aktuellen Auswahl vornehmen.',

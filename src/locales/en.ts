@@ -752,6 +752,7 @@ export const en = {
     noLayout: 'No layout found',
     selectTableFirst: 'Please select a table first',
     tableSaveError: 'Failed to save table selection',
+    tableSaved: 'Seat selection saved',
     menuUpdateError: 'Failed to update menu selection',
     menuSaveError: 'Failed to save menu selection',
     spendLimitExceeded: 'You have reached the maximum selection limit. You can only make changes among your current selections.',

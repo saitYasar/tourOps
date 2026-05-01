@@ -752,6 +752,7 @@ export const tr = {
     noLayout: 'Yerleşim planı bulunamadı',
     selectTableFirst: 'Önce masa seçmelisiniz',
     tableSaveError: 'Masa seçimi kaydedilemedi',
+    tableSaved: 'Yer seçimi kaydedildi',
     menuUpdateError: 'Menü seçimi güncellenemedi',
     menuSaveError: 'Menü seçimi kaydedilemedi',
     spendLimitExceeded: 'Maksimum seçim limitini doldurdunuz. Yalnızca seçimleriniz arasında değişiklik yapabilirsiniz.',
