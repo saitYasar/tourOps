@@ -2196,11 +2196,9 @@ export default function TourDetailPage() {
                       <CardContent>
                         {choicesLoading ? (
                           <LoadingState message={t.common.loading} />
-                        ) : !stopChoices?.length ? (
-                          <p className="text-sm text-slate-500 text-center py-4">{t.tours.noChoices}</p>
                         ) : (
                           <div className="space-y-2">
-                            {stopChoices.map((choice: AgencyStopChoicesDto, choiceIdx: number) => {
+                            {(stopChoices || []).map((choice: AgencyStopChoicesDto, choiceIdx: number) => {
                               const clientName = choice.client
                                 ? `${choice.client.firstName || ''} ${choice.client.lastName || ''}`.trim()
                                 : choice.clientName || `#${choice.clientId}`;
@@ -2228,7 +2226,7 @@ export default function TourDetailPage() {
                                     </div>
                                     <div className="flex items-center gap-2 shrink-0">
                                       {choice.resourceChoice && (
-                                        <Badge variant="outline" className="text-xs">{t.tours.resource}</Badge>
+                                        <Badge variant="outline" className="text-xs">{t.tours.resourceSelection}</Badge>
                                       )}
                                       {choice.serviceChoices && choice.serviceChoices.length > 0 && (
                                         <Badge variant="secondary" className="text-xs">
@@ -2328,6 +2326,87 @@ export default function TourDetailPage() {
                                 </div>
                               );
                             })}
+
+                            {/* Clients without choices */}
+                            {(() => {
+                              const choiceClientIds = new Set((stopChoices || []).map((c: AgencyStopChoicesDto) => c.clientId ?? c.client?.id));
+                              const confirmedWithoutChoices = (tourClients || []).filter(
+                                (tc: TourClientDto) => tc.status === 'confirmed' && !choiceClientIds.has(tc.clientId)
+                              );
+                              if (confirmedWithoutChoices.length === 0) return null;
+                              return (
+                                <>
+                                  <div className="flex items-center gap-2 mt-4 mb-1">
+                                    <div className="flex-1 border-t border-dashed border-slate-200" />
+                                    <span className="text-xs text-slate-400 shrink-0">{t.tours.noChoicesClients || 'Seçim yapmamış misafirler'}</span>
+                                    <div className="flex-1 border-t border-dashed border-slate-200" />
+                                  </div>
+                                  {confirmedWithoutChoices.map((tc: TourClientDto) => {
+                                    const cName = `${tc.client.firstName || ''} ${tc.client.lastName || ''}`.trim();
+                                    const isExpanded = expandedClientId === tc.clientId;
+                                    return (
+                                      <div key={`no-choice-${tc.clientId}`} className="border border-dashed border-slate-200 rounded-lg overflow-hidden">
+                                        <button
+                                          type="button"
+                                          className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 transition-colors"
+                                          onClick={() => setExpandedClientId(isExpanded ? null : tc.clientId)}
+                                        >
+                                          <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center shrink-0 overflow-hidden">
+                                            {tc.client.profilePhoto ? (
+                                              <img src={tc.client.profilePhoto} alt="" className="w-full h-full object-cover" />
+                                            ) : (
+                                              <UserIcon className="h-4 w-4 text-slate-400" />
+                                            )}
+                                          </div>
+                                          <div className="flex-1 min-w-0 text-left">
+                                            <p className="text-sm font-medium truncate">{cName}</p>
+                                            {tc.client.email && (
+                                              <p className="text-xs text-slate-500">{tc.client.email}</p>
+                                            )}
+                                          </div>
+                                          <Badge variant="outline" className="text-xs text-slate-400 shrink-0">{t.tours.noChoices}</Badge>
+                                          {isExpanded ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
+                                        </button>
+                                        {isExpanded && (
+                                          <div className="border-t px-3 py-3 bg-slate-50 space-y-3">
+                                            <div className="flex items-center justify-between">
+                                              <p className="text-xs font-medium text-slate-500">{t.tours.resource}</p>
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-6 px-2 text-xs gap-1 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  openLayoutEditDialog(choicesStopId!, tc.clientId, cName, false);
+                                                }}
+                                              >
+                                                <Armchair className="h-3 w-3" />
+                                                {t.customer.selectSeat}
+                                              </Button>
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                              <p className="text-xs font-medium text-slate-500">{t.tours.service}</p>
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-6 px-2 text-xs gap-1 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setMenuEditTarget({ stopId: choicesStopId!, clientId: tc.clientId, clientName: cName });
+                                                }}
+                                              >
+                                                <UtensilsCrossed className="h-3 w-3" />
+                                                {t.customer.selectMenuAction}
+                                              </Button>
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </>
+                              );
+                            })()}
                           </div>
                         )}
                       </CardContent>
