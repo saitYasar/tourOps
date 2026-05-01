@@ -2545,6 +2545,8 @@ function ResourcesTab({ orgId, categoryId }: { orgId: number; categoryId?: numbe
   const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set());
   const [form, setForm] = useState<AdminVenueFormState>(adminVenueInitialForm);
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
+  const [bulkDeleteTarget, setBulkDeleteTarget] = useState<{ sectionId: number; seats: ResourceDto[] } | null>(null);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [multipleCreating, setMultipleCreating] = useState(false);
 
   // Queries
@@ -2618,15 +2620,13 @@ function ResourcesTab({ orgId, categoryId }: { orgId: number; categoryId?: numbe
         const prevHasCoords = prevEntries?.some(e => e.coordinates);
         if (prevHasCoords && computedEntries) {
           if (computedEntries.length === prevEntries.length) {
-            // Same count — keep layout-enriched data
             next[numKey] = prevEntries;
           } else {
-            // Count changed (add/delete) — need to re-fetch layout
             sectionsToRefetch.push(numKey);
+            next[numKey] = prevEntries;
           }
         }
       }
-      // Re-fetch layout data for sections where count changed
       if (sectionsToRefetch.length > 0) {
         for (const sectionId of sectionsToRefetch) {
           resourceApi.getLayout(sectionId, orgId).then((result) => {
@@ -2893,8 +2893,11 @@ function ResourcesTab({ orgId, categoryId }: { orgId: number; categoryId?: numbe
           if (!isNaN(num) && num > maxSeatNum) maxSeatNum = num;
           const coords = child.coordinates;
           if (coords) {
-            const parts = typeof coords === 'string' ? coords.split(',') : Array.isArray(coords) ? coords : [];
-            const cx = Number(parts[0]) || 0;
+            let cx = 0;
+            if (typeof coords === 'string') {
+              const parts = coords.split(',');
+              if (parts.length === 2) cx = parseFloat(parts[0]) || 0;
+            }
             if (cx + 24 > maxOccupiedX) maxOccupiedX = cx + 24;
           }
         }
@@ -2917,6 +2920,11 @@ function ResourcesTab({ orgId, categoryId }: { orgId: number; categoryId?: numbe
           }
         }
         queryClient.invalidateQueries({ queryKey: ['admin-org-resources', orgId] });
+        const layoutResult = await resourceApi.getLayout(form.parentId!, orgId);
+        if (layoutResult.success && layoutResult.data) {
+          const children = Array.isArray(layoutResult.data) ? layoutResult.data : [];
+          setLocalChildrenCache(p => ({ ...p, [form.parentId!]: children }));
+        }
         toast.success(`${totalSeats} ${t.venue.seatUnit} ${t.venue.resourceCreated.toLowerCase()}`);
         closeForm();
       } catch {
@@ -2999,6 +3007,37 @@ function ResourcesTab({ orgId, categoryId }: { orgId: number; categoryId?: numbe
       try { await adminApi.deleteOrgResource(orgId, child.id); } catch { /* ignore */ }
     }
     deleteMutation.mutate(deleteTarget.id);
+  };
+
+  const handleBulkDelete = async () => {
+    if (!bulkDeleteTarget) return;
+    const ids = bulkDeleteTarget.seats.map(s => s.id);
+    setBulkDeleting(true);
+    try {
+      const result = await adminApi.bulkDeleteOrgResources(ids);
+      if (result.success && result.data) {
+        const { deleted, errors } = result.data;
+        if (deleted.length > 0) {
+          toast.success(`${deleted.length} ${t.venue.bulkDeleteSuccess}`);
+        }
+        if (errors.length > 0) {
+          toast.error(`${errors.length} ${t.venue.bulkDeletePartial}`);
+        }
+      } else {
+        toast.error(result.error || t.venue.deleteError);
+      }
+      queryClient.invalidateQueries({ queryKey: ['admin-org-resources', orgId] });
+      const layoutResult = await resourceApi.getLayout(bulkDeleteTarget.sectionId, orgId);
+      if (layoutResult.success && layoutResult.data) {
+        const children = Array.isArray(layoutResult.data) ? layoutResult.data : [];
+        setLocalChildrenCache(p => ({ ...p, [bulkDeleteTarget.sectionId]: children }));
+      }
+    } catch {
+      toast.error(t.venue.deleteError);
+    } finally {
+      setBulkDeleting(false);
+      setBulkDeleteTarget(null);
+    }
   };
 
   const isPending = createMutation.isPending || updateMutation.isPending || multipleCreating;
@@ -3262,6 +3301,7 @@ function ResourcesTab({ orgId, categoryId }: { orgId: number; categoryId?: numbe
                 onOpenSectionCreateForm={(typeId) => openCreateForm(null, typeId)}
                 onOpenEditForm={openEditForm}
                 onDeleteRequest={(target) => setDeleteTarget(target)}
+                onBulkDeleteRequest={(sectionId, seats) => setBulkDeleteTarget({ sectionId, seats })}
                 onChildrenCacheUpdate={setLocalChildrenCache}
                 apiAdapter={{
                   update: (id, data) => adminApiAdapter.update(id, data),
@@ -3594,6 +3634,20 @@ function ResourcesTab({ orgId, categoryId }: { orgId: number; categoryId?: numbe
         confirmLabel={t.common.delete}
         onConfirm={handleDelete}
         variant="destructive"
+      />
+
+      {/* Bulk Delete Confirm */}
+      <ConfirmDialog
+        open={!!bulkDeleteTarget}
+        onOpenChange={(open) => !open && !bulkDeleting && setBulkDeleteTarget(null)}
+        title={t.venue.bulkDeleteTitle}
+        description={bulkDeleteTarget
+          ? `${t.venue.bulkDeleteDesc}\n\n${bulkDeleteTarget.seats.map(s => s.name).join(', ')}`
+          : ''}
+        confirmLabel={`${t.common.delete} (${bulkDeleteTarget?.seats.length || 0})`}
+        onConfirm={handleBulkDelete}
+        variant="destructive"
+        loading={bulkDeleting}
       />
     </div>
   );

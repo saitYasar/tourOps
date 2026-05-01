@@ -2991,6 +2991,13 @@ class ApiClient {
     }, lang);
   }
 
+  async bulkDeleteResources(ids: number[], lang: 'tr' | 'en' | 'de' = 'tr') {
+    return this.request<{ deleted: number[]; errors: { id: number; message: string }[] }>('/resources/bulk', {
+      method: 'DELETE',
+      body: JSON.stringify({ ids }),
+    }, lang);
+  }
+
   async moveResource(id: number, newParentId: number | null, lang: 'tr' | 'en' | 'de' = 'tr') {
     return this.request<ResourceDto>(`/resources/${id}/move`, {
       method: 'PUT',
@@ -5657,6 +5664,15 @@ export const resourceApi = {
     }
   },
 
+  async bulkDelete(ids: number[]): Promise<{ success: boolean; data?: { deleted: number[]; errors: { id: number; message: string }[] }; error?: string }> {
+    try {
+      const result = await apiClient.bulkDeleteResources(ids);
+      return { success: true, data: result };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
   // Kaynak taşı
   async move(id: number, newParentId: number | null): Promise<{ success: boolean; error?: string }> {
     try {
@@ -6088,6 +6104,15 @@ export const adminApi = {
     try {
       await apiClient.deleteAdminOrgResource(orgId, resourceId);
       return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async bulkDeleteOrgResources(ids: number[]): Promise<{ success: boolean; data?: { deleted: number[]; errors: { id: number; message: string }[] }; error?: string }> {
+    try {
+      const result = await apiClient.bulkDeleteResources(ids);
+      return { success: true, data: result };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
