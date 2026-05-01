@@ -10,7 +10,7 @@ import type { useLanguage } from '@/contexts/LanguageContext';
 // ============================================
 // Types
 // ============================================
-export type ReceiptTemplate = 'compact' | 'compact-noprice' | 'detailed' | 'kitchen' | 'service-summary';
+export type ReceiptTemplate = 'compact' | 'compact-noprice' | 'detailed' | 'table-based' | 'kitchen' | 'service-summary';
 
 export interface ReceiptTourInfo {
   tourName?: string;
@@ -129,11 +129,13 @@ export function CompactReceipt({
   choices,
   orgName,
   t,
+  showPrices = true,
 }: {
   tourInfo: ReceiptTourInfo;
   choices: AgencyStopChoicesDto[];
   orgName: string;
   t: T;
+  showPrices?: boolean;
 }) {
   return (
     <div className="font-mono text-xs" style={{ width: '80mm' }}>
@@ -155,10 +157,12 @@ export function CompactReceipt({
           : '';
         let personTotal = 0;
         let currency = '';
-        for (const sc of choice.serviceChoices || []) {
-          if (sc.service?.basePrice != null) {
-            personTotal += (sc.quantity || 1) * Number(sc.service.basePrice);
-            if (!currency) currency = getCurrencySymbol(sc.service?.currency);
+        if (showPrices) {
+          for (const sc of choice.serviceChoices || []) {
+            if (sc.service?.basePrice != null) {
+              personTotal += (sc.quantity || 1) * Number(sc.service.basePrice);
+              if (!currency) currency = getCurrencySymbol(sc.service?.currency);
+            }
           }
         }
         return (
@@ -166,9 +170,9 @@ export function CompactReceipt({
             <p className="font-bold">{clientName}</p>
             {resourceLabel && <p className="text-[10px]">{resourceLabel}</p>}
             {choice.serviceChoices?.map((sc) => (
-              <div key={sc.id} className="flex justify-between">
-                <span>{sc.service?.title || `#${sc.serviceId}`}</span>
-                {sc.service?.basePrice != null && (
+              <div key={sc.id} className={showPrices ? 'flex justify-between' : ''}>
+                <span>{sc.quantity > 1 ? `${sc.quantity} x ` : ''}{sc.service?.title || `#${sc.serviceId}`}</span>
+                {showPrices && sc.service?.basePrice != null && (
                   <span>{sc.quantity} x {Number(sc.service.basePrice).toFixed(2)} {currency}</span>
                 )}
               </div>
@@ -176,7 +180,7 @@ export function CompactReceipt({
             {choice.serviceChoices?.filter((sc) => sc.note).map((sc) => (
               <p key={`note-${sc.id}`} className="text-[10px] italic">* {sc.note}</p>
             ))}
-            {personTotal > 0 && (
+            {showPrices && personTotal > 0 && (
               <div className="flex justify-between font-bold border-t border-dotted mt-1 pt-1">
                 <span>{t.guests.total}</span>
                 <span>{personTotal.toFixed(2)} {currency}</span>
@@ -189,56 +193,6 @@ export function CompactReceipt({
   );
 }
 
-// ============================================
-// Compact Receipt No Price (80mm thermal, without prices)
-// ============================================
-export function CompactReceiptNoPrice({
-  tourInfo,
-  choices,
-  orgName,
-  t,
-}: {
-  tourInfo: ReceiptTourInfo;
-  choices: AgencyStopChoicesDto[];
-  orgName: string;
-  t: T;
-}) {
-  return (
-    <div className="font-mono text-xs" style={{ width: '80mm' }}>
-      <div className="text-center border-b border-dashed pb-2 mb-2">
-        <p className="font-bold text-sm">{orgName}</p>
-        {tourInfo.agencyName && <p className="font-semibold">{tourInfo.agencyName}</p>}
-        <p>{tourInfo.tourName}</p>
-        <p>{formatShortDateTime(tourInfo.stopStartDate || tourInfo.startDate)} - {formatShortDateTime(tourInfo.stopEndDate)}</p>
-        <p className="text-[10px] mt-1">{t.guests.printedAt}: {new Date().toLocaleString()}</p>
-      </div>
-      {sortChoicesBySeat(choices).map((choice, idx) => {
-        const clientName = choice.client
-          ? `${choice.client.firstName || ''} ${choice.client.lastName || ''}`.trim()
-          : choice.clientName || `#${choice.clientId}`;
-        const resourceLabel = choice.resourceChoice
-          ? Array.isArray(choice.resourceChoice)
-            ? choice.resourceChoice.map((item: ClientResourceChoiceItemDto) => `${item.resourceTypeName}: ${item.resourceName}`).join(' · ')
-            : (choice.resourceChoice.resource?.name || '')
-          : '';
-        return (
-          <div key={`${choice.clientId}-${idx}`} className="border-b border-dashed py-1.5">
-            <p className="font-bold">{clientName}</p>
-            {resourceLabel && <p className="text-[10px]">{resourceLabel}</p>}
-            {choice.serviceChoices?.map((sc) => (
-              <div key={sc.id}>
-                <span>{sc.quantity > 1 ? `${sc.quantity} x ` : ''}{sc.service?.title || `#${sc.serviceId}`}</span>
-              </div>
-            ))}
-            {choice.serviceChoices?.filter((sc) => sc.note).map((sc) => (
-              <p key={`note-${sc.id}`} className="text-[10px] italic">* {sc.note}</p>
-            ))}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
 // ============================================
 // Detailed List Receipt (A4 landscape table)
@@ -430,6 +384,193 @@ export function DetailedListReceipt({
 }
 
 // ============================================
+// Table Based List Receipt (grouped by table)
+// ============================================
+export function TableBasedListReceipt({
+  tourInfo,
+  choices,
+  orgName,
+  t,
+}: {
+  tourInfo: ReceiptTourInfo;
+  choices: AgencyStopChoicesDto[];
+  orgName: string;
+  t: T;
+}) {
+  const sortedChoices = sortChoicesBySeat(choices);
+  const isTransport = sortedChoices.length > 0 && isTransportChoice(sortedChoices[0]);
+
+  const tableGroups = new Map<string, AgencyStopChoicesDto[]>();
+  for (const choice of sortedChoices) {
+    const tableName = getTableResourceName(choice) || (isTransport ? (getShortTableLabel(choice) || '-') : '-');
+    if (!tableGroups.has(tableName)) tableGroups.set(tableName, []);
+    tableGroups.get(tableName)!.push(choice);
+  }
+
+  const globalFoodColorMap = new Map<string, string>();
+  let globalColorIdx = 0;
+  for (const choice of sortedChoices) {
+    for (const sc of choice.serviceChoices || []) {
+      const title = (sc.service?.title || `#${sc.serviceId}`).toUpperCase();
+      if (!globalFoodColorMap.has(title)) {
+        globalFoodColorMap.set(title, COMBINATION_COLORS[globalColorIdx % COMBINATION_COLORS.length]);
+        globalColorIdx++;
+      }
+    }
+  }
+
+  const handleDownloadTable = (tableName: string, tableChoices: AgencyStopChoicesDto[]) => {
+    const categoryOrderMap = new Map<string, number>();
+    for (const choice of tableChoices) {
+      for (const sc of choice.serviceChoices || []) {
+        const catName = sc.service?.serviceCategoryName || t.guests.uncategorized;
+        if (!categoryOrderMap.has(catName)) categoryOrderMap.set(catName, categoryOrderMap.size);
+      }
+    }
+    const categoryNames = Array.from(categoryOrderMap.keys());
+
+    const rows = tableChoices.map((choice, idx) => {
+      const firstName = (choice.client?.firstName || '').toUpperCase();
+      const lastName = (choice.client?.lastName || '').toUpperCase();
+      const seatLabel = getShortSeatLabel(choice);
+      const categoryMap = new Map<string, string>();
+      for (const sc of choice.serviceChoices || []) {
+        const catName = sc.service?.serviceCategoryName || t.guests.uncategorized;
+        const title = (sc.service?.title || `#${sc.serviceId}`).toUpperCase();
+        const label = sc.quantity > 1 ? `${sc.quantity} ${title}` : title;
+        const existing = categoryMap.get(catName);
+        categoryMap.set(catName, existing ? `${existing}, ${label}` : label);
+      }
+      return { idx: idx + 1, firstName, lastName, seatLabel, categoryMap };
+    });
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const tableHtml = `
+      <html>
+      <head>
+        <title>${tableName}</title>
+        <style>
+          body { font-family: Arial, sans-serif; font-size: 12px; padding: 16px; }
+          h2 { text-align: center; margin-bottom: 4px; }
+          p { text-align: center; margin: 2px 0; color: #64748b; font-size: 11px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+          th { border: 1px solid #999; padding: 6px 8px; background: #e2e8f0; font-weight: bold; text-align: center; }
+          td { border: 1px solid #ccc; padding: 5px 8px; text-align: center; }
+          td.left { text-align: left; }
+          @media print { body { padding: 0; } }
+        </style>
+      </head>
+      <body>
+        <h2>${tableName}</h2>
+        <p>${tourInfo.tourName || ''} — ${formatShortDateTime(tourInfo.stopStartDate || tourInfo.startDate)} - ${formatShortDateTime(tourInfo.stopEndDate)}</p>
+        <p>${tableChoices.length} ${t.guests.person || 'kişi'}</p>
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>${isTransport ? (t.guests.seatNoTransport || 'Koltuk') : t.guests.seatNo}</th>
+              <th>${t.guests.lastName}</th>
+              <th>${t.guests.firstName}</th>
+              ${categoryNames.map(cat => `<th>${cat.toUpperCase()}</th>`).join('')}
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map(row => `
+              <tr>
+                <td>${row.idx}</td>
+                <td>${row.seatLabel}</td>
+                <td class="left" style="font-weight:600">${row.lastName}</td>
+                <td class="left">${row.firstName}</td>
+                ${categoryNames.map(cat => `<td>${row.categoryMap.get(cat) || ''}</td>`).join('')}
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        <script>window.onload = function() { window.print(); }</script>
+      </body>
+      </html>
+    `;
+    printWindow.document.write(tableHtml);
+    printWindow.document.close();
+  };
+
+  // Build per-table service counts
+  const tableServiceMap = new Map<string, { services: Map<string, { count: number; color: string }>; total: number }>();
+  for (const [tableName, tableChoices] of tableGroups.entries()) {
+    const services = new Map<string, { count: number; color: string }>();
+    let total = 0;
+    for (const choice of tableChoices) {
+      for (const sc of choice.serviceChoices || []) {
+        const title = (sc.service?.title || `#${sc.serviceId}`).toUpperCase();
+        const qty = sc.quantity || 1;
+        const existing = services.get(title);
+        if (existing) {
+          existing.count += qty;
+        } else {
+          services.set(title, { count: qty, color: globalFoodColorMap.get(title) || '#e2e8f0' });
+        }
+        total += qty;
+      }
+    }
+    tableServiceMap.set(tableName, { services, total });
+  }
+
+  return (
+    <div style={{ fontSize: '0.875rem' }}>
+      {Array.from(tableGroups.entries()).map(([tableName, tableChoices]) => {
+        const tableData = tableServiceMap.get(tableName);
+        if (!tableData) return null;
+        return (
+          <div
+            key={tableName}
+            style={{
+              border: '1px solid #e2e8f0', borderRadius: '8px', padding: '12px 16px',
+              marginBottom: '12px', backgroundColor: '#fafbfc',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontWeight: 'bold', fontSize: '1rem' }}>{tableName}</span>
+                <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                  ({tableChoices.length} {t.guests.person || 'kişi'})
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleDownloadTable(tableName, tableChoices)}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '4px',
+                  padding: '4px 10px', fontSize: '0.75rem', fontWeight: 500,
+                  border: '1px solid #cbd5e1', borderRadius: '4px',
+                  backgroundColor: '#fff', cursor: 'pointer', color: '#334155',
+                }}
+              >
+                🖨️ {t.guests.print}
+              </button>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+              {Array.from(tableData.services.entries()).map(([title, { count, color }]) => (
+                <span
+                  key={title}
+                  style={{
+                    padding: '3px 8px', borderRadius: '4px', fontSize: '0.8rem',
+                    fontWeight: 500, backgroundColor: color, whiteSpace: 'nowrap',
+                  }}
+                >
+                  {title} × {count}
+                </span>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ============================================
 // Kitchen Summary Receipt
 // ============================================
 export function KitchenSummaryReceipt({
@@ -585,11 +726,13 @@ export function ServiceSummaryReceipt({
   serviceSummary,
   orgName,
   t,
+  showPrices = true,
 }: {
   tourInfo: ReceiptTourInfo;
   serviceSummary: AgencyStopServiceSummaryDto | null | undefined;
   orgName: string;
   t: T;
+  showPrices?: boolean;
 }) {
   if (!serviceSummary?.services?.length) {
     return (
@@ -623,8 +766,8 @@ export function ServiceSummaryReceipt({
           <tr>
             <th style={{ border: '1px solid #999', padding: '6px 8px', textAlign: 'left', backgroundColor: '#e2e8f0', fontWeight: 'bold' }}>{t.guests.service}</th>
             <th style={{ border: '1px solid #999', padding: '6px 8px', textAlign: 'center', backgroundColor: '#e2e8f0', fontWeight: 'bold' }}>{t.guests.quantity}</th>
-            <th style={{ border: '1px solid #999', padding: '6px 8px', textAlign: 'right', backgroundColor: '#e2e8f0', fontWeight: 'bold' }}>{t.tours.unitPrice}</th>
-            <th style={{ border: '1px solid #999', padding: '6px 8px', textAlign: 'right', backgroundColor: '#e2e8f0', fontWeight: 'bold' }}>{t.tours.totalPrice}</th>
+            {showPrices && <th style={{ border: '1px solid #999', padding: '6px 8px', textAlign: 'right', backgroundColor: '#e2e8f0', fontWeight: 'bold' }}>{t.tours.unitPrice}</th>}
+            {showPrices && <th style={{ border: '1px solid #999', padding: '6px 8px', textAlign: 'right', backgroundColor: '#e2e8f0', fontWeight: 'bold' }}>{t.tours.totalPrice}</th>}
           </tr>
         </thead>
         <tbody>
@@ -632,33 +775,35 @@ export function ServiceSummaryReceipt({
             <tr key={idx}>
               <td style={{ border: '1px solid #ccc', padding: '5px 8px' }}>{item.serviceName || item.service?.title || ''}</td>
               <td style={{ border: '1px solid #ccc', padding: '5px 8px', textAlign: 'center' }}>{item.totalQuantity}</td>
-              <td style={{ border: '1px solid #ccc', padding: '5px 8px', textAlign: 'right' }}>{Number(item.unitPrice).toFixed(2)} {currSymbol}</td>
-              <td style={{ border: '1px solid #ccc', padding: '5px 8px', textAlign: 'right', fontWeight: 500 }}>{Number(item.totalPrice).toFixed(2)} {currSymbol}</td>
+              {showPrices && <td style={{ border: '1px solid #ccc', padding: '5px 8px', textAlign: 'right' }}>{Number(item.unitPrice).toFixed(2)} {currSymbol}</td>}
+              {showPrices && <td style={{ border: '1px solid #ccc', padding: '5px 8px', textAlign: 'right', fontWeight: 500 }}>{Number(item.totalPrice).toFixed(2)} {currSymbol}</td>}
             </tr>
           ))}
         </tbody>
-        <tfoot>
-          <tr style={{ borderTop: '2px solid #333' }}>
-            <td colSpan={3} style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 'bold' }}>{t.tours.grandTotal}</td>
-            <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 'bold', fontSize: '1rem' }}>{Number(serviceSummary.grandTotal).toFixed(2)} {currSymbol}</td>
-          </tr>
-          {serviceSummary.commissionRate != null && serviceSummary.commissionAmount != null && (
-            <tr>
-              <td colSpan={3} style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 500, color: '#ea580c' }}>
-                {t.tours.agencyCommission} %{serviceSummary.commissionRate}
-              </td>
-              <td style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 600, color: '#ea580c' }}>{Number(serviceSummary.commissionAmount).toFixed(2)} {currSymbol}</td>
+        {showPrices && (
+          <tfoot>
+            <tr style={{ borderTop: '2px solid #333' }}>
+              <td colSpan={3} style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 'bold' }}>{t.tours.grandTotal}</td>
+              <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 'bold', fontSize: '1rem' }}>{Number(serviceSummary.grandTotal).toFixed(2)} {currSymbol}</td>
             </tr>
-          )}
-          {systemCommissionRate != null && systemCommissionAmount != null && (
-            <tr>
-              <td colSpan={3} style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 500, color: '#7c3aed' }}>
-                {t.tours.systemCommission} %{String(systemCommissionRate)}
-              </td>
-              <td style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 600, color: '#7c3aed' }}>{Number(systemCommissionAmount as number).toFixed(2)} {currSymbol}</td>
-            </tr>
-          )}
-        </tfoot>
+            {serviceSummary.commissionRate != null && serviceSummary.commissionAmount != null && (
+              <tr>
+                <td colSpan={3} style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 500, color: '#ea580c' }}>
+                  {t.tours.agencyCommission} %{serviceSummary.commissionRate}
+                </td>
+                <td style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 600, color: '#ea580c' }}>{Number(serviceSummary.commissionAmount).toFixed(2)} {currSymbol}</td>
+              </tr>
+            )}
+            {systemCommissionRate != null && systemCommissionAmount != null && (
+              <tr>
+                <td colSpan={3} style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 500, color: '#7c3aed' }}>
+                  {t.tours.systemCommission} %{String(systemCommissionRate)}
+                </td>
+                <td style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 600, color: '#7c3aed' }}>{Number(systemCommissionAmount as number).toFixed(2)} {currSymbol}</td>
+              </tr>
+            )}
+          </tfoot>
+        )}
       </table>
     </div>
   );
@@ -670,9 +815,11 @@ export function ServiceSummaryReceipt({
 export function ReceiptServiceSummary({
   serviceSummary,
   t,
+  showPrices = true,
 }: {
   serviceSummary: AgencyStopServiceSummaryDto | null | undefined;
   t: T;
+  showPrices?: boolean;
 }) {
   if (!serviceSummary?.services?.length) return null;
 
@@ -688,8 +835,8 @@ export function ReceiptServiceSummary({
           <tr>
             <th style={{ border: '1px solid #999', padding: '6px 8px', textAlign: 'left', backgroundColor: '#e2e8f0', fontWeight: 'bold' }}>{t.guests.service}</th>
             <th style={{ border: '1px solid #999', padding: '6px 8px', textAlign: 'center', backgroundColor: '#e2e8f0', fontWeight: 'bold' }}>{t.guests.quantity}</th>
-            <th style={{ border: '1px solid #999', padding: '6px 8px', textAlign: 'right', backgroundColor: '#e2e8f0', fontWeight: 'bold' }}>{t.tours.unitPrice}</th>
-            <th style={{ border: '1px solid #999', padding: '6px 8px', textAlign: 'right', backgroundColor: '#e2e8f0', fontWeight: 'bold' }}>{t.tours.totalPrice}</th>
+            {showPrices && <th style={{ border: '1px solid #999', padding: '6px 8px', textAlign: 'right', backgroundColor: '#e2e8f0', fontWeight: 'bold' }}>{t.tours.unitPrice}</th>}
+            {showPrices && <th style={{ border: '1px solid #999', padding: '6px 8px', textAlign: 'right', backgroundColor: '#e2e8f0', fontWeight: 'bold' }}>{t.tours.totalPrice}</th>}
           </tr>
         </thead>
         <tbody>
@@ -697,33 +844,35 @@ export function ReceiptServiceSummary({
             <tr key={idx}>
               <td style={{ border: '1px solid #ccc', padding: '5px 8px' }}>{item.serviceName || item.service?.title || ''}</td>
               <td style={{ border: '1px solid #ccc', padding: '5px 8px', textAlign: 'center' }}>{item.totalQuantity}</td>
-              <td style={{ border: '1px solid #ccc', padding: '5px 8px', textAlign: 'right' }}>{Number(item.unitPrice).toFixed(2)} {currSymbol}</td>
-              <td style={{ border: '1px solid #ccc', padding: '5px 8px', textAlign: 'right', fontWeight: 500 }}>{Number(item.totalPrice).toFixed(2)} {currSymbol}</td>
+              {showPrices && <td style={{ border: '1px solid #ccc', padding: '5px 8px', textAlign: 'right' }}>{Number(item.unitPrice).toFixed(2)} {currSymbol}</td>}
+              {showPrices && <td style={{ border: '1px solid #ccc', padding: '5px 8px', textAlign: 'right', fontWeight: 500 }}>{Number(item.totalPrice).toFixed(2)} {currSymbol}</td>}
             </tr>
           ))}
         </tbody>
-        <tfoot>
-          <tr style={{ borderTop: '2px solid #333' }}>
-            <td colSpan={3} style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 'bold' }}>{t.tours.grandTotal}</td>
-            <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 'bold', fontSize: '1rem' }}>{Number(serviceSummary.grandTotal).toFixed(2)} {currSymbol}</td>
-          </tr>
-          {serviceSummary.commissionRate != null && serviceSummary.commissionAmount != null && (
-            <tr>
-              <td colSpan={3} style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 500, color: '#ea580c' }}>
-                {t.tours.agencyCommission} %{serviceSummary.commissionRate}
-              </td>
-              <td style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 600, color: '#ea580c' }}>{Number(serviceSummary.commissionAmount).toFixed(2)} {currSymbol}</td>
+        {showPrices && (
+          <tfoot>
+            <tr style={{ borderTop: '2px solid #333' }}>
+              <td colSpan={3} style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 'bold' }}>{t.tours.grandTotal}</td>
+              <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 'bold', fontSize: '1rem' }}>{Number(serviceSummary.grandTotal).toFixed(2)} {currSymbol}</td>
             </tr>
-          )}
-          {systemCommissionRate != null && systemCommissionAmount != null && (
-            <tr>
-              <td colSpan={3} style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 500, color: '#7c3aed' }}>
-                {t.tours.systemCommission} %{String(systemCommissionRate)}
-              </td>
-              <td style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 600, color: '#7c3aed' }}>{Number(systemCommissionAmount as number).toFixed(2)} {currSymbol}</td>
-            </tr>
-          )}
-        </tfoot>
+            {serviceSummary.commissionRate != null && serviceSummary.commissionAmount != null && (
+              <tr>
+                <td colSpan={3} style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 500, color: '#ea580c' }}>
+                  {t.tours.agencyCommission} %{serviceSummary.commissionRate}
+                </td>
+                <td style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 600, color: '#ea580c' }}>{Number(serviceSummary.commissionAmount).toFixed(2)} {currSymbol}</td>
+              </tr>
+            )}
+            {systemCommissionRate != null && systemCommissionAmount != null && (
+              <tr>
+                <td colSpan={3} style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 500, color: '#7c3aed' }}>
+                  {t.tours.systemCommission} %{String(systemCommissionRate)}
+                </td>
+                <td style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 600, color: '#7c3aed' }}>{Number(systemCommissionAmount as number).toFixed(2)} {currSymbol}</td>
+              </tr>
+            )}
+          </tfoot>
+        )}
       </table>
     </div>
   );

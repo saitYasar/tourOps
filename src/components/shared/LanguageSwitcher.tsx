@@ -20,9 +20,10 @@ const flags: Record<Locale, string> = {
 
 interface LanguageSwitcherProps {
   variant?: 'default' | 'dark';
+  compact?: boolean;
 }
 
-export function LanguageSwitcher({ variant = 'default' }: LanguageSwitcherProps) {
+export function LanguageSwitcher({ variant = 'default', compact = false }: LanguageSwitcherProps) {
   const { locale, setLocale } = useLanguage();
 
   return (
@@ -30,20 +31,26 @@ export function LanguageSwitcher({ variant = 'default' }: LanguageSwitcherProps)
       <DropdownMenuTrigger asChild>
         <Button
           variant="outline"
-          size="sm"
+          size={compact ? 'icon' : 'sm'}
           className={cn(
-            'gap-1.5',
+            compact ? 'h-7 w-7' : 'gap-1.5',
             variant === 'dark' && 'bg-slate-800 border-slate-600 text-white hover:bg-slate-700 hover:text-white'
           )}
         >
-          <Globe className="h-4 w-4" />
-          <span className="font-medium">{flags[locale]}</span>
-          <span className={cn(
-            'text-xs hidden sm:inline',
-            variant === 'dark' ? 'text-slate-400' : 'text-slate-500'
-          )}>
-            {localeNames[locale]}
-          </span>
+          {compact ? (
+            <span className="text-xs font-medium">{flags[locale]}</span>
+          ) : (
+            <>
+              <Globe className="h-4 w-4" />
+              <span className="font-medium">{flags[locale]}</span>
+              <span className={cn(
+                'text-xs hidden sm:inline',
+                variant === 'dark' ? 'text-slate-400' : 'text-slate-500'
+              )}>
+                {localeNames[locale]}
+              </span>
+            </>
+          )}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-40">
