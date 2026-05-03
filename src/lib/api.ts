@@ -4145,6 +4145,22 @@ class ApiClient {
     }, lang);
   }
 
+  async createAdminResourceChoice(stopId: number, clientId: number, data: CreateResourceChoiceDto, lang: 'tr' | 'en' | 'de' = 'tr') {
+    return this.request<ClientResourceChoiceDto>(`/admin/tour-stops/${stopId}/clients/${clientId}/resource-choice`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }, lang);
+  }
+
+  async updateAdminResourceChoice(stopId: number, clientId: number, data: CreateResourceChoiceDto, lang: 'tr' | 'en' | 'de' = 'tr') {
+    return this.request<ClientResourceChoiceDto>(`/admin/tour-stops/${stopId}/clients/${clientId}/resource-choice`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }, lang);
+  }
+
   // ============================================
   // Tour Stop - Public
   // ============================================
@@ -4499,6 +4515,22 @@ class ApiClient {
 
   async updateAgencyServiceChoice(serviceChoiceId: number, data: UpdateServiceChoiceDto, lang: 'tr' | 'en' | 'de' = 'tr') {
     return this.request<ClientServiceChoiceDto>(`/tour-stops/service-choices/${serviceChoiceId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }, lang);
+  }
+
+  async createAgencyResourceChoice(stopId: number, clientId: number, data: CreateResourceChoiceDto, lang: 'tr' | 'en' | 'de' = 'tr') {
+    return this.request<ClientResourceChoiceDto>(`/tour-stops/${stopId}/clients/${clientId}/resource-choice`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }, lang);
+  }
+
+  async updateAgencyResourceChoice(stopId: number, clientId: number, data: CreateResourceChoiceDto, lang: 'tr' | 'en' | 'de' = 'tr') {
+    return this.request<ClientResourceChoiceDto>(`/tour-stops/${stopId}/clients/${clientId}/resource-choice`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -5573,6 +5605,24 @@ export const agencyApi = {
       return { success: false, error: (error as Error).message };
     }
   },
+
+  async createResourceChoiceForClient(stopId: number, clientId: number, data: CreateResourceChoiceDto, lang: 'tr' | 'en' | 'de' = 'tr') {
+    try {
+      const response = await apiClient.createAgencyResourceChoice(stopId, clientId, data, lang);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async updateResourceChoiceForClient(stopId: number, clientId: number, data: CreateResourceChoiceDto, lang: 'tr' | 'en' | 'de' = 'tr') {
+    try {
+      const response = await apiClient.updateAgencyResourceChoice(stopId, clientId, data, lang);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
 };
 
 // ============================================
@@ -6609,6 +6659,24 @@ export const adminApi = {
   async updateServiceChoiceForClient(serviceChoiceId: number, data: UpdateServiceChoiceDto, lang: 'tr' | 'en' | 'de' = 'tr') {
     try {
       const response = await apiClient.updateAdminServiceChoice(serviceChoiceId, data, lang);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async createResourceChoiceForClient(stopId: number, clientId: number, data: CreateResourceChoiceDto, lang: 'tr' | 'en' | 'de' = 'tr') {
+    try {
+      const response = await apiClient.createAdminResourceChoice(stopId, clientId, data, lang);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  async updateResourceChoiceForClient(stopId: number, clientId: number, data: CreateResourceChoiceDto, lang: 'tr' | 'en' | 'de' = 'tr') {
+    try {
+      const response = await apiClient.updateAdminResourceChoice(stopId, clientId, data, lang);
       return { success: true, data: response };
     } catch (error) {
       return { success: false, error: (error as Error).message };

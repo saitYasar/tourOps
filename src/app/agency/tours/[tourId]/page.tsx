@@ -46,6 +46,7 @@ import {
   FileSpreadsheet,
   Download,
   UtensilsCrossed,
+  Armchair,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -53,8 +54,10 @@ import dynamic from 'next/dynamic';
 
 import { tourApi, tourStopApi, apiClient, agencyApi } from '@/lib/api';
 import { getCurrencySymbol } from '@/lib/utils';
-import type { ApiTourDto, ApiTourStopDto, CreateTourStopPayload, UpdateTourPayload, ServiceRequestDto, OrganizationPublicDto, TourClientDto, AgencyClientDto, AgencyStopChoicesDto, AgencyStopServiceSummaryDto, CategoryDto, LocationDto, CreateAgencyClientDto, ClientStopMenuCategoryDto, ClientStopMenuServiceDto, ClientServiceChoiceDto, ClientStopChoicesDto, SelectionLimit, ClientResourceChoiceItemDto } from '@/lib/api';
+import type { ApiTourDto, ApiTourStopDto, CreateTourStopPayload, UpdateTourPayload, ServiceRequestDto, OrganizationPublicDto, TourClientDto, AgencyClientDto, AgencyStopChoicesDto, AgencyStopServiceSummaryDto, CategoryDto, LocationDto, CreateAgencyClientDto, ClientStopMenuCategoryDto, ClientStopMenuServiceDto, ClientServiceChoiceDto, ClientStopChoicesDto, SelectionLimit, ClientResourceChoiceItemDto, ResourceDto } from '@/lib/api';
 import { ServiceDetailDialog } from '@/components/shared/ServiceDetailDialog';
+import { CustomerVenueSelector } from '@/components/customer/CustomerVenueSelector';
+import { StopVenuePreview } from '@/components/customer/StopVenuePreview';
 import { formatDate, formatShortDateTime } from '@/lib/dateUtils';
 
 // UTC ISO string'i datetime-local input formatına (yerel saat) çevirir
@@ -290,6 +293,15 @@ export default function TourDetailPage() {
   const [menuNotes, setMenuNotes] = useState<Record<number, string>>({});
   const [menuInitialQty, setMenuInitialQty] = useState<Record<number, number>>({});
   const menuNoteTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  // Layout (resource choice) edit dialog state
+  const [layoutEditTarget, setLayoutEditTarget] = useState<{ stopId: number; clientId: number; clientName: string; hasExisting: boolean } | null>(null);
+  const [layoutChildrenCache, setLayoutChildrenCache] = useState<Record<number, ResourceDto[]>>({});
+  const [layoutLoadingChildren, setLayoutLoadingChildren] = useState(false);
+  const [layoutSaving, setLayoutSaving] = useState(false);
+  const [layoutPendingChair, setLayoutPendingChair] = useState<ResourceDto | null>(null);
+  const [layoutExistingResourceId, setLayoutExistingResourceId] = useState<number | undefined>(undefined);
+  const [layoutNavigateToTableId, setLayoutNavigateToTableId] = useState<number | null>(null);
 
   const refreshTab = (tab: string) => {
     setRefreshingTab(tab);
@@ -550,7 +562,103 @@ export default function TourDetailPage() {
     queryClient.invalidateQueries({ queryKey: ['agency-stop-service-summary', choicesStopId, apiLang] });
   }, [queryClient, choicesStopId, apiLang]);
 
-  // Note: layout endpoint is client-only (/client/tours/stops/{stopId}/layout), not available for agencies
+  // Layout edit: fetch layout for the stop
+  const { data: layoutEditData, isLoading: layoutEditLoading, error: layoutEditError } = useQuery({
+    queryKey: ['agency-stop-layout', layoutEditTarget?.stopId, apiLang],
+    queryFn: () => apiClient.getStopLayout(layoutEditTarget!.stopId, undefined, apiLang),
+    enabled: !!layoutEditTarget,
+    retry: false,
+  });
+
+  const layoutFloors: ResourceDto[] = (() => {
+    if (!layoutEditData) return [];
+    const arr = Array.isArray(layoutEditData) ? layoutEditData : (layoutEditData as unknown as { data?: ResourceDto[] })?.data ?? [];
+    return (Array.isArray(arr) ? arr : []).filter((r: ResourceDto) => !r.parentId);
+  })();
+
+  const layoutFetchChildren = useCallback(async (parentId: number, force = false) => {
+    if (!force && layoutChildrenCache[parentId]) return;
+    if (!layoutEditTarget) return;
+    setLayoutLoadingChildren(true);
+    try {
+      const result = await apiClient.getStopLayout(layoutEditTarget.stopId, parentId, apiLang);
+      const children = Array.isArray(result) ? result : (result as unknown as { data?: ResourceDto[] })?.data ?? [];
+      setLayoutChildrenCache(prev => ({ ...prev, [parentId]: Array.isArray(children) ? children : [] }));
+    } catch {
+      setLayoutChildrenCache(prev => ({ ...prev, [parentId]: [] }));
+    } finally {
+      setLayoutLoadingChildren(false);
+    }
+  }, [layoutChildrenCache, layoutEditTarget, apiLang]);
+
+  const layoutFindParentNames = useCallback((chairId: number): { floorName: string; roomName: string; tableName: string } => {
+    const activeStop = layoutEditTarget?.stopId ? stops?.find((s: ApiTourStopDto) => s.id === layoutEditTarget.stopId) : null;
+    if (activeStop?.organization?.categoryId === 2) {
+      for (const section of layoutFloors) {
+        const seats = layoutChildrenCache[section.id] ?? [];
+        if (seats.some(s => s.id === chairId)) {
+          const seat = seats.find(s => s.id === chairId);
+          return { floorName: section.name, roomName: '', tableName: seat?.name || '' };
+        }
+      }
+      return { floorName: '', roomName: '', tableName: '' };
+    }
+    for (const floor of layoutFloors) {
+      const rooms = layoutChildrenCache[floor.id] ?? [];
+      for (const room of rooms) {
+        const tables = layoutChildrenCache[room.id] ?? [];
+        for (const table of tables) {
+          const chairs = layoutChildrenCache[table.id] ?? [];
+          if (chairs.some(c => c.id === chairId)) {
+            return { floorName: floor.name, roomName: room.name, tableName: table.name };
+          }
+        }
+      }
+    }
+    return { floorName: '', roomName: '', tableName: '' };
+  }, [layoutFloors, layoutChildrenCache, layoutEditTarget, stops]);
+
+  const handleLayoutSelectChair = useCallback(async (chair: ResourceDto, skipConfirm = false) => {
+    if (!layoutEditTarget) return;
+    const hasExisting = layoutEditTarget.hasExisting;
+    if (hasExisting && !skipConfirm && layoutExistingResourceId !== chair.id) {
+      setLayoutPendingChair(chair);
+      return;
+    }
+    setLayoutSaving(true);
+    try {
+      if (hasExisting) {
+        const result = await agencyApi.updateResourceChoiceForClient(layoutEditTarget.stopId, layoutEditTarget.clientId, { resourceId: chair.id }, apiLang);
+        if (!result.success) { toast.error(result.error || t.customer.tableSaveError); return; }
+      } else {
+        const result = await agencyApi.createResourceChoiceForClient(layoutEditTarget.stopId, layoutEditTarget.clientId, { resourceId: chair.id }, apiLang);
+        if (!result.success) { toast.error(result.error || t.customer.tableSaveError); return; }
+      }
+      toast.success(t.customer.tableSaved || 'Yer seçimi kaydedildi');
+      closeLayoutEditDialog();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t.customer.tableSaveError);
+    } finally {
+      setLayoutSaving(false);
+    }
+  }, [layoutEditTarget, layoutExistingResourceId, apiLang, t]);
+
+  const openLayoutEditDialog = useCallback((stopId: number, clientId: number, clientName: string, hasExisting: boolean, existingResourceId?: number) => {
+    setLayoutEditTarget({ stopId, clientId, clientName, hasExisting });
+    setLayoutChildrenCache({});
+    setLayoutPendingChair(null);
+    setLayoutExistingResourceId(existingResourceId);
+    setLayoutNavigateToTableId(null);
+  }, []);
+
+  const closeLayoutEditDialog = useCallback(() => {
+    setLayoutEditTarget(null);
+    setLayoutChildrenCache({});
+    setLayoutPendingChair(null);
+    setLayoutExistingResourceId(undefined);
+    setLayoutNavigateToTableId(null);
+    queryClient.invalidateQueries({ queryKey: ['agency-stop-choices', choicesStopId, apiLang] });
+  }, [queryClient, choicesStopId, apiLang]);
 
   // Auto-select first stop in choices tab
   useEffect(() => {
@@ -2100,11 +2208,9 @@ export default function TourDetailPage() {
                       <CardContent>
                         {choicesLoading ? (
                           <LoadingState message={t.common.loading} />
-                        ) : !stopChoices?.length ? (
-                          <p className="text-sm text-slate-500 text-center py-4">{t.tours.noChoices}</p>
                         ) : (
                           <div className="space-y-2">
-                            {stopChoices.map((choice: AgencyStopChoicesDto, choiceIdx: number) => {
+                            {(stopChoices || []).map((choice: AgencyStopChoicesDto, choiceIdx: number) => {
                               const clientName = choice.client
                                 ? `${choice.client.firstName || ''} ${choice.client.lastName || ''}`.trim()
                                 : choice.clientName || `#${choice.clientId}`;
@@ -2132,7 +2238,7 @@ export default function TourDetailPage() {
                                     </div>
                                     <div className="flex items-center gap-2 shrink-0">
                                       {choice.resourceChoice && (
-                                        <Badge variant="outline" className="text-xs">{t.tours.resource}</Badge>
+                                        <Badge variant="outline" className="text-xs">{t.tours.resourceSelection}</Badge>
                                       )}
                                       {choice.serviceChoices && choice.serviceChoices.length > 0 && (
                                         <Badge variant="secondary" className="text-xs">
@@ -2146,17 +2252,42 @@ export default function TourDetailPage() {
                                   {isExpanded && (
                                     <div className="border-t px-3 py-3 bg-slate-50 space-y-3">
                                       {/* Resource choice */}
-                                      {choice.resourceChoice && (
-                                        <div>
-                                          <p className="text-xs font-medium text-slate-500 mb-1">{t.tours.resource}</p>
+                                      <div>
+                                        <div className="flex items-center justify-between mb-1">
+                                          <p className="text-xs font-medium text-slate-500">{t.tours.resource}</p>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-6 px-2 text-xs gap-1 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              const cId = choice.clientId ?? choice.client?.id;
+                                              if (!cId) return;
+                                              const cName = choice.client
+                                                ? `${choice.client.firstName || ''} ${choice.client.lastName || ''}`.trim()
+                                                : choice.clientName || `#${cId}`;
+                                              const hasExisting = !!choice.resourceChoice;
+                                              const existingResId = !Array.isArray(choice.resourceChoice) && choice.resourceChoice?.resourceId
+                                                ? choice.resourceChoice.resourceId
+                                                : undefined;
+                                              openLayoutEditDialog(choicesStopId!, cId, cName, hasExisting, existingResId);
+                                            }}
+                                          >
+                                            <Armchair className="h-3 w-3" />
+                                            {choice.resourceChoice ? t.customer.changeTable : t.customer.selectSeat}
+                                          </Button>
+                                        </div>
+                                        {choice.resourceChoice ? (
                                           <div className="text-sm bg-white rounded p-2 border">
                                             {Array.isArray(choice.resourceChoice)
                                               ? choice.resourceChoice.map((item) => `${item.resourceTypeName}: ${item.resourceName}`).join(' · ')
                                               : (choice.resourceChoice.resource?.name || `#${choice.resourceChoice.resourceId}`)
                                             }
                                           </div>
-                                        </div>
-                                      )}
+                                        ) : (
+                                          <p className="text-xs text-slate-400">{t.tours.noChoices}</p>
+                                        )}
+                                      </div>
 
                                       {/* Service choices */}
                                       <div>
@@ -2207,6 +2338,87 @@ export default function TourDetailPage() {
                                 </div>
                               );
                             })}
+
+                            {/* Clients without choices */}
+                            {(() => {
+                              const choiceClientIds = new Set((stopChoices || []).map((c: AgencyStopChoicesDto) => c.clientId ?? c.client?.id));
+                              const confirmedWithoutChoices = (tourClients || []).filter(
+                                (tc: TourClientDto) => tc.status === 'confirmed' && !choiceClientIds.has(tc.clientId)
+                              );
+                              if (confirmedWithoutChoices.length === 0) return null;
+                              return (
+                                <>
+                                  <div className="flex items-center gap-2 mt-4 mb-1">
+                                    <div className="flex-1 border-t border-dashed border-slate-200" />
+                                    <span className="text-xs text-slate-400 shrink-0">{t.tours.noChoicesClients || 'Seçim yapmamış misafirler'}</span>
+                                    <div className="flex-1 border-t border-dashed border-slate-200" />
+                                  </div>
+                                  {confirmedWithoutChoices.map((tc: TourClientDto) => {
+                                    const cName = `${tc.client.firstName || ''} ${tc.client.lastName || ''}`.trim();
+                                    const isExpanded = expandedClientId === tc.clientId;
+                                    return (
+                                      <div key={`no-choice-${tc.clientId}`} className="border border-dashed border-slate-200 rounded-lg overflow-hidden">
+                                        <button
+                                          type="button"
+                                          className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 transition-colors"
+                                          onClick={() => setExpandedClientId(isExpanded ? null : tc.clientId)}
+                                        >
+                                          <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center shrink-0 overflow-hidden">
+                                            {tc.client.profilePhoto ? (
+                                              <img src={tc.client.profilePhoto} alt="" className="w-full h-full object-cover" />
+                                            ) : (
+                                              <UserIcon className="h-4 w-4 text-slate-400" />
+                                            )}
+                                          </div>
+                                          <div className="flex-1 min-w-0 text-left">
+                                            <p className="text-sm font-medium truncate">{cName}</p>
+                                            {tc.client.email && (
+                                              <p className="text-xs text-slate-500">{tc.client.email}</p>
+                                            )}
+                                          </div>
+                                          <Badge variant="outline" className="text-xs text-slate-400 shrink-0">{t.tours.noChoices}</Badge>
+                                          {isExpanded ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
+                                        </button>
+                                        {isExpanded && (
+                                          <div className="border-t px-3 py-3 bg-slate-50 space-y-3">
+                                            <div className="flex items-center justify-between">
+                                              <p className="text-xs font-medium text-slate-500">{t.tours.resource}</p>
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-6 px-2 text-xs gap-1 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  openLayoutEditDialog(choicesStopId!, tc.clientId, cName, false);
+                                                }}
+                                              >
+                                                <Armchair className="h-3 w-3" />
+                                                {t.customer.selectSeat}
+                                              </Button>
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                              <p className="text-xs font-medium text-slate-500">{t.tours.service}</p>
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-6 px-2 text-xs gap-1 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setMenuEditTarget({ stopId: choicesStopId!, clientId: tc.clientId, clientName: cName });
+                                                }}
+                                              >
+                                                <UtensilsCrossed className="h-3 w-3" />
+                                                {t.customer.selectMenuAction}
+                                              </Button>
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </>
+                              );
+                            })()}
                           </div>
                         )}
                       </CardContent>
@@ -3470,6 +3682,82 @@ export default function TourDetailPage() {
               t={t}
               onSave={closeMenuEditDialog}
             />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Layout (Resource Choice) Edit Dialog */}
+      <Dialog open={!!layoutEditTarget} onOpenChange={(open) => { if (!open) closeLayoutEditDialog(); }}>
+        <DialogContent className="sm:max-w-4xl max-h-[95vh] sm:max-h-[90vh] w-[95vw] sm:w-auto flex flex-col">
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle className="flex items-center gap-2">
+              <Armchair className="h-5 w-5 text-orange-500" />
+              {layoutEditTarget?.clientName} — {layoutEditTarget?.hasExisting ? t.customer.changeTable : t.customer.selectSeat}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto pr-1">
+            {layoutEditLoading ? (
+              <LoadingState message={t.common.loading} />
+            ) : layoutEditError ? (
+              <div className="text-center py-8">
+                <p className="text-red-500">{(layoutEditError as Error).message}</p>
+              </div>
+            ) : layoutFloors.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-slate-500">{t.customer.noLayout}</p>
+              </div>
+            ) : (
+              <>
+                <StopVenuePreview
+                  stopId={layoutEditTarget!.stopId}
+                  floors={layoutFloors}
+                  childrenCache={layoutChildrenCache}
+                  categoryId={stops?.find((s: ApiTourStopDto) => s.id === layoutEditTarget!.stopId)?.organization?.categoryId}
+                  onTableSelect={(tableResourceId) => {
+                    setLayoutNavigateToTableId(tableResourceId);
+                    setTimeout(() => {
+                      document.getElementById('agency-venue-selector')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }, 200);
+                  }}
+                />
+                <div id="agency-venue-selector" />
+                <CustomerVenueSelector
+                  floors={layoutFloors}
+                  childrenCache={layoutChildrenCache}
+                  loadingChildren={layoutLoadingChildren}
+                  fetchChildren={layoutFetchChildren}
+                  onSelectChair={handleLayoutSelectChair}
+                  savingTable={layoutSaving}
+                  existingResourceId={layoutExistingResourceId}
+                  pendingChairId={layoutPendingChair?.id}
+                  currentClientId={layoutEditTarget?.clientId}
+                  navigateToTableId={layoutNavigateToTableId}
+                  categoryId={stops?.find((s: ApiTourStopDto) => s.id === layoutEditTarget!.stopId)?.organization?.categoryId}
+                />
+              </>
+            )}
+          </div>
+
+          {layoutPendingChair && (
+            <div className="flex-shrink-0 border-t bg-amber-50 rounded-b-lg -mx-6 -mb-6 px-6 py-4">
+              <p className="text-sm font-semibold text-amber-800 mb-1">{t.customer.seatChangeTitle}</p>
+              <p className="text-sm text-amber-700 mb-3">{t.customer.confirmSeatChange}</p>
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" size="sm" onClick={() => setLayoutPendingChair(null)}>
+                  {t.common.cancel}
+                </Button>
+                <Button size="sm" className="bg-orange-500 hover:bg-orange-600" onClick={() => {
+                  if (layoutPendingChair) {
+                    const chair = layoutPendingChair;
+                    setLayoutPendingChair(null);
+                    handleLayoutSelectChair(chair, true);
+                  }
+                }}>
+                  {t.common.confirm}
+                </Button>
+              </div>
+            </div>
           )}
         </DialogContent>
       </Dialog>

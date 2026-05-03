@@ -507,16 +507,23 @@ export function CustomerVenueSelector({
                 {normObjects.map(obj => (
                   <div
                     key={obj.id}
-                    className="absolute rounded border border-slate-200 flex items-center justify-center overflow-hidden"
+                    className="group/obj absolute flex items-center justify-center"
                     style={{
                       left: obj.nx,
                       top: obj.ny,
                       width: Math.max(seatSize, obj.w * scaleX),
                       height: Math.max(seatSize, obj.h * scaleY),
-                      backgroundColor: obj.color || '#f1f5f9',
                     }}
                   >
-                    <span className="text-[9px] font-semibold text-slate-600 text-center leading-tight px-0.5 truncate">
+                    <div
+                      className="w-full h-full rounded border border-slate-200 flex items-center justify-center overflow-hidden"
+                      style={{ backgroundColor: obj.color || '#f1f5f9' }}
+                    >
+                      <span className="text-[9px] font-semibold text-slate-600 text-center leading-tight px-0.5 truncate">
+                        {obj.name}
+                      </span>
+                    </div>
+                    <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap text-[9px] font-semibold px-1.5 py-0.5 rounded shadow-sm z-20 transition-opacity opacity-0 group-hover/obj:opacity-100 bg-slate-700 text-white pointer-events-none">
                       {obj.name}
                     </span>
                   </div>
