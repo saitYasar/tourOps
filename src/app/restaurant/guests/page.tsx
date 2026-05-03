@@ -93,7 +93,8 @@ export default function RestaurantGuestsPage() {
   // Receipt dialog
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [receiptTemplate, setReceiptTemplate] = useState<ReceiptTemplate>('compact');
-  const [showPrices, setShowPrices] = useState(true);
+  const [showPrices, setShowPrices] = useState(false);
+  const [receiptFilter, setReceiptFilter] = useState('');
 
   // Organization info
   const { data: orgResult } = useQuery({
@@ -213,7 +214,18 @@ export default function RestaurantGuestsPage() {
     handleReceiptPrint(printRef, receiptTemplate);
   }, [receiptTemplate]);
 
-  const tourInfo = selectedReservation ? { tourName: selectedReservation.tour?.tourName, startDate: selectedReservation.tour?.startDate } : { tourName: '', startDate: '' };
+  const tourInfo = selectedReservation ? { tourName: selectedReservation.tour?.tourName, agencyName: (selectedReservation as any).tour?.agency?.name || (selectedReservation as any).agency?.name || '', startDate: selectedReservation.tour?.startDate } : { tourName: '', startDate: '' };
+  const filteredChoices = receiptFilter.trim()
+    ? choices.filter((c) => {
+        const q = receiptFilter.trim().toLowerCase();
+        const name = `${c.client?.firstName || ''} ${c.client?.lastName || ''}`.toLowerCase();
+        const clientId = String(c.clientId);
+        const seatLabel = c.resourceChoice && Array.isArray(c.resourceChoice)
+          ? (c.resourceChoice as any[]).map((r) => r.resourceName || '').join(' ').toLowerCase()
+          : '';
+        return name.includes(q) || clientId.includes(q) || seatLabel.includes(q);
+      })
+    : choices;
 
   const handleExportExcel = useCallback(() => {
     if (!selectedReservation) return;
@@ -730,18 +742,25 @@ export default function RestaurantGuestsPage() {
             <DialogDescription>{t.guests.receiptTemplate}</DialogDescription>
           </DialogHeader>
 
-          {/* Price toggle */}
-          <div className="flex justify-end mb-2">
+          {/* Filter and price toggle */}
+          <div className="flex items-center gap-2 mb-2">
+            <input
+              type="text"
+              value={receiptFilter}
+              onChange={(e) => setReceiptFilter(e.target.value)}
+              placeholder={t.common.search || 'Ara...'}
+              className="flex-1 px-3 py-1.5 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-slate-400"
+            />
             <button
               type="button"
               onClick={() => setShowPrices(!showPrices)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors ${
+              className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors whitespace-nowrap ${
                 showPrices
                   ? 'bg-green-50 border-green-300 text-green-700'
                   : 'bg-slate-50 border-slate-300 text-slate-600'
               }`}
             >
-              {showPrices ? `💰 ${t.guests.showPrices}` : `🚫 ${t.guests.hidePrices}`}
+              {showPrices ? t.guests.showPrices : t.guests.hidePrices}
             </button>
           </div>
 
@@ -775,23 +794,23 @@ export default function RestaurantGuestsPage() {
             {selectedReservation && (
               <>
                 {receiptTemplate === 'compact' && (
-                  <CompactReceipt tourInfo={tourInfo} choices={choices} orgName={orgName} t={t} showPrices={showPrices} />
+                  <CompactReceipt tourInfo={tourInfo} choices={filteredChoices} orgName={orgName} t={t} showPrices={showPrices} />
                 )}
                 {receiptTemplate === 'detailed' && (
-                  <DetailedListReceipt tourInfo={tourInfo} choices={choices} orgName={orgName} t={t} />
+                  <DetailedListReceipt tourInfo={tourInfo} choices={filteredChoices} orgName={orgName} t={t} showPrices={showPrices} />
                 )}
                 {receiptTemplate === 'table-based' && (
-                  <TableBasedListReceipt tourInfo={tourInfo} choices={choices} orgName={orgName} t={t} />
+                  <TableBasedListReceipt tourInfo={tourInfo} choices={filteredChoices} orgName={orgName} t={t} showPrices={showPrices} />
                 )}
                 {receiptTemplate === 'kitchen' && (
-                  <KitchenSummaryReceipt tourInfo={tourInfo} choices={choices} orgName={orgName} t={t} />
+                  <KitchenSummaryReceipt tourInfo={tourInfo} choices={filteredChoices} orgName={orgName} t={t} showPrices={showPrices} />
                 )}
                 {receiptTemplate === 'service-summary' && (
                   <ServiceSummaryReceipt tourInfo={tourInfo} serviceSummary={serviceSummary} orgName={orgName} t={t} showPrices={showPrices} />
                 )}
                 {receiptTemplate !== 'service-summary' && (
                   <>
-                    <ReceiptTableServices choices={choices} t={t} />
+                    <ReceiptTableServices choices={filteredChoices} t={t} showPrices={showPrices} />
                     <ReceiptServiceSummary serviceSummary={serviceSummary} t={t} showPrices={showPrices} />
                   </>
                 )}

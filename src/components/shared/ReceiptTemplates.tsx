@@ -140,8 +140,8 @@ export function CompactReceipt({
   return (
     <div className="font-mono text-xs" style={{ width: '80mm' }}>
       <div className="text-center border-b border-dashed pb-2 mb-2">
-        <p className="font-bold text-sm">{orgName}</p>
-        {tourInfo.agencyName && <p className="font-semibold">{tourInfo.agencyName}</p>}
+        {tourInfo.agencyName && <p className="font-bold text-base">{tourInfo.agencyName}</p>}
+        <p className="font-semibold text-sm">{orgName}</p>
         <p>{tourInfo.tourName}</p>
         <p>{formatShortDateTime(tourInfo.stopStartDate || tourInfo.startDate)} - {formatShortDateTime(tourInfo.stopEndDate)}</p>
         <p className="text-[10px] mt-1">{t.guests.printedAt}: {new Date().toLocaleString()}</p>
@@ -202,11 +202,13 @@ export function DetailedListReceipt({
   choices,
   orgName,
   t,
+  showPrices: _showPrices = true,
 }: {
   tourInfo: ReceiptTourInfo;
   choices: AgencyStopChoicesDto[];
   orgName: string;
   t: T;
+  showPrices?: boolean;
 }) {
   const sortedChoices = sortChoicesBySeat(choices);
   const isTransport = sortedChoices.length > 0 && isTransportChoice(sortedChoices[0]);
@@ -281,8 +283,8 @@ export function DetailedListReceipt({
   return (
     <div style={{ fontSize: '0.875rem', maxWidth: '297mm' }}>
       <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
-        <h2 style={{ fontWeight: 'bold', fontSize: '1.25rem', margin: '0 0 4px 0' }}>{orgName}</h2>
-        {tourInfo.agencyName && <p style={{ margin: '2px 0', fontWeight: 600 }}>{tourInfo.agencyName}</p>}
+        {tourInfo.agencyName && <h2 style={{ fontWeight: 'bold', fontSize: '1.5rem', margin: '0 0 4px 0' }}>{tourInfo.agencyName}</h2>}
+        <p style={{ margin: '2px 0', fontWeight: 600, fontSize: '1rem' }}>{orgName}</p>
         <p style={{ margin: '2px 0' }}>{tourInfo.tourName} — {formatShortDateTime(tourInfo.stopStartDate || tourInfo.startDate)} - {formatShortDateTime(tourInfo.stopEndDate)}</p>
         <p style={{ margin: '2px 0', fontSize: '0.75rem', color: '#64748b' }}>{t.guests.printedAt}: {new Date().toLocaleString()}</p>
       </div>
@@ -391,11 +393,13 @@ export function TableBasedListReceipt({
   choices,
   orgName,
   t,
+  showPrices = true,
 }: {
   tourInfo: ReceiptTourInfo;
   choices: AgencyStopChoicesDto[];
   orgName: string;
   t: T;
+  showPrices?: boolean;
 }) {
   const sortedChoices = sortChoicesBySeat(choices);
   const isTransport = sortedChoices.length > 0 && isTransportChoice(sortedChoices[0]);
@@ -463,6 +467,8 @@ export function TableBasedListReceipt({
         </style>
       </head>
       <body>
+        ${tourInfo.agencyName ? `<h1 style="text-align:center;font-size:22px;margin:0 0 4px 0;font-weight:bold;">${tourInfo.agencyName}</h1>` : ''}
+        <p style="text-align:center;font-size:14px;margin:0 0 8px 0;font-weight:600;">${orgName}</p>
         <h2>${tableName}</h2>
         <p>${tourInfo.tourName || ''} — ${formatShortDateTime(tourInfo.stopStartDate || tourInfo.startDate)} - ${formatShortDateTime(tourInfo.stopEndDate)}</p>
         <p>${tableChoices.length} ${t.guests.person || 'kişi'}</p>
@@ -497,28 +503,38 @@ export function TableBasedListReceipt({
   };
 
   // Build per-table service counts
-  const tableServiceMap = new Map<string, { services: Map<string, { count: number; color: string }>; total: number }>();
+  const tableServiceMap = new Map<string, { services: Map<string, { count: number; color: string; unitPrice: number; currency: string }>; total: number; totalPrice: number }>();
   for (const [tableName, tableChoices] of tableGroups.entries()) {
-    const services = new Map<string, { count: number; color: string }>();
+    const services = new Map<string, { count: number; color: string; unitPrice: number; currency: string }>();
     let total = 0;
+    let totalPrice = 0;
     for (const choice of tableChoices) {
       for (const sc of choice.serviceChoices || []) {
         const title = (sc.service?.title || `#${sc.serviceId}`).toUpperCase();
         const qty = sc.quantity || 1;
+        const price = Number(sc.service?.basePrice) || 0;
+        const currency = sc.service?.currency || '';
         const existing = services.get(title);
         if (existing) {
           existing.count += qty;
         } else {
-          services.set(title, { count: qty, color: globalFoodColorMap.get(title) || '#e2e8f0' });
+          services.set(title, { count: qty, color: globalFoodColorMap.get(title) || '#e2e8f0', unitPrice: price, currency });
         }
         total += qty;
+        totalPrice += qty * price;
       }
     }
-    tableServiceMap.set(tableName, { services, total });
+    tableServiceMap.set(tableName, { services, total, totalPrice });
   }
 
   return (
     <div style={{ fontSize: '0.875rem' }}>
+      <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+        {tourInfo.agencyName && <h2 style={{ fontWeight: 'bold', fontSize: '1.5rem', margin: '0 0 4px 0' }}>{tourInfo.agencyName}</h2>}
+        <p style={{ margin: '2px 0', fontWeight: 600, fontSize: '1rem' }}>{orgName}</p>
+        <p style={{ margin: '2px 0' }}>{tourInfo.tourName} — {formatShortDateTime(tourInfo.stopStartDate || tourInfo.startDate)} - {formatShortDateTime(tourInfo.stopEndDate)}</p>
+        <p style={{ margin: '2px 0', fontSize: '0.75rem', color: '#64748b' }}>{t.guests.printedAt}: {new Date().toLocaleString()}</p>
+      </div>
       {Array.from(tableGroups.entries()).map(([tableName, tableChoices]) => {
         const tableData = tableServiceMap.get(tableName);
         if (!tableData) return null;
@@ -551,7 +567,7 @@ export function TableBasedListReceipt({
               </button>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-              {Array.from(tableData.services.entries()).map(([title, { count, color }]) => (
+              {Array.from(tableData.services.entries()).map(([title, { count, color, unitPrice, currency }]) => (
                 <span
                   key={title}
                   style={{
@@ -560,9 +576,19 @@ export function TableBasedListReceipt({
                   }}
                 >
                   {title} × {count}
+                  {showPrices && unitPrice > 0 && (
+                    <span style={{ marginLeft: '4px', fontSize: '0.7rem', opacity: 0.8 }}>
+                      ({(count * unitPrice).toFixed(2)} {getCurrencySymbol(currency)})
+                    </span>
+                  )}
                 </span>
               ))}
             </div>
+            {showPrices && tableData.totalPrice > 0 && (
+              <div style={{ marginTop: '6px', fontSize: '0.8rem', fontWeight: 600, textAlign: 'right', color: '#334155' }}>
+                {t.guests.total}: {tableData.totalPrice.toFixed(2)} {getCurrencySymbol(Array.from(tableData.services.values())[0]?.currency || '')}
+              </div>
+            )}
           </div>
         );
       })}
@@ -578,11 +604,13 @@ export function KitchenSummaryReceipt({
   choices,
   orgName,
   t,
+  showPrices: _showPrices = true,
 }: {
   tourInfo: ReceiptTourInfo;
   choices: AgencyStopChoicesDto[];
   orgName: string;
   t: T;
+  showPrices?: boolean;
 }) {
   const serviceMap = new Map<string, { name: string; totalQty: number; entries: { seat: string; name: string; qty: number; note?: string }[] }>();
   const serviceOrder: string[] = [];
@@ -611,8 +639,8 @@ export function KitchenSummaryReceipt({
   return (
     <div className="text-sm" style={{ maxWidth: '210mm' }}>
       <div className="text-center mb-4">
-        <h2 className="font-bold text-lg">{orgName}</h2>
-        {tourInfo.agencyName && <p className="font-semibold">{tourInfo.agencyName}</p>}
+        {tourInfo.agencyName && <h2 className="font-bold text-xl">{tourInfo.agencyName}</h2>}
+        <p className="font-semibold text-base">{orgName}</p>
         <p>{tourInfo.tourName} — {formatShortDateTime(tourInfo.stopStartDate || tourInfo.startDate)} - {formatShortDateTime(tourInfo.stopEndDate)}</p>
         <p className="text-xs text-slate-500">{t.guests.printedAt}: {new Date().toLocaleString()}</p>
       </div>
@@ -680,12 +708,14 @@ function getTableLabel(choice: AgencyStopChoicesDto): string {
 export function ReceiptTableServices({
   choices,
   t,
+  showPrices = true,
 }: {
   choices: AgencyStopChoicesDto[];
   t: T;
+  showPrices?: boolean;
 }) {
-  // Group services by table label, aggregating quantities
-  const tableMap = new Map<string, Map<string, number>>();
+  // Group services by table label, aggregating quantities and prices
+  const tableMap = new Map<string, Map<string, { qty: number; unitPrice: number; currency: string }>>();
   for (const choice of choices) {
     const tableLabel = getTableLabel(choice);
     if (!tableLabel) continue;
@@ -693,7 +723,13 @@ export function ReceiptTableServices({
     const serviceMap = tableMap.get(tableLabel)!;
     for (const sc of choice.serviceChoices || []) {
       const title = sc.service?.title || `#${sc.serviceId}`;
-      serviceMap.set(title, (serviceMap.get(title) || 0) + (sc.quantity || 1));
+      const qty = sc.quantity || 1;
+      const existing = serviceMap.get(title);
+      if (existing) {
+        existing.qty += qty;
+      } else {
+        serviceMap.set(title, { qty, unitPrice: Number(sc.service?.basePrice) || 0, currency: sc.service?.currency || '' });
+      }
     }
   }
 
@@ -704,16 +740,34 @@ export function ReceiptTableServices({
       <h3 style={{ fontWeight: 'bold', fontSize: '0.95rem', marginBottom: '0.5rem' }}>{t.guests.tableBasedServices}</h3>
       {Array.from(tableMap.entries())
         .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
-        .map(([tableLabel, serviceMap]) => (
-        <div key={tableLabel} style={{ marginBottom: '0.75rem', padding: '8px 12px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '4px' }}>
-          <p style={{ fontWeight: 'bold', fontSize: '0.85rem', marginBottom: '4px' }}>{tableLabel}</p>
-          {Array.from(serviceMap.entries()).map(([title, qty]) => (
-            <p key={title} style={{ fontSize: '0.8rem', margin: '2px 0', paddingLeft: '8px' }}>
-              {title} x{qty}
-            </p>
-          ))}
-        </div>
-      ))}
+        .map(([tableLabel, serviceMap]) => {
+        let tableTotal = 0;
+        let tableCurrency = '';
+        for (const { qty, unitPrice, currency } of serviceMap.values()) {
+          tableTotal += qty * unitPrice;
+          if (!tableCurrency && currency) tableCurrency = currency;
+        }
+        return (
+          <div key={tableLabel} style={{ marginBottom: '0.75rem', padding: '8px 12px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '4px' }}>
+            <p style={{ fontWeight: 'bold', fontSize: '0.85rem', marginBottom: '4px' }}>{tableLabel}</p>
+            {Array.from(serviceMap.entries()).map(([title, { qty, unitPrice, currency }]) => (
+              <p key={title} style={{ fontSize: '0.8rem', margin: '2px 0', paddingLeft: '8px' }}>
+                {title} x{qty}
+                {showPrices && unitPrice > 0 && (
+                  <span style={{ marginLeft: '8px', color: '#475569' }}>
+                    — {(qty * unitPrice).toFixed(2)} {getCurrencySymbol(currency)}
+                  </span>
+                )}
+              </p>
+            ))}
+            {showPrices && tableTotal > 0 && (
+              <p style={{ fontSize: '0.8rem', fontWeight: 600, marginTop: '4px', paddingLeft: '8px', borderTop: '1px solid #e2e8f0', paddingTop: '4px' }}>
+                {t.guests.total}: {tableTotal.toFixed(2)} {getCurrencySymbol(tableCurrency)}
+              </p>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -738,8 +792,8 @@ export function ServiceSummaryReceipt({
     return (
       <div style={{ fontSize: '0.875rem', maxWidth: '210mm' }}>
         <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
-          <h2 style={{ fontWeight: 'bold', fontSize: '1.25rem', margin: '0 0 4px 0' }}>{orgName}</h2>
-          {tourInfo.agencyName && <p style={{ margin: '2px 0', fontWeight: 600 }}>{tourInfo.agencyName}</p>}
+          {tourInfo.agencyName && <h2 style={{ fontWeight: 'bold', fontSize: '1.5rem', margin: '0 0 4px 0' }}>{tourInfo.agencyName}</h2>}
+          <p style={{ margin: '2px 0', fontWeight: 600, fontSize: '1rem' }}>{orgName}</p>
           <p style={{ margin: '2px 0' }}>{tourInfo.tourName} — {formatShortDateTime(tourInfo.stopStartDate || tourInfo.startDate)} - {formatShortDateTime(tourInfo.stopEndDate)}</p>
           <p style={{ margin: '2px 0', fontSize: '0.75rem', color: '#64748b' }}>{t.guests.printedAt}: {new Date().toLocaleString()}</p>
         </div>
@@ -755,8 +809,8 @@ export function ServiceSummaryReceipt({
   return (
     <div style={{ fontSize: '0.875rem', maxWidth: '210mm' }}>
       <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
-        <h2 style={{ fontWeight: 'bold', fontSize: '1.25rem', margin: '0 0 4px 0' }}>{orgName}</h2>
-        {tourInfo.agencyName && <p style={{ margin: '2px 0', fontWeight: 600 }}>{tourInfo.agencyName}</p>}
+        {tourInfo.agencyName && <h2 style={{ fontWeight: 'bold', fontSize: '1.5rem', margin: '0 0 4px 0' }}>{tourInfo.agencyName}</h2>}
+        <p style={{ margin: '2px 0', fontWeight: 600, fontSize: '1rem' }}>{orgName}</p>
         <p style={{ margin: '2px 0' }}>{tourInfo.tourName} — {formatShortDateTime(tourInfo.stopStartDate || tourInfo.startDate)} - {formatShortDateTime(tourInfo.stopEndDate)}</p>
         <p style={{ margin: '2px 0', fontSize: '0.75rem', color: '#64748b' }}>{t.guests.printedAt}: {new Date().toLocaleString()}</p>
       </div>

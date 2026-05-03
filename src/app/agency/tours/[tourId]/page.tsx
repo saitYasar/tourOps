@@ -53,7 +53,7 @@ import dynamic from 'next/dynamic';
 
 import { tourApi, tourStopApi, apiClient, agencyApi } from '@/lib/api';
 import { getCurrencySymbol } from '@/lib/utils';
-import type { ApiTourDto, ApiTourStopDto, CreateTourStopPayload, UpdateTourPayload, ServiceRequestDto, OrganizationPublicDto, TourClientDto, AgencyClientDto, AgencyStopChoicesDto, AgencyStopServiceSummaryDto, CategoryDto, LocationDto, CreateAgencyClientDto, ClientStopMenuCategoryDto, ClientStopMenuServiceDto, ClientServiceChoiceDto, ClientStopChoicesDto, SelectionLimit } from '@/lib/api';
+import type { ApiTourDto, ApiTourStopDto, CreateTourStopPayload, UpdateTourPayload, ServiceRequestDto, OrganizationPublicDto, TourClientDto, AgencyClientDto, AgencyStopChoicesDto, AgencyStopServiceSummaryDto, CategoryDto, LocationDto, CreateAgencyClientDto, ClientStopMenuCategoryDto, ClientStopMenuServiceDto, ClientServiceChoiceDto, ClientStopChoicesDto, SelectionLimit, ClientResourceChoiceItemDto } from '@/lib/api';
 import { ServiceDetailDialog } from '@/components/shared/ServiceDetailDialog';
 import { formatDate, formatShortDateTime } from '@/lib/dateUtils';
 
@@ -279,7 +279,8 @@ export default function TourDetailPage() {
   // Receipt dialog
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [receiptTemplate, setReceiptTemplate] = useState<ReceiptTemplate>('compact');
-  const [showPrices, setShowPrices] = useState(true);
+  const [showPrices, setShowPrices] = useState(false);
+  const [receiptFilter, setReceiptFilter] = useState('');
   const printRef = useRef<HTMLDivElement>(null);
 
   // Menu edit dialog state
@@ -564,12 +565,23 @@ export default function TourDetailPage() {
   const agencyName = agencyResult?.success ? agencyResult.data?.name : undefined;
   const receiptTourInfo = tour ? {
     tourName: tour.tourName,
-    agencyName: agencyName || '',
+    agencyName: agencyName || tour.agency?.name || '',
     startDate: tour.startDate,
     stopStartDate: selectedStop?.scheduledStartTime,
     stopEndDate: selectedStop?.scheduledEndTime,
   } : { tourName: '', startDate: '' };
   const choicesArr = stopChoices || [];
+  const filteredChoices = receiptFilter.trim()
+    ? choicesArr.filter((c: AgencyStopChoicesDto) => {
+        const q = receiptFilter.trim().toLowerCase();
+        const name = `${c.client?.firstName || ''} ${c.client?.lastName || ''}`.toLowerCase();
+        const clientId = String(c.clientId);
+        const seatLabel = c.resourceChoice && Array.isArray(c.resourceChoice)
+          ? (c.resourceChoice as ClientResourceChoiceItemDto[]).map((r) => r.resourceName || '').join(' ').toLowerCase()
+          : '';
+        return name.includes(q) || clientId.includes(q) || seatLabel.includes(q);
+      })
+    : choicesArr;
 
   const handlePrint = useCallback(() => {
     handleReceiptPrint(printRef, receiptTemplate);
@@ -2278,18 +2290,25 @@ export default function TourDetailPage() {
             <DialogDescription>{t.guests.receiptTemplate}</DialogDescription>
           </DialogHeader>
 
-          {/* Price toggle */}
-          <div className="flex justify-end mb-2">
+          {/* Filter and price toggle */}
+          <div className="flex items-center gap-2 mb-2">
+            <input
+              type="text"
+              value={receiptFilter}
+              onChange={(e) => setReceiptFilter(e.target.value)}
+              placeholder={t.common.search || 'Ara...'}
+              className="flex-1 px-3 py-1.5 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-slate-400"
+            />
             <button
               type="button"
               onClick={() => setShowPrices(!showPrices)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors ${
+              className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors whitespace-nowrap ${
                 showPrices
                   ? 'bg-green-50 border-green-300 text-green-700'
                   : 'bg-slate-50 border-slate-300 text-slate-600'
               }`}
             >
-              {showPrices ? `💰 ${t.guests.showPrices}` : `🚫 ${t.guests.hidePrices}`}
+              {showPrices ? t.guests.showPrices : t.guests.hidePrices}
             </button>
           </div>
 
@@ -2320,26 +2339,26 @@ export default function TourDetailPage() {
 
           {/* Receipt preview */}
           <div className="border rounded-lg p-4 bg-white overflow-auto max-h-[50vh]" ref={printRef}>
-            {choicesArr.length > 0 && (
+            {filteredChoices.length > 0 && (
               <>
                 {receiptTemplate === 'compact' && (
-                  <CompactReceipt tourInfo={receiptTourInfo} choices={choicesArr} orgName={choicesOrgName} t={t} showPrices={showPrices} />
+                  <CompactReceipt tourInfo={receiptTourInfo} choices={filteredChoices} orgName={choicesOrgName} t={t} showPrices={showPrices} />
                 )}
                 {receiptTemplate === 'detailed' && (
-                  <DetailedListReceipt tourInfo={receiptTourInfo} choices={choicesArr} orgName={choicesOrgName} t={t} />
+                  <DetailedListReceipt tourInfo={receiptTourInfo} choices={filteredChoices} orgName={choicesOrgName} t={t} showPrices={showPrices} />
                 )}
                 {receiptTemplate === 'table-based' && (
-                  <TableBasedListReceipt tourInfo={receiptTourInfo} choices={choicesArr} orgName={choicesOrgName} t={t} />
+                  <TableBasedListReceipt tourInfo={receiptTourInfo} choices={filteredChoices} orgName={choicesOrgName} t={t} showPrices={showPrices} />
                 )}
                 {receiptTemplate === 'kitchen' && (
-                  <KitchenSummaryReceipt tourInfo={receiptTourInfo} choices={choicesArr} orgName={choicesOrgName} t={t} />
+                  <KitchenSummaryReceipt tourInfo={receiptTourInfo} choices={filteredChoices} orgName={choicesOrgName} t={t} showPrices={showPrices} />
                 )}
                 {receiptTemplate === 'service-summary' && (
                   <ServiceSummaryReceipt tourInfo={receiptTourInfo} serviceSummary={serviceSummary} orgName={choicesOrgName} t={t} showPrices={showPrices} />
                 )}
                 {receiptTemplate !== 'service-summary' && (
                   <>
-                    <ReceiptTableServices choices={choicesArr} t={t} />
+                    <ReceiptTableServices choices={filteredChoices} t={t} showPrices={showPrices} />
                     <ReceiptServiceSummary serviceSummary={serviceSummary} t={t} showPrices={showPrices} />
                   </>
                 )}
