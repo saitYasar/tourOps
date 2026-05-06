@@ -106,7 +106,7 @@ export default function CustomerTourDetailPage() {
   const showCenterToast = useCallback((msg: string) => {
     setCenterToast(msg);
     if (centerToastTimer.current) clearTimeout(centerToastTimer.current);
-    centerToastTimer.current = setTimeout(() => setCenterToast(null), 3000);
+    centerToastTimer.current = setTimeout(() => setCenterToast(null), 4000);
   }, []);
 
   // Children cache for layout hierarchy (floor -> rooms, room -> tables, table -> chairs)
@@ -606,8 +606,8 @@ export default function CustomerTourDetailPage() {
     <div className="min-h-screen bg-gradient-to-br from-sky-50 via-orange-50 to-amber-50">
       {/* Center toast */}
       {centerToast && (
-        <div className="fixed inset-0 flex items-center justify-center z-[9999] pointer-events-none">
-          <div className="bg-red-600 text-white px-5 py-3 rounded-xl shadow-2xl text-sm font-medium flex items-center gap-2 pointer-events-auto animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 flex items-center justify-center z-[9999] pointer-events-none px-4">
+          <div className="bg-red-600 text-white px-4 py-2.5 rounded-xl shadow-2xl text-xs sm:text-sm font-medium flex items-center gap-2 pointer-events-auto animate-in fade-in zoom-in-95 duration-200 max-w-xs sm:max-w-sm text-center">
             <svg className="h-4 w-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
             {centerToast}
           </div>

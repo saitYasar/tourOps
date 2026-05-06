@@ -92,11 +92,7 @@ export function InteractiveMenuCategory({
         )
       )}
 
-      {!collapsed && depth === 0 && limitReached && (
-        <div className="mx-1 mb-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-xs text-red-600 font-medium">{t.customer.categoryLimitReached}</p>
-        </div>
-      )}
+
 
       {!collapsed && category.services && category.services.length > 0 && (
         <div className="space-y-1 mb-3">
@@ -190,7 +186,7 @@ export function InteractiveMenuCategory({
                       <button
                         className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-orange-500 text-white flex items-center justify-center shadow-md hover:bg-orange-600 hover:shadow-lg active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-md transition-all duration-150"
                         onClick={() => setItemQty(stopId, svc.id, qty + 1)}
-                        disabled={isOutOfStock || isStockLimitReached || limitReached}
+                        disabled={isOutOfStock || isStockLimitReached}
                       >
                         <Plus className="h-5 w-5 sm:h-6 sm:w-6" />
                       </button>
