@@ -2828,7 +2828,11 @@ export default function AdminToursPage() {
               getMenuTotal={menuEditGetMenuTotal}
               menuTotalItemCount={menuEditTotalItemCount}
               t={t}
-              onSave={closeMenuEditDialog}
+              onSave={() => {
+                toast.success(t.customer.selectionSaved);
+                queryClient.invalidateQueries({ queryKey: ['admin-stop-choices', choicesStopId, lang] });
+                queryClient.invalidateQueries({ queryKey: ['admin-stop-service-summary', choicesStopId, lang] });
+              }}
             />
           )}
         </DialogContent>

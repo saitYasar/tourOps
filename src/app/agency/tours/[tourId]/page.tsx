@@ -3680,7 +3680,11 @@ export default function TourDetailPage() {
               getMenuTotal={menuEditGetMenuTotal}
               menuTotalItemCount={menuEditTotalItemCount}
               t={t}
-              onSave={closeMenuEditDialog}
+              onSave={() => {
+                toast.success(t.customer.selectionSaved);
+                queryClient.invalidateQueries({ queryKey: ['agency-stop-choices', choicesStopId, apiLang] });
+                queryClient.invalidateQueries({ queryKey: ['agency-stop-service-summary', choicesStopId, apiLang] });
+              }}
             />
           )}
         </DialogContent>
