@@ -251,6 +251,8 @@ export default function TourDetailPage() {
   const [deletePhotoId, setDeletePhotoId] = useState<number | null>(null);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
+  const [pdfShowPhone, setPdfShowPhone] = useState(false);
+  const [pdfShowStatus, setPdfShowStatus] = useState(false);
   const [batchImportOpen, setBatchImportOpen] = useState(false);
   const [whatsappTarget, setWhatsappTarget] = useState<any>(null);
   const [whatsappLang, setWhatsappLang] = useState<Locale>('tr');
@@ -792,11 +794,14 @@ export default function TourDetailPage() {
       const name = c ? `${c.firstName || ''} ${c.lastName || ''}`.trim() : `#${tc.clientId}`;
       const email = c?.email || '-';
       const username = c?.username || '-';
+      const phone = c?.phone ? `+${c.phoneCountryCode || '90'} ${c.phone}` : '-';
       return `<tr>
         <td style="padding:6px 10px;border:1px solid #e2e8f0;text-align:center">${i + 1}</td>
         <td style="padding:6px 10px;border:1px solid #e2e8f0">${name}</td>
         <td style="padding:6px 10px;border:1px solid #e2e8f0">${email}</td>
         <td style="padding:6px 10px;border:1px solid #e2e8f0">${username}</td>
+        ${pdfShowPhone ? `<td style="padding:6px 10px;border:1px solid #e2e8f0">${phone}</td>` : ''}
+        ${pdfShowStatus ? `<td style="padding:6px 10px;border:1px solid #e2e8f0;text-align:center">${tc.status || '-'}</td>` : ''}
       </tr>`;
     }).join('');
     printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${t.invitations.clientList}</title>
@@ -816,6 +821,8 @@ export default function TourDetailPage() {
           <th>${t.invitations.columnClient}</th>
           <th>${t.invitations.columnEmail}</th>
           <th>${t.invitations.columnUsername}</th>
+          ${pdfShowPhone ? `<th>${t.common.phone || 'Telefon'}</th>` : ''}
+          ${pdfShowStatus ? `<th style="text-align:center">${t.invitations.columnStatus}</th>` : ''}
         </tr></thead>
         <tbody>${rows}</tbody>
       </table></body></html>`);
@@ -1819,7 +1826,22 @@ export default function TourDetailPage() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-lg">{t.tours.clients}</CardTitle>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setPdfShowPhone(!pdfShowPhone)}
+                    className={`px-2.5 py-1 text-xs font-medium rounded-md border transition-colors ${pdfShowPhone ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-slate-50 border-slate-200 text-slate-500'}`}
+                  >
+                    <Phone className="h-3 w-3 inline mr-1" />
+                    {t.common.phone || 'Telefon'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPdfShowStatus(!pdfShowStatus)}
+                    className={`px-2.5 py-1 text-xs font-medium rounded-md border transition-colors ${pdfShowStatus ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-slate-50 border-slate-200 text-slate-500'}`}
+                  >
+                    {t.invitations.columnStatus}
+                  </button>
                   <Button variant="outline" size="sm" onClick={() => refreshTab('clients')} disabled={refreshingTab === 'clients'}>
                     <RefreshCw className={`h-4 w-4 mr-1 ${refreshingTab === 'clients' ? 'animate-spin' : ''}`} />
                     Yenile
