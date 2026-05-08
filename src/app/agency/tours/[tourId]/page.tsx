@@ -792,14 +792,11 @@ export default function TourDetailPage() {
       const name = c ? `${c.firstName || ''} ${c.lastName || ''}`.trim() : `#${tc.clientId}`;
       const email = c?.email || '-';
       const username = c?.username || '-';
-      const phone = c?.phone ? `+${c.phoneCountryCode || '90'} ${c.phone}` : '-';
       return `<tr>
         <td style="padding:6px 10px;border:1px solid #e2e8f0;text-align:center">${i + 1}</td>
         <td style="padding:6px 10px;border:1px solid #e2e8f0">${name}</td>
         <td style="padding:6px 10px;border:1px solid #e2e8f0">${email}</td>
         <td style="padding:6px 10px;border:1px solid #e2e8f0">${username}</td>
-        <td style="padding:6px 10px;border:1px solid #e2e8f0">${phone}</td>
-        <td style="padding:6px 10px;border:1px solid #e2e8f0;text-align:center">${tc.status || '-'}</td>
       </tr>`;
     }).join('');
     printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${t.invitations.clientList}</title>
@@ -819,8 +816,6 @@ export default function TourDetailPage() {
           <th>${t.invitations.columnClient}</th>
           <th>${t.invitations.columnEmail}</th>
           <th>${t.invitations.columnUsername}</th>
-          <th>${t.common.phone || 'Telefon'}</th>
-          <th style="text-align:center">${t.invitations.columnStatus}</th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table></body></html>`);

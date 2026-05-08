@@ -347,14 +347,12 @@ export default function AgencyClientsPage() {
     const rows = clients.map((client: AgencyClientDto, i: number) => {
       const tours = clientTourMap.get(client.clientId);
       const tourStr = tours?.join(', ') || '-';
-      const status = client.active ? t.agency.clientActive : t.agency.clientInactive;
       const date = new Date(client.createdAt).toLocaleDateString(locale === 'tr' ? 'tr-TR' : locale === 'de' ? 'de-DE' : 'en-US');
       return `<tr>
         <td style="padding:6px 10px;border:1px solid #e2e8f0;text-align:center">${i + 1}</td>
         <td style="padding:6px 10px;border:1px solid #e2e8f0">${client.client?.firstName || ''} ${client.client?.lastName || ''}</td>
         <td style="padding:6px 10px;border:1px solid #e2e8f0">${client.client?.email || '-'}</td>
         <td style="padding:6px 10px;border:1px solid #e2e8f0">${client.client?.username || '-'}</td>
-        <td style="padding:6px 10px;border:1px solid #e2e8f0;text-align:center">${status}</td>
         <td style="padding:6px 10px;border:1px solid #e2e8f0">${tourStr}</td>
         <td style="padding:6px 10px;border:1px solid #e2e8f0;text-align:center">${date}</td>
       </tr>`;
@@ -379,7 +377,6 @@ export default function AgencyClientsPage() {
           <th>${t.invitations.columnClient}</th>
           <th>${t.invitations.columnEmail}</th>
           <th>${t.invitations.columnUsername}</th>
-          <th style="text-align:center">${t.invitations.columnStatus}</th>
           <th>${t.invitations.columnTour}</th>
           <th style="text-align:center">${t.invitations.columnDate}</th>
         </tr></thead>
