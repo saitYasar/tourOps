@@ -973,7 +973,7 @@ export default function AdminToursPage() {
       </Card>
 
       {/* Tour Detail Dialog */}
-      <Dialog open={!!selectedTourId} onOpenChange={(open) => { if (!open) { setSelectedTourId(null); setExpandedParticipantId(null); setDialogTab('info'); } }}>
+      <Dialog open={!!selectedTourId} onOpenChange={(open) => { if (!open && !menuEditTarget && !layoutEditTarget) { setSelectedTourId(null); setExpandedParticipantId(null); setDialogTab('info'); } }}>
         <DialogContent className="max-w-6xl w-full h-[90vh] flex flex-col overflow-hidden">
           {isDetailLoading ? (
             <div className="flex items-center justify-center py-12">
