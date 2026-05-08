@@ -2786,7 +2786,7 @@ export default function AdminToursPage() {
 
       {/* Menu Edit Dialog */}
       <Dialog open={!!menuEditTarget} onOpenChange={(open) => { if (!open) closeMenuEditDialog(); }}>
-        <DialogContent className="sm:max-w-lg max-h-[95vh] sm:max-h-[85vh] min-h-[60vh] sm:min-h-[50vh] w-[95vw] sm:w-auto flex flex-col">
+        <DialogContent className="sm:max-w-lg max-h-[95vh] sm:max-h-[85vh] min-h-[60vh] sm:min-h-[50vh] w-[95vw] sm:w-auto flex flex-col" onPointerDownOutside={(e) => e.stopPropagation()} onInteractOutside={(e) => e.stopPropagation()}>
           <DialogHeader className="flex-shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <UtensilsCrossed className="h-5 w-5 text-orange-500" />
@@ -2840,7 +2840,7 @@ export default function AdminToursPage() {
 
       {/* Layout (Resource Choice) Edit Dialog */}
       <Dialog open={!!layoutEditTarget} onOpenChange={(open) => { if (!open) closeLayoutEditDialog(); }}>
-        <DialogContent className="sm:max-w-4xl max-h-[95vh] sm:max-h-[90vh] w-[95vw] sm:w-auto flex flex-col">
+        <DialogContent className="sm:max-w-4xl max-h-[95vh] sm:max-h-[90vh] w-[95vw] sm:w-auto flex flex-col" onPointerDownOutside={(e) => e.stopPropagation()} onInteractOutside={(e) => e.stopPropagation()}>
           <DialogHeader className="flex-shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <Armchair className="h-5 w-5 text-orange-500" />
