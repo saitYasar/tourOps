@@ -642,6 +642,7 @@ export const en = {
     subCategories: 'Subcategories',
     preview: 'Preview',
     menuPreview: 'Menu Preview',
+    venuePreview: 'Venue Layout Preview',
     dailyStock: 'Daily Stock',
     stockUnlimited: 'Unlimited',
     stockOut: 'Out of Stock',

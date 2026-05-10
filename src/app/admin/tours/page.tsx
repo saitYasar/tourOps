@@ -96,6 +96,7 @@ import {
 } from '@/components/shared';
 import type { ReceiptTemplate } from '@/components/shared';
 import { AdminStopVenuePreview } from '@/components/admin/AdminStopVenuePreview';
+import { OrgVenuePreviewDialog } from '@/components/admin/OrgVenuePreviewDialog';
 import { CustomerVenueSelector } from '@/components/customer/CustomerVenueSelector';
 import { StopVenuePreview } from '@/components/customer/StopVenuePreview';
 
@@ -196,7 +197,9 @@ export default function AdminToursPage() {
   const [stopMaxSpend, setStopMaxSpend] = useState('');
   const [stopChoiceDeadline, setStopChoiceDeadline] = useState('');
   const [stopSelectionLimits, setStopSelectionLimits] = useState<Record<number, number>>({});
+  const [stopPassiveResources, setStopPassiveResources] = useState<number[]>([]);
   const [menuPreviewOpen, setMenuPreviewOpen] = useState(false);
+  const [venuePreviewOpen, setVenuePreviewOpen] = useState(false);
   const [deleteStopId, setDeleteStopId] = useState<number | null>(null);
   const [rejectStopId, setRejectStopId] = useState<number | null>(null);
   const [rejectReason, setRejectReason] = useState('');
@@ -213,6 +216,8 @@ export default function AdminToursPage() {
   const [editMenuPreviewOpen, setEditMenuPreviewOpen] = useState(false);
   const [editMenuPreviewOrgId, setEditMenuPreviewOrgId] = useState<number | null>(null);
   const [editMenuPreviewOrgName, setEditMenuPreviewOrgName] = useState('');
+  const [editVenuePreviewOpen, setEditVenuePreviewOpen] = useState(false);
+  const [editStopPassiveResources, setEditStopPassiveResources] = useState<number[]>([]);
 
   // Reset page on filter change
   const prevFilters = useRef({ debouncedSearch, statusFilter, agencyFilter, timeFilter, sortBy, sortOrder });
@@ -636,6 +641,7 @@ export default function AdminToursPage() {
       setStopMaxSpend('');
       setStopChoiceDeadline('');
       setStopSelectionLimits({});
+      setStopPassiveResources([]);
       setAddStopOrgSearch('');
     },
     onError: (err: Error) => toast.error(err.message || t.admin.tourStopError),
@@ -739,6 +745,7 @@ export default function AdminToursPage() {
       maxSpendLimit: stopMaxSpend ? Number(stopMaxSpend) : null,
       choiceDeadlineTime: stopChoiceDeadline || undefined,
       ...(limits.length > 0 ? { selectionLimits: limits } : {}),
+      ...(stopPassiveResources.length > 0 ? { passiveResources: stopPassiveResources } : {}),
     });
   };
 
@@ -1521,6 +1528,7 @@ export default function AdminToursPage() {
                                           }
                                           setEditMenuPreviewOrgId(stop.organizationId);
                                           setEditMenuPreviewOrgName(stop.organization?.name || '');
+                                          setEditStopPassiveResources(stop.passiveResources ?? []);
                                         }
                                       }}
                                     >
@@ -1548,16 +1556,28 @@ export default function AdminToursPage() {
                             {/* Inline edit form */}
                             {isEditing && (
                               <div className="mt-3 pt-3 border-t space-y-3">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  className="w-full"
-                                  onClick={() => setEditMenuPreviewOpen(true)}
-                                >
-                                  <Eye className="h-3.5 w-3.5 mr-1.5" />
-                                  {t.menu.menuPreview}
-                                </Button>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="w-full"
+                                    onClick={() => setEditMenuPreviewOpen(true)}
+                                  >
+                                    <Eye className="h-3.5 w-3.5 mr-1.5" />
+                                    {t.menu.menuPreview}
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="w-full"
+                                    onClick={() => setEditVenuePreviewOpen(true)}
+                                  >
+                                    <Building2 className="h-3.5 w-3.5 mr-1.5" />
+                                    {t.menu.venuePreview}
+                                  </Button>
+                                </div>
                                 <div className="space-y-1.5">
                                   <Label className="text-xs">{t.admin.descriptionLabel}</Label>
                                   <Textarea
@@ -1640,6 +1660,7 @@ export default function AdminToursPage() {
                                         maxSpendLimit: editStopMaxSpend ? Number(editStopMaxSpend) : null,
                                         choiceDeadlineTime: editStopChoiceDeadline || undefined,
                                         selectionLimits: editLimits.length > 0 ? editLimits : null,
+                                        passiveResources: editStopPassiveResources.length > 0 ? editStopPassiveResources : null,
                                       };
                                       updateStopMutation.mutate({ stopId: stop.id, data });
                                     }}
@@ -2274,6 +2295,7 @@ export default function AdminToursPage() {
           setStopMaxSpend('');
           setStopChoiceDeadline('');
           setStopSelectionLimits({});
+          setStopPassiveResources([]);
           setAddStopOrgSearch('');
         }
       }}>
@@ -2376,16 +2398,28 @@ export default function AdminToursPage() {
                         </div>
                       )}
                     </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="w-full mt-2"
-                      onClick={() => setMenuPreviewOpen(true)}
-                    >
-                      <Eye className="h-3.5 w-3.5 mr-1.5" />
-                      {t.menu.menuPreview}
-                    </Button>
+                    <div className="grid grid-cols-2 gap-2 mt-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => setMenuPreviewOpen(true)}
+                      >
+                        <Eye className="h-3.5 w-3.5 mr-1.5" />
+                        {t.menu.menuPreview}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => setVenuePreviewOpen(true)}
+                      >
+                        <Building2 className="h-3.5 w-3.5 mr-1.5" />
+                        {t.menu.venuePreview}
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               )}
@@ -2549,6 +2583,27 @@ export default function AdminToursPage() {
             return { ...prev, [catId]: val };
           });
         }}
+      />
+
+      {/* Venue Preview (Add Stop) */}
+      <OrgVenuePreviewDialog
+        open={venuePreviewOpen}
+        onOpenChange={setVenuePreviewOpen}
+        organizationId={selectedOrgDetail?.id}
+        organizationName={selectedOrgDetail?.name}
+        passiveResources={stopPassiveResources}
+        onPassiveResourcesChange={setStopPassiveResources}
+      />
+
+      {/* Venue Preview (Edit Stop) */}
+      <OrgVenuePreviewDialog
+        open={editVenuePreviewOpen}
+        onOpenChange={setEditVenuePreviewOpen}
+        organizationId={editMenuPreviewOrgId}
+        organizationName={editMenuPreviewOrgName}
+        stopId={editingStopId}
+        passiveResources={editStopPassiveResources}
+        onPassiveResourcesChange={setEditStopPassiveResources}
       />
 
       {/* WhatsApp Share Dialog */}

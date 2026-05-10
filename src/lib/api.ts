@@ -455,6 +455,7 @@ export interface ResourceDto {
 
   // Durum
   active: boolean;
+  isPassive?: boolean;
   imageUrl?: string;
 
   // Meta
@@ -1300,6 +1301,7 @@ export interface ApiTourStopDto {
   preReservationStatus?: 'pending' | 'approved' | 'rejected' | null;
   choicesStatus?: 'in_progress' | 'submitted' | 'approved' | 'rejected' | 'revision_requested' | null;
   selectionLimits?: SelectionLimit[] | null;
+  passiveResources?: number[] | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -1459,6 +1461,7 @@ export interface CreateTourStopPayload {
   maxSpendLimit?: number | null;
   choiceDeadlineTime?: string;
   selectionLimits?: SelectionLimit[];
+  passiveResources?: number[];
 }
 
 export interface UpdateTourStopPayload {
@@ -1470,6 +1473,7 @@ export interface UpdateTourStopPayload {
   maxSpendLimit?: number | null;
   choiceDeadlineTime?: string;
   selectionLimits?: SelectionLimit[] | null;
+  passiveResources?: number[] | null;
 }
 
 // ============================================

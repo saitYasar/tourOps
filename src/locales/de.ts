@@ -642,6 +642,7 @@ export const de = {
     subCategories: 'Unterkategorien',
     preview: 'Vorschau',
     menuPreview: 'Menuvorschau',
+    venuePreview: 'Sitzplan-Vorschau',
     dailyStock: 'Tagesbestand',
     stockUnlimited: 'Unbegrenzt',
     stockOut: 'Nicht vorrätig',

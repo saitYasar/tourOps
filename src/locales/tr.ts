@@ -642,6 +642,7 @@ export const tr = {
     subCategories: 'Alt Kategoriler',
     preview: 'Ön İzleme',
     menuPreview: 'Menü Ön İzleme',
+    venuePreview: 'Yer Düzeni Ön İzleme',
     dailyStock: 'Günlük Stok',
     stockUnlimited: 'Sınırsız',
     stockOut: 'Stok Yok',

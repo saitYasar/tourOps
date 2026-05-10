@@ -99,6 +99,15 @@ export function CustomerVenueSelector({
 }: CustomerVenueSelectorProps) {
   const { t } = useLanguage();
 
+  const filteredFloors = useMemo(() => floorResources.filter(r => !r.isPassive), [floorResources]);
+  const filteredCache = useMemo(() => {
+    const result: Record<number, ResourceDto[]> = {};
+    for (const [key, value] of Object.entries(childrenCache)) {
+      result[Number(key)] = value.filter(r => !r.isPassive);
+    }
+    return result;
+  }, [childrenCache]);
+
   // Navigation state: floor → room → table (chairs)
   const [activeFloorId, setActiveFloorId] = useState<number | null>(null);
   const [activeRoomId, setActiveRoomId] = useState<number | null>(null);
@@ -107,26 +116,26 @@ export function CustomerVenueSelector({
 
   // Auto-select first floor/section on mount
   useEffect(() => {
-    if (floorResources.length > 0 && !activeFloorId) {
-      const firstId = floorResources[0].id;
+    if (filteredFloors.length > 0 && !activeFloorId) {
+      const firstId = filteredFloors[0].id;
       setActiveFloorId(firstId);
-      if (!childrenCache[firstId]) {
+      if (!filteredCache[firstId]) {
         fetchChildren(firstId);
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [floorResources]);
+  }, [filteredFloors]);
 
   // Transport: preload ALL sections' children so we can locate existing seat
   useEffect(() => {
-    if (categoryId !== 2 || floorResources.length === 0) return;
-    for (const section of floorResources) {
-      if (!childrenCache[section.id]) {
+    if (categoryId !== 2 || filteredFloors.length === 0) return;
+    for (const section of filteredFloors) {
+      if (!filteredCache[section.id]) {
         fetchChildren(section.id);
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [floorResources, categoryId]);
+  }, [filteredFloors, categoryId]);
 
   // Transport: once children load, switch to the section containing the current user's seat (only on first load)
   const initialSectionSet = useRef(false);
@@ -134,8 +143,8 @@ export function CustomerVenueSelector({
     if (categoryId !== 2 || !currentClientId) return;
     if (initialSectionSet.current) return;
     // Search all sections for a seat belonging to this client
-    for (const section of floorResources) {
-      const children = childrenCache[section.id] ?? [];
+    for (const section of filteredFloors) {
+      const children = filteredCache[section.id] ?? [];
       if (children.some(c => c.client?.id === currentClientId)) {
         setActiveFloorId(section.id);
         initialSectionSet.current = true;
@@ -143,16 +152,16 @@ export function CustomerVenueSelector({
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [childrenCache, currentClientId]);
+  }, [filteredCache, currentClientId]);
 
   // Navigate to a specific table when navigateToTableId changes (from 3D model click)
   useEffect(() => {
     if (!navigateToTableId) return;
     // Find which floor/room contains this table by walking the cache
-    for (const floor of floorResources) {
-      const rooms = childrenCache[floor.id] ?? [];
+    for (const floor of filteredFloors) {
+      const rooms = filteredCache[floor.id] ?? [];
       for (const room of rooms) {
-        const tables = filterTables(childrenCache[room.id] ?? []);
+        const tables = filterTables(filteredCache[room.id] ?? []);
         if (tables.some(t => t.id === navigateToTableId)) {
           setActiveFloorId(floor.id);
           setActiveRoomId(room.id);
@@ -169,39 +178,39 @@ export function CustomerVenueSelector({
   const autoSkippedFrom = useRef(new Set<number>());
 
   // Derived data
-  const activeRooms = activeFloorId ? (childrenCache[activeFloorId] ?? []) : [];
-  const roomTables = activeRoomId ? filterTables(childrenCache[activeRoomId] ?? []) : [];
-  const roomObjects = activeRoomId ? filterObjects(childrenCache[activeRoomId] ?? []) : [];
-  const chairResources = selectedTableId ? (childrenCache[selectedTableId] ?? []) : [];
+  const activeRooms = activeFloorId ? (filteredCache[activeFloorId] ?? []) : [];
+  const roomTables = activeRoomId ? filterTables(filteredCache[activeRoomId] ?? []) : [];
+  const roomObjects = activeRoomId ? filterObjects(filteredCache[activeRoomId] ?? []) : [];
+  const chairResources = selectedTableId ? (filteredCache[selectedTableId] ?? []) : [];
 
   // Auto-skip room selection when floor has only one room
   useEffect(() => {
     if (activeFloorId && !activeRoomId) {
-      const rooms = childrenCache[activeFloorId];
+      const rooms = filteredCache[activeFloorId];
       if (rooms && rooms.length === 1 && !autoSkippedFrom.current.has(activeFloorId)) {
         autoSkippedFrom.current.add(activeFloorId);
         setActiveRoomId(rooms[0].id);
-        if (!childrenCache[rooms[0].id]) {
+        if (!filteredCache[rooms[0].id]) {
           fetchChildren(rooms[0].id);
         }
       }
     }
-  }, [activeFloorId, activeRoomId, childrenCache, fetchChildren]);
+  }, [activeFloorId, activeRoomId, filteredCache, fetchChildren]);
 
   // Auto-skip table selection when room has only one table
   useEffect(() => {
     if (activeRoomId && !selectedTableId) {
-      const tables = filterTables(childrenCache[activeRoomId] ?? []);
+      const tables = filterTables(filteredCache[activeRoomId] ?? []);
       if (tables.length === 1 && !autoSkippedFrom.current.has(activeRoomId)) {
         autoSkippedFrom.current.add(activeRoomId);
         setSelectedTableId(tables[0].id);
         fetchChildren(tables[0].id, true);
       }
     }
-  }, [activeRoomId, selectedTableId, childrenCache, fetchChildren]);
+  }, [activeRoomId, selectedTableId, filteredCache, fetchChildren]);
 
   // Breadcrumb data
-  const activeFloor = floorResources.find(f => f.id === activeFloorId);
+  const activeFloor = filteredFloors.find(f => f.id === activeFloorId);
   const activeRoom = activeRooms.find(r => r.id === activeRoomId);
   const activeTable = roomTables.find(t => t.id === selectedTableId);
 
@@ -210,18 +219,18 @@ export function CustomerVenueSelector({
     setActiveFloorId(floorId);
     setActiveRoomId(null);
     setSelectedTableId(null);
-    if (!childrenCache[floorId]) {
+    if (!filteredCache[floorId]) {
       fetchChildren(floorId);
     }
-  }, [fetchChildren, childrenCache]);
+  }, [fetchChildren, filteredCache]);
 
   const handleRoomClick = useCallback((roomId: number) => {
     setActiveRoomId(roomId);
     setSelectedTableId(null);
-    if (!childrenCache[roomId]) {
+    if (!filteredCache[roomId]) {
       fetchChildren(roomId);
     }
-  }, [fetchChildren, childrenCache]);
+  }, [fetchChildren, filteredCache]);
 
   const handleTableClick = useCallback((tableId: number) => {
     setSelectedTableId(tableId);
@@ -241,10 +250,10 @@ export function CustomerVenueSelector({
 
   // ─── Transport: Bus-style seat picker ──────────────────────
   if (isTransport) {
-    const sections = floorResources; // root resources = sections for transport
+    const sections = filteredFloors; // root resources = sections for transport
     const activeSectionId = activeFloorId;
     const activeSection = sections.find(s => s.id === activeSectionId);
-    const sectionChildren = activeSectionId ? (childrenCache[activeSectionId] ?? []) : [];
+    const sectionChildren = activeSectionId ? (filteredCache[activeSectionId] ?? []) : [];
     const seats = sectionChildren.filter(r => r.resourceType?.code === 'transport_seat');
     const objects = sectionChildren.filter(r => r.resourceType?.code === 'transport_object');
     const isSeatsLoading = loadingChildren && seats.length === 0 && !!activeSectionId;
@@ -787,16 +796,16 @@ export function CustomerVenueSelector({
   return (
     <div className="space-y-3">
       {/* Resource type title for floors */}
-      {floorResources.length > 0 && floorResources[0].resourceType?.name && (
+      {filteredFloors.length > 0 && filteredFloors[0].resourceType?.name && (
         <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide">
-          {floorResources[0].resourceType.name}
+          {filteredFloors[0].resourceType.name}
         </h3>
       )}
 
       {/* Floor tabs */}
-      {floorResources.length > 1 && (
+      {filteredFloors.length > 1 && (
         <div className="flex gap-1 overflow-x-auto pb-1 -mb-1">
-          {floorResources.map(floor => (
+          {filteredFloors.map(floor => (
             <button
               key={floor.id}
               className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all ${

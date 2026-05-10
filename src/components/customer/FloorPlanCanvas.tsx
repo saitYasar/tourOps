@@ -80,7 +80,9 @@ function resourceToRoom(room: ResourceDto, index: number): EditorRoom {
 // ── Table conversion (matching useLayoutSync resourceToTable) ──
 interface EditorChair {
   id: number;
+  name: string;
   occupied: boolean;
+  isPassive: boolean;
 }
 
 interface EditorTable {
@@ -95,6 +97,7 @@ interface EditorTable {
   isRound: boolean;
   chairCount: number;
   chairs: EditorChair[];
+  isPassive: boolean;
 }
 
 function resourceToTable(
@@ -149,7 +152,9 @@ function resourceToTable(
 
   const chairs: EditorChair[] = (table.children ?? []).map(child => ({
     id: child.id,
+    name: child.name,
     occupied: !!child.client,
+    isPassive: !!child.isPassive,
   }));
 
   return {
@@ -164,6 +169,7 @@ function resourceToTable(
     isRound: defaults.isRound,
     chairCount,
     chairs,
+    isPassive: !!table.isPassive,
   };
 }
 
@@ -319,10 +325,12 @@ interface FloorPlanCanvasProps {
   objectsMap?: Record<number, ResourceDto[]>;
   selectedTableId: number | null;
   onTableClick: (tableId: number) => void;
+  onRoomClick?: (roomId: number) => void;
+  passiveResourceIds?: Set<number>;
 }
 
 // ── Main Component ─────────────────────────────────────────────
-export function FloorPlanCanvas({ rooms, tablesMap, objectsMap, selectedTableId, onTableClick }: FloorPlanCanvasProps) {
+export function FloorPlanCanvas({ rooms, tablesMap, objectsMap, selectedTableId, onTableClick, onRoomClick, passiveResourceIds }: FloorPlanCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
@@ -376,38 +384,41 @@ export function FloorPlanCanvas({ rooms, tablesMap, objectsMap, selectedTableId,
   const panX = userPanX ?? fitResult?.panX ?? 0;
   const panY = userPanY ?? fitResult?.panY ?? 0;
 
-  // Measure container
+  // Measure container (debounced to prevent feedback loops)
+  const containerSizeRef = useRef({ width: 0, height: 0 });
   useLayoutEffect(() => {
     const container = containerRef.current;
     if (!container) return;
     const w = container.offsetWidth;
     const h = container.offsetHeight;
     if (w > 0 && h > 0) {
+      containerSizeRef.current = { width: w, height: h };
       setContainerSize({ width: w, height: h });
     }
     const observer = new ResizeObserver(() => {
       const nw = container.offsetWidth;
       const nh = container.offsetHeight;
-      if (nw > 0 && nh > 0) setContainerSize({ width: nw, height: nh });
+      if (nw <= 0 || nh <= 0) return;
+      const prev = containerSizeRef.current;
+      if (Math.abs(nw - prev.width) < 3 && Math.abs(nh - prev.height) < 3) return;
+      containerSizeRef.current = { width: nw, height: nh };
+      setContainerSize({ width: nw, height: nh });
     });
     observer.observe(container);
     return () => observer.disconnect();
   }, []);
 
-  // Reset user overrides when rooms change so auto-fit kicks in
+  // Reset user overrides only when rooms change so auto-fit kicks in
   const roomsKey = rooms.map(r => r.id).join(',');
-  const lastFitKey = useRef('');
+  const lastRoomsKey = useRef('');
 
   useLayoutEffect(() => {
-    const fitKey = `${roomsKey}|${containerSize.width}|${containerSize.height}`;
-    if (fitKey === lastFitKey.current) return;
-    lastFitKey.current = fitKey;
-    // Clear user overrides so fitResult (useMemo) values are used
+    if (roomsKey === lastRoomsKey.current) return;
+    lastRoomsKey.current = roomsKey;
     setUserZoom(null);
     setUserPanX(null);
     setUserPanY(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomsKey, containerSize]);
+  }, [roomsKey]);
 
 
   const handleWheel = useCallback((e: Konva.KonvaEventObject<WheelEvent>) => {
@@ -451,15 +462,16 @@ export function FloorPlanCanvas({ rooms, tablesMap, objectsMap, selectedTableId,
             {/* ── Rooms ── */}
             {editorRooms.map((room) => {
               const roomTables = editorTables.filter(t => t.roomId === room.id);
+              const isRoomPassive = !!passiveResourceIds?.has(room.id);
 
               return (
-                <Group key={room.id} x={room.x} y={room.y}>
+                <Group key={room.id} x={room.x} y={room.y} opacity={isRoomPassive ? 0.4 : 1}>
                   {/* Room floor base */}
                   <Rect
                     width={room.w}
                     height={room.h}
-                    fill="#E8DFD0"
-                    stroke={room.color + '90'}
+                    fill={isRoomPassive ? '#E5E7EB' : '#E8DFD0'}
+                    stroke={isRoomPassive ? '#9CA3AF' : room.color + '90'}
                     strokeWidth={2}
                     cornerRadius={4}
                     listening={false}
@@ -589,11 +601,12 @@ export function FloorPlanCanvas({ rooms, tablesMap, objectsMap, selectedTableId,
                       ? rawPositions
                       : reorderChairPositions(rawPositions, table.chairCount);
 
-                    const tableFill = isSelected ? '#C4A46C' : isHovered ? '#B8956A' : '#A0845C';
-                    const tableStroke = isSelected ? '#3B82F6' : isHovered ? '#8B6D3F' : '#7A5C35';
+                    const isTablePassive = table.isPassive || !!passiveResourceIds?.has(table.id);
+                    const tableFill = isTablePassive ? '#D1D5DB' : isSelected ? '#C4A46C' : isHovered ? '#B8956A' : '#A0845C';
+                    const tableStroke = isTablePassive ? '#9CA3AF' : isSelected ? '#3B82F6' : isHovered ? '#8B6D3F' : '#7A5C35';
                     const tableStrokeWidth = isSelected ? 2.5 : 1.5;
-                    const defaultChairFill = isSelected ? '#93BBFD' : '#7CA8D4';
-                    const defaultChairStroke = isSelected ? '#2563EB' : '#5A8AB8';
+                    const defaultChairFill = isTablePassive ? '#E5E7EB' : isSelected ? '#93BBFD' : '#7CA8D4';
+                    const defaultChairStroke = isTablePassive ? '#9CA3AF' : isSelected ? '#2563EB' : '#5A8AB8';
 
                     // Occupancy counts for label
                     const occupiedCount = table.chairs.filter(c => c.occupied).length;
@@ -608,8 +621,11 @@ export function FloorPlanCanvas({ rooms, tablesMap, objectsMap, selectedTableId,
                         {/* Chairs */}
                         {chairPositions.map((pos, ci) => {
                           const isOccupied = table.chairs[ci]?.occupied ?? false;
-                          const cFill = isOccupied ? '#F87171' : defaultChairFill;
-                          const cStroke = isOccupied ? '#DC2626' : defaultChairStroke;
+                          const chairId = table.chairs[ci]?.id;
+                          const isChairPassive = (table.chairs[ci]?.isPassive ?? false) || !!(chairId && passiveResourceIds?.has(chairId));
+                          const chairName = table.chairs[ci]?.name ?? '';
+                          const cFill = isChairPassive ? '#E5E7EB' : isOccupied ? '#F87171' : defaultChairFill;
+                          const cStroke = isChairPassive ? '#9CA3AF' : isOccupied ? '#DC2626' : defaultChairStroke;
                           return (
                           <Group key={ci} x={table.w / 2 + pos.x} y={table.h / 2 + pos.y} listening={false}>
                             <Group rotation={(pos.angle * 180) / Math.PI}>
@@ -634,6 +650,21 @@ export function FloorPlanCanvas({ rooms, tablesMap, objectsMap, selectedTableId,
                                 cornerRadius={[2, 2, 0, 0]}
                               />
                             </Group>
+                            {chairName && (
+                              <Text
+                                text={chairName}
+                                fontSize={5}
+                                fill="#1F2937"
+                                fontStyle="bold"
+                                align="center"
+                                verticalAlign="middle"
+                                width={20}
+                                height={6}
+                                x={-10}
+                                y={pos.y < 0 ? -CHAIR_H / 2 - 7 : CHAIR_H / 2 + 1}
+                                listening={false}
+                              />
+                            )}
                           </Group>
                           );
                         })}
@@ -669,6 +700,7 @@ export function FloorPlanCanvas({ rooms, tablesMap, objectsMap, selectedTableId,
                               fill={tableFill}
                               stroke={tableStroke}
                               strokeWidth={tableStrokeWidth}
+                              opacity={isTablePassive ? 0.5 : 1}
                               onClick={() => onTableClick(table.id)}
                               onTap={() => onTableClick(table.id)}
                               onMouseEnter={() => {
@@ -698,6 +730,7 @@ export function FloorPlanCanvas({ rooms, tablesMap, objectsMap, selectedTableId,
                               stroke={tableStroke}
                               strokeWidth={tableStrokeWidth}
                               cornerRadius={4}
+                              opacity={isTablePassive ? 0.5 : 1}
                               onClick={() => onTableClick(table.id)}
                               onTap={() => onTableClick(table.id)}
                               onMouseEnter={() => {
@@ -780,7 +813,10 @@ export function FloorPlanCanvas({ rooms, tablesMap, objectsMap, selectedTableId,
                     height={24}
                     fill={room.color}
                     cornerRadius={[4, 0, 4, 0]}
-                    listening={false}
+                    onClick={() => onRoomClick?.(room.id)}
+                    onTap={() => onRoomClick?.(room.id)}
+                    onMouseEnter={() => { document.body.style.cursor = 'pointer'; }}
+                    onMouseLeave={() => { document.body.style.cursor = 'default'; }}
                   />
                   <Text
                     x={8}
