@@ -47,6 +47,7 @@ import {
   Download,
   UtensilsCrossed,
   Armchair,
+  Building2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -58,6 +59,7 @@ import type { ApiTourDto, ApiTourStopDto, CreateTourStopPayload, UpdateTourPaylo
 import { ServiceDetailDialog } from '@/components/shared/ServiceDetailDialog';
 import { CustomerVenueSelector } from '@/components/customer/CustomerVenueSelector';
 import { StopVenuePreview } from '@/components/customer/StopVenuePreview';
+import { OrgVenuePreviewDialog } from '@/components/admin/OrgVenuePreviewDialog';
 import { formatDate, formatShortDateTime } from '@/lib/dateUtils';
 
 // UTC ISO string'i datetime-local input formatına (yerel saat) çevirir
@@ -272,6 +274,8 @@ export default function TourDetailPage() {
   const [isMenuPreviewOpen, setIsMenuPreviewOpen] = useState(false);
   const [menuPreviewLang, setMenuPreviewLang] = useState<'tr' | 'en' | 'de'>('tr');
   const [menuDetailService, setMenuDetailService] = useState<ClientStopMenuServiceDto | null>(null);
+  const [venuePreviewOpen, setVenuePreviewOpen] = useState(false);
+  const [stopPassiveResources, setStopPassiveResources] = useState<number[]>([]);
   const [stopSelectionLimits, setStopSelectionLimits] = useState<Record<number, number>>({});
   const [choicesStopId, setChoicesStopId] = useState<number | null>(null);
   const [expandedClientId, setExpandedClientId] = useState<number | null>(null);
@@ -1016,6 +1020,7 @@ export default function TourDetailPage() {
         showPriceToCustomer: stopForm.showPriceToCustomer,
         maxSpendLimit: stopForm.maxSpendLimit !== '' ? Number(stopForm.maxSpendLimit) : null,
         ...(limits.length > 0 ? { selectionLimits: limits } : {}),
+        ...(stopPassiveResources.length > 0 ? { passiveResources: stopPassiveResources } : {}),
       };
       const result = await tourStopApi.create(payload, apiLang);
       if (!result.success) throw new Error(result.error);
@@ -1046,6 +1051,7 @@ export default function TourDetailPage() {
         showPriceToCustomer: stopForm.showPriceToCustomer,
         maxSpendLimit: stopForm.maxSpendLimit !== '' ? Number(stopForm.maxSpendLimit) : null,
         selectionLimits: limits.length > 0 ? limits : null,
+        passiveResources: stopPassiveResources.length > 0 ? stopPassiveResources : null,
       }, apiLang);
       if (!result.success) throw new Error(result.error);
       return result.data;
@@ -1132,6 +1138,7 @@ export default function TourDetailPage() {
       maxSpendLimit: '',
     });
     setStopSelectionLimits({});
+    setStopPassiveResources([]);
     limitsInitializedForOrg.current = null;
     setOrgSearch('');
     setSelectedOrgDetail(null);
@@ -1158,6 +1165,7 @@ export default function TourDetailPage() {
     } else {
       setStopSelectionLimits({});
     }
+    setStopPassiveResources(stop.passiveResources ?? []);
     // Find org from existing data for edit mode
     const existingOrg = organizations?.find((o) => o.id === stop.organizationId);
     if (existingOrg) {
@@ -1183,6 +1191,7 @@ export default function TourDetailPage() {
       maxSpendLimit: '',
     });
     setStopSelectionLimits({});
+    setStopPassiveResources([]);
     limitsInitializedForOrg.current = null;
     setSelectedOrgDetail(org);
     setOrgSearch(org.name);
@@ -1201,6 +1210,7 @@ export default function TourDetailPage() {
       maxSpendLimit: '',
     });
     setStopSelectionLimits({});
+    setStopPassiveResources([]);
     limitsInitializedForOrg.current = null;
     setOrgSearch('');
     setSelectedOrgDetail(null);
@@ -2980,16 +2990,28 @@ export default function TourDetailPage() {
                           </div>
                         )}
                       </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="w-full mt-1"
-                        onClick={() => setIsMenuPreviewOpen(true)}
-                      >
-                        <Eye className="h-3.5 w-3.5 mr-1.5" />
-                        {t.menu.menuPreview}
-                      </Button>
+                      <div className="grid grid-cols-2 gap-2 mt-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => setIsMenuPreviewOpen(true)}
+                        >
+                          <Eye className="h-3.5 w-3.5 mr-1.5" />
+                          {t.menu.menuPreview}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => setVenuePreviewOpen(true)}
+                        >
+                          <Building2 className="h-3.5 w-3.5 mr-1.5" />
+                          {t.menu.venuePreview}
+                        </Button>
+                      </div>
                     </CardContent>
                   </Card>
                 )}
@@ -3414,6 +3436,17 @@ export default function TourDetailPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Venue Preview Dialog */}
+      <OrgVenuePreviewDialog
+        open={venuePreviewOpen}
+        onOpenChange={setVenuePreviewOpen}
+        organizationId={selectedOrgDetail?.id}
+        organizationName={selectedOrgDetail?.name}
+        stopId={editingStop?.id}
+        passiveResources={stopPassiveResources}
+        onPassiveResourcesChange={setStopPassiveResources}
+      />
 
       {/* WhatsApp Share Dialog */}
       <Dialog open={!!whatsappTarget} onOpenChange={(open) => { if (!open) { setWhatsappTarget(null); setWhatsappLang('tr'); } }}>
