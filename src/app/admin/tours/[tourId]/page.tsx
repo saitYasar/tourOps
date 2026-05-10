@@ -1,0 +1,2771 @@
+'use client';
+
+import React, { useState, useEffect, useRef, useCallback, Fragment } from 'react';
+import { createPortal } from 'react-dom';
+import { useParams, useRouter } from 'next/navigation';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  ArrowLeft,
+  Search,
+  Image as ImageIcon,
+  Users,
+  Eye,
+  EyeOff,
+  KeyRound,
+  Building2,
+  MapPin,
+  Clock,
+  ChevronDown,
+  ChevronUp,
+  Mail,
+  Phone,
+  ClipboardList,
+  DollarSign,
+  User as UserIcon,
+  Printer,
+  FileSpreadsheet,
+  Plus,
+  Trash2,
+  CheckCircle,
+  XCircle,
+  X,
+  Loader2,
+  Lock,
+  Unlock,
+  Pencil,
+  Save,
+  Download,
+  Upload,
+  MessageCircle,
+  Send,
+  UtensilsCrossed,
+  Armchair,
+} from 'lucide-react';
+import { toast } from 'sonner';
+
+import { useLanguage } from '@/contexts/LanguageContext';
+import { locales, type Locale } from '@/locales';
+import { useDebounce } from '@/hooks/useDebounce';
+import { adminApi } from '@/lib/api';
+import type { ApiTourDto, AgencyStopChoicesDto, AgencyStopServiceSummaryDto, CreateTourStopPayload, UpdateTourStopPayload, SelectionLimit, ClientStopMenuCategoryDto, ClientStopMenuServiceDto, ClientServiceChoiceDto, CreateServiceChoiceDto, UpdateServiceChoiceDto, ClientResourceChoiceItemDto, ResourceDto } from '@/lib/api';
+import { apiClient } from '@/lib/api';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { ConfirmDialog } from '@/components/shared';
+import { getCurrencySymbol } from '@/lib/utils';
+import { formatDate, formatShortDateTime } from '@/lib/dateUtils';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { DateTimeInput } from '@/components/ui/datetime-input';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import {
+  LoadingState, EmptyState, ErrorState, TourStatusBadge,
+  CompactReceipt, DetailedListReceipt, TableBasedListReceipt, KitchenSummaryReceipt, ServiceSummaryReceipt, ReceiptTableServices, ReceiptServiceSummary,
+  handleReceiptPrint, exportReceiptExcel, ChoiceDeadlineCountdown, OrgMenuPreviewDialog,
+  InteractiveMenuCategory, MenuBottomBar,
+} from '@/components/shared';
+import type { ReceiptTemplate } from '@/components/shared';
+import { AdminStopVenuePreview } from '@/components/admin/AdminStopVenuePreview';
+import { CustomerVenueSelector } from '@/components/customer/CustomerVenueSelector';
+import { StopVenuePreview } from '@/components/customer/StopVenuePreview';
+
+function resolveImageUrl(url?: string | null): string | null {
+  return url || null;
+}
+
+export default function AdminTourDetailPage() {
+  const params = useParams();
+  const tourId = Number(params.tourId);
+  const router = useRouter();
+  const { t, locale } = useLanguage();
+  const lang = locale as 'tr' | 'en' | 'de';
+  const queryClient = useQueryClient();
+
+  // Detail state
+  const [dialogTab, setDialogTab] = useState('info');
+  const [expandedParticipantId, setExpandedParticipantId] = useState<number | null>(null);
+  const [pdfShowPhone, setPdfShowPhone] = useState(false);
+  const [pdfShowStatus, setPdfShowStatus] = useState(false);
+  const [batchImportOpen, setBatchImportOpen] = useState(false);
+  const [whatsappTarget, setWhatsappTarget] = useState<any>(null);
+  const [whatsappLang, setWhatsappLang] = useState<Locale>('tr');
+  const [batchFile, setBatchFile] = useState<File | null>(null);
+  const [batchPreview, setBatchPreview] = useState<string[][]>([]);
+  const batchFileRef = useRef<HTMLInputElement>(null);
+  const [passwordTarget, setPasswordTarget] = useState<{ clientId: number; name: string; username?: string } | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [newPasswordError, setNewPasswordError] = useState('');
+  const [choicesStopId, setChoicesStopId] = useState<number | null>(null);
+  const [expandedClientId, setExpandedClientId] = useState<number | null>(null);
+  const [receiptOpen, setReceiptOpen] = useState(false);
+  const [receiptTemplate, setReceiptTemplate] = useState<ReceiptTemplate>('compact');
+  const [showPrices, setShowPrices] = useState(false);
+  const [receiptFilter, setReceiptFilter] = useState('');
+  const printRef = useRef<HTMLDivElement>(null);
+
+  // Menu edit dialog state
+  const [menuEditTarget, setMenuEditTarget] = useState<{ stopId: number; clientId: number; clientName: string } | null>(null);
+  const [menuSelectedItems, setMenuSelectedItems] = useState<Record<number, number>>({});
+  const [menuServiceChoiceIds, setMenuServiceChoiceIds] = useState<Record<number, number>>({});
+  const [menuNotes, setMenuNotes] = useState<Record<number, string>>({});
+  const [menuInitialQty, setMenuInitialQty] = useState<Record<number, number>>({});
+  const menuNoteTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  // Layout (resource choice) edit dialog state
+  const [layoutEditTarget, setLayoutEditTarget] = useState<{ stopId: number; clientId: number; clientName: string; hasExisting: boolean } | null>(null);
+  const [layoutChildrenCache, setLayoutChildrenCache] = useState<Record<number, ResourceDto[]>>({});
+  const [layoutLoadingChildren, setLayoutLoadingChildren] = useState(false);
+  const [layoutSaving, setLayoutSaving] = useState(false);
+  const [layoutPendingChair, setLayoutPendingChair] = useState<ResourceDto | null>(null);
+  const [layoutExistingResourceId, setLayoutExistingResourceId] = useState<number | undefined>(undefined);
+  const [layoutNavigateToTableId, setLayoutNavigateToTableId] = useState<number | null>(null);
+
+  // Lightbox state
+  const [lightboxImages, setLightboxImages] = useState<string[]>([]);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+
+  const openLightbox = useCallback((images: string[], index: number) => {
+    setLightboxImages(images);
+    setLightboxIndex(index);
+  }, []);
+
+  const closeLightbox = useCallback(() => {
+    setLightboxImages([]);
+    setLightboxIndex(0);
+  }, []);
+
+  useEffect(() => {
+    if (lightboxImages.length === 0) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeLightbox();
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [lightboxImages, closeLightbox]);
+
+  // Tour stops management
+  const [addStopOpen, setAddStopOpen] = useState(false);
+  const [addStopOrgSearch, setAddStopOrgSearch] = useState('');
+  const debouncedOrgSearch = useDebounce(addStopOrgSearch, 400);
+  const [selectedOrgDetail, setSelectedOrgDetail] = useState<{ id: number; name: string; address?: string; email?: string; phone?: string; phoneCountryCode?: number } | null>(null);
+  const [stopDescription, setStopDescription] = useState('');
+  const [stopStartTime, setStopStartTime] = useState('');
+  const [stopEndTime, setStopEndTime] = useState('');
+  const [stopShowPrice, setStopShowPrice] = useState(true);
+  const [stopMaxSpend, setStopMaxSpend] = useState('');
+  const [stopChoiceDeadline, setStopChoiceDeadline] = useState('');
+  const [stopSelectionLimits, setStopSelectionLimits] = useState<Record<number, number>>({});
+  const [menuPreviewOpen, setMenuPreviewOpen] = useState(false);
+  const [deleteStopId, setDeleteStopId] = useState<number | null>(null);
+  const [rejectStopId, setRejectStopId] = useState<number | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+
+  // Edit stop state
+  const [editingStopId, setEditingStopId] = useState<number | null>(null);
+  const [editStopDescription, setEditStopDescription] = useState('');
+  const [editStopStartTime, setEditStopStartTime] = useState('');
+  const [editStopEndTime, setEditStopEndTime] = useState('');
+  const [editStopShowPrice, setEditStopShowPrice] = useState(true);
+  const [editStopMaxSpend, setEditStopMaxSpend] = useState('');
+  const [editStopChoiceDeadline, setEditStopChoiceDeadline] = useState('');
+  const [editStopSelectionLimits, setEditStopSelectionLimits] = useState<Record<number, number>>({});
+  const [editMenuPreviewOpen, setEditMenuPreviewOpen] = useState(false);
+  const [editMenuPreviewOrgId, setEditMenuPreviewOrgId] = useState<number | null>(null);
+  const [editMenuPreviewOrgName, setEditMenuPreviewOrgName] = useState('');
+
+  // Tour detail query
+  const { data: tourDetail, isLoading: isDetailLoading } = useQuery({
+    queryKey: ['admin-tour-detail', tourId, lang],
+    queryFn: async () => {
+      const result = await adminApi.getTourById(tourId, lang);
+      if (!result.success) throw new Error(result.error);
+      return result.data;
+    },
+    enabled: !!tourId,
+  });
+
+  // Query: Stop choices
+  const { data: stopChoices, isLoading: choicesLoading } = useQuery({
+    queryKey: ['admin-stop-choices', choicesStopId, lang],
+    queryFn: async () => {
+      const result = await adminApi.getStopChoices(choicesStopId!, lang);
+      if (!result.success) throw new Error(result.error);
+      return result.data || [];
+    },
+    enabled: !!choicesStopId,
+  });
+
+  // Query: Stop service summary
+  const { data: serviceSummary, isLoading: summaryLoading } = useQuery({
+    queryKey: ['admin-stop-service-summary', choicesStopId, lang],
+    queryFn: async () => {
+      const result = await adminApi.getStopServiceSummary(choicesStopId!, lang);
+      if (!result.success) throw new Error(result.error);
+      return result.data;
+    },
+    enabled: !!choicesStopId,
+  });
+
+  // Auto-select first stop when tour detail loads
+  const stops = tourDetail?.stops;
+  useEffect(() => {
+    if (stops?.length && !choicesStopId) {
+      setChoicesStopId(stops[0].id);
+    }
+  }, [stops, choicesStopId]);
+
+  // Menu edit: fetch menu categories for the stop
+  const { data: menuEditCategories, isLoading: menuEditLoading } = useQuery({
+    queryKey: ['admin-stop-menu-edit', menuEditTarget?.stopId, lang],
+    queryFn: () => apiClient.getStopMenu(menuEditTarget!.stopId, lang),
+    enabled: !!menuEditTarget,
+  });
+
+  // Menu edit: extract client choices from already-loaded stopChoices
+  useEffect(() => {
+    if (!menuEditTarget || !stopChoices) return;
+    const clientData = stopChoices.find((c: AgencyStopChoicesDto) => {
+      const cId = c.clientId ?? (c as any).client?.id;
+      return cId === menuEditTarget.clientId;
+    });
+    const sc = clientData?.serviceChoices || [];
+    const items: Record<number, number> = {};
+    const ids: Record<number, number> = {};
+    const notes: Record<number, string> = {};
+    for (const c of sc) {
+      const svcId = c.serviceId ?? c.service?.id;
+      if (!svcId) continue;
+      items[svcId] = c.quantity;
+      ids[svcId] = c.id;
+      if (c.note) notes[svcId] = c.note;
+    }
+    setMenuSelectedItems(items);
+    setMenuServiceChoiceIds(ids);
+    setMenuNotes(notes);
+    setMenuInitialQty({ ...items });
+  }, [menuEditTarget, stopChoices]);
+
+  const menuEditGetItemQty = useCallback((stopId: number, serviceId: number) => menuSelectedItems[serviceId] ?? 0, [menuSelectedItems]);
+  const menuEditGetItemNote = useCallback((stopId: number, serviceId: number) => menuNotes[serviceId] ?? '', [menuNotes]);
+
+  const menuEditGetMenuTotal = useCallback((stopId: number, categories: ClientStopMenuCategoryDto[]) => {
+    let total = 0;
+    const walk = (cats: ClientStopMenuCategoryDto[]) => {
+      for (const cat of cats) {
+        for (const svc of cat.services || []) {
+          const qty = menuSelectedItems[svc.id] ?? 0;
+          if (qty > 0) total += qty * Number(svc.basePrice || 0);
+        }
+        if (cat.child_service_categories) walk(cat.child_service_categories);
+      }
+    };
+    walk(categories);
+    return total;
+  }, [menuSelectedItems]);
+
+  const menuEditTotalItemCount = useCallback((stopId: number) => {
+    return Object.values(menuSelectedItems).reduce((sum, q) => sum + q, 0);
+  }, [menuSelectedItems]);
+
+  const menuEditGetInitialQty = useCallback((stopId: number, serviceId: number) => menuInitialQty[serviceId] ?? 0, [menuInitialQty]);
+
+  const menuEditSetItemQty = useCallback(async (stopId: number, serviceId: number, qty: number) => {
+    if (!menuEditTarget) return;
+    const newQty = Math.max(0, qty);
+    const existingChoiceId = menuServiceChoiceIds[serviceId];
+
+    if (existingChoiceId) {
+      const result = await adminApi.updateServiceChoiceForClient(existingChoiceId, { quantity: newQty, note: menuNotes[serviceId] || undefined }, lang);
+      if (!result.success) {
+        toast.error(result.error || t.customer.menuUpdateError);
+        return;
+      }
+      if (newQty === 0) {
+        setMenuSelectedItems(prev => { const n = { ...prev }; delete n[serviceId]; return n; });
+        setMenuServiceChoiceIds(prev => { const n = { ...prev }; delete n[serviceId]; return n; });
+        setMenuNotes(prev => { const n = { ...prev }; delete n[serviceId]; return n; });
+      } else {
+        setMenuSelectedItems(prev => ({ ...prev, [serviceId]: newQty }));
+      }
+    } else if (newQty > 0) {
+      const result = await adminApi.createServiceChoiceForClient(menuEditTarget.stopId, menuEditTarget.clientId, { serviceId, note: menuNotes[serviceId] || undefined }, lang);
+      if (!result.success) {
+        toast.error(result.error || t.customer.menuSaveError);
+        return;
+      }
+      if (result.data) {
+        setMenuSelectedItems(prev => ({ ...prev, [serviceId]: (result.data as ClientServiceChoiceDto).quantity ?? 1 }));
+        setMenuServiceChoiceIds(prev => ({ ...prev, [serviceId]: (result.data as ClientServiceChoiceDto).id }));
+      }
+    }
+  }, [menuEditTarget, menuServiceChoiceIds, menuNotes, lang, t]);
+
+  const menuEditSetItemNote = useCallback((stopId: number, serviceId: number, note: string) => {
+    setMenuNotes(prev => ({ ...prev, [serviceId]: note }));
+    const key = `${serviceId}`;
+    if (menuNoteTimersRef.current[key]) clearTimeout(menuNoteTimersRef.current[key]);
+    menuNoteTimersRef.current[key] = setTimeout(async () => {
+      const choiceId = menuServiceChoiceIds[serviceId];
+      if (!choiceId) return;
+      const result = await adminApi.updateServiceChoiceForClient(choiceId, { note }, lang);
+      if (!result.success) {
+        toast.error(result.error || t.customer.noteSaveError);
+      }
+    }, 800);
+  }, [menuServiceChoiceIds, lang, t]);
+
+  const closeMenuEditDialog = useCallback(() => {
+    setMenuEditTarget(null);
+    setMenuSelectedItems({});
+    setMenuServiceChoiceIds({});
+    setMenuNotes({});
+    setMenuInitialQty({});
+    Object.values(menuNoteTimersRef.current).forEach(clearTimeout);
+    menuNoteTimersRef.current = {};
+    queryClient.invalidateQueries({ queryKey: ['admin-stop-choices', choicesStopId, lang] });
+    queryClient.invalidateQueries({ queryKey: ['admin-stop-service-summary', choicesStopId, lang] });
+  }, [queryClient, choicesStopId, lang]);
+
+  // Layout edit: fetch layout for the stop
+  const { data: layoutEditData, isLoading: layoutEditLoading, error: layoutEditError } = useQuery({
+    queryKey: ['admin-stop-layout', layoutEditTarget?.stopId, lang],
+    queryFn: () => apiClient.getStopLayout(layoutEditTarget!.stopId, undefined, lang),
+    enabled: !!layoutEditTarget,
+    retry: false,
+  });
+
+  const layoutFloors: ResourceDto[] = (() => {
+    if (!layoutEditData) return [];
+    const arr = Array.isArray(layoutEditData) ? layoutEditData : (layoutEditData as unknown as { data?: ResourceDto[] })?.data ?? [];
+    return (Array.isArray(arr) ? arr : []).filter((r: ResourceDto) => !r.parentId);
+  })();
+
+  const layoutFetchChildren = useCallback(async (parentId: number, force = false) => {
+    if (!force && layoutChildrenCache[parentId]) return;
+    if (!layoutEditTarget) return;
+    setLayoutLoadingChildren(true);
+    try {
+      const result = await apiClient.getStopLayout(layoutEditTarget.stopId, parentId, lang);
+      const children = Array.isArray(result) ? result : (result as unknown as { data?: ResourceDto[] })?.data ?? [];
+      setLayoutChildrenCache(prev => ({ ...prev, [parentId]: Array.isArray(children) ? children : [] }));
+    } catch {
+      setLayoutChildrenCache(prev => ({ ...prev, [parentId]: [] }));
+    } finally {
+      setLayoutLoadingChildren(false);
+    }
+  }, [layoutChildrenCache, layoutEditTarget, lang]);
+
+  const handleLayoutSelectChair = useCallback(async (chair: ResourceDto, skipConfirm = false) => {
+    if (!layoutEditTarget) return;
+    const hasExisting = layoutEditTarget.hasExisting;
+    if (hasExisting && !skipConfirm && layoutExistingResourceId !== chair.id) {
+      setLayoutPendingChair(chair);
+      return;
+    }
+    setLayoutSaving(true);
+    try {
+      if (hasExisting) {
+        const result = await adminApi.updateResourceChoiceForClient(layoutEditTarget.stopId, layoutEditTarget.clientId, { resourceId: chair.id }, lang);
+        if (!result.success) { toast.error(result.error || t.customer.tableSaveError); return; }
+      } else {
+        const result = await adminApi.createResourceChoiceForClient(layoutEditTarget.stopId, layoutEditTarget.clientId, { resourceId: chair.id }, lang);
+        if (!result.success) { toast.error(result.error || t.customer.tableSaveError); return; }
+      }
+      toast.success(t.customer.tableSaved || 'Yer seçimi kaydedildi');
+      closeLayoutEditDialog();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t.customer.tableSaveError);
+    } finally {
+      setLayoutSaving(false);
+    }
+  }, [layoutEditTarget, layoutExistingResourceId, lang, t]);
+
+  const openLayoutEditDialog = useCallback((stopId: number, clientId: number, clientName: string, hasExisting: boolean, existingResourceId?: number) => {
+    setLayoutEditTarget({ stopId, clientId, clientName, hasExisting });
+    setLayoutChildrenCache({});
+    setLayoutPendingChair(null);
+    setLayoutExistingResourceId(existingResourceId);
+    setLayoutNavigateToTableId(null);
+  }, []);
+
+  const closeLayoutEditDialog = useCallback(() => {
+    setLayoutEditTarget(null);
+    setLayoutChildrenCache({});
+    setLayoutPendingChair(null);
+    setLayoutExistingResourceId(undefined);
+    setLayoutNavigateToTableId(null);
+    queryClient.invalidateQueries({ queryKey: ['admin-stop-choices', choicesStopId, lang] });
+  }, [queryClient, choicesStopId, lang]);
+
+  // Organization search for add stop dialog
+  const { data: orgsResult, isLoading: orgSearchLoading } = useQuery({
+    queryKey: ['admin-organizations-for-stop', debouncedOrgSearch],
+    queryFn: () => adminApi.getOrganizationsList({ name: debouncedOrgSearch || undefined, limit: 20, status: 'active' as any }),
+    enabled: addStopOpen && !selectedOrgDetail,
+  });
+  const searchedOrgs = orgsResult?.success ? (orgsResult.data?.data || []) : [];
+
+  // Mutations
+  const invalidateTourDetail = () => {
+    queryClient.invalidateQueries({ queryKey: ['admin-tour-detail', tourId, lang] });
+  };
+
+  const handleDownloadParticipantsPdf = () => {
+    if (!tourDetail?.participants?.length) return;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    const rows = tourDetail.participants.map((p: any, i: number) => {
+      const c = p.client;
+      const name = c ? `${c.firstName || ''} ${c.lastName || ''}`.trim() : p.clientName || `#${p.clientId}`;
+      const email = c?.email || '-';
+      const username = c?.username || '-';
+      const phone = c?.phone ? `+${c.phoneCountryCode || '90'} ${c.phone}` : '-';
+      return `<tr>
+        <td style="padding:6px 10px;border:1px solid #e2e8f0;text-align:center">${i + 1}</td>
+        <td style="padding:6px 10px;border:1px solid #e2e8f0">${name}</td>
+        <td style="padding:6px 10px;border:1px solid #e2e8f0">${email}</td>
+        <td style="padding:6px 10px;border:1px solid #e2e8f0">${username}</td>
+        ${pdfShowPhone ? `<td style="padding:6px 10px;border:1px solid #e2e8f0">${phone}</td>` : ''}
+        ${pdfShowStatus ? `<td style="padding:6px 10px;border:1px solid #e2e8f0;text-align:center">${p.status || '-'}</td>` : ''}
+      </tr>`;
+    }).join('');
+    printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${t.invitations.clientList}</title>
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 20px; color: #1e293b; }
+        h1 { font-size: 18px; margin-bottom: 4px; }
+        p { font-size: 13px; color: #64748b; margin-bottom: 16px; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        th { padding: 8px 10px; border: 1px solid #cbd5e1; background: #f1f5f9; font-weight: 600; text-align: left; }
+        @media print { body { padding: 0; } }
+      </style></head><body>
+      <h1>${tourDetail.tourName}</h1>
+      <p>${t.invitations.clientList} — ${tourDetail.participants.length} ${t.tours.clients.toLowerCase()}</p>
+      <table>
+        <thead><tr>
+          <th style="text-align:center">#</th>
+          <th>${t.invitations.columnClient}</th>
+          <th>${t.invitations.columnEmail}</th>
+          <th>${t.invitations.columnUsername}</th>
+          ${pdfShowPhone ? `<th>${t.common.phone || 'Telefon'}</th>` : ''}
+          ${pdfShowStatus ? `<th style="text-align:center">${t.invitations.columnStatus}</th>` : ''}
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table></body></html>`);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => printWindow.print(), 300);
+  };
+
+  const handleSendParticipantsWhatsapp = () => {
+    if (!tourDetail?.participants?.length) return;
+    const lines = tourDetail.participants.map((p: any, i: number) => {
+      const c = p.client;
+      const n = c ? `${c.firstName || ''} ${c.lastName || ''}`.trim() : p.clientName || `#${p.clientId}`;
+      return `${i + 1}. ${n}`;
+    });
+    const header = `*${t.invitations.clientList}* — ${tourDetail.tourName}`;
+    const text = encodeURIComponent(`${header}\n\n${lines.join('\n')}`);
+    window.open(`https://web.whatsapp.com/send?text=${text}`, '_blank');
+  };
+
+  const closeBatchImport = () => {
+    setBatchImportOpen(false);
+    setBatchFile(null);
+    setBatchPreview([]);
+  };
+
+  const changePasswordMutation = useMutation({
+    mutationFn: ({ clientId, newPassword }: { clientId: number; newPassword: string }) =>
+      adminApi.changeClientPassword(clientId, newPassword),
+    onSuccess: (result) => {
+      if (result.success) {
+        toast.success(t.invitations.passwordChanged);
+        setPasswordTarget(null);
+        setNewPassword('');
+        setNewPasswordError('');
+        setShowNewPassword(false);
+      } else {
+        toast.error(result.error || t.invitations.passwordChangeFailed);
+      }
+    },
+    onError: () => {
+      toast.error(t.invitations.passwordChangeFailed);
+    },
+  });
+
+  const batchImportMutation = useMutation({
+    mutationFn: async ({ file }: { file: File }) => {
+      const result = await adminApi.batchImportTourClients(tourId, file, lang);
+      if (!result.success) throw new Error(result.error);
+      return result.data;
+    },
+    onSuccess: (result) => {
+      const msg = t.invitations.batchImportSuccess
+        .replace('{successful}', String(result?.successful ?? 0))
+        .replace('{totalRows}', String(result?.totalRows ?? 0));
+      toast.success(msg);
+      invalidateTourDetail();
+      closeBatchImport();
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || t.invitations.batchImportFailed);
+    },
+  });
+
+  const addStopMutation = useMutation({
+    mutationFn: async (data: CreateTourStopPayload) => {
+      const result = await adminApi.createTourStop(data, lang);
+      if (!result.success) throw new Error(result.error);
+      return result.data;
+    },
+    onSuccess: () => {
+      toast.success(t.admin.tourStopAdded);
+      invalidateTourDetail();
+      setAddStopOpen(false);
+      setSelectedOrgDetail(null);
+      setStopDescription('');
+      setStopStartTime('');
+      setStopEndTime('');
+      setStopShowPrice(true);
+      setStopMaxSpend('');
+      setStopChoiceDeadline('');
+      setStopSelectionLimits({});
+      setAddStopOrgSearch('');
+    },
+    onError: (err: Error) => toast.error(err.message || t.admin.tourStopError),
+  });
+
+  const deleteStopMutation = useMutation({
+    mutationFn: async (stopId: number) => {
+      const result = await adminApi.deleteTourStop(stopId, lang);
+      if (!result.success) throw new Error(result.error);
+    },
+    onSuccess: () => {
+      toast.success(t.admin.tourStopRemoved);
+      invalidateTourDetail();
+      setDeleteStopId(null);
+    },
+    onError: (err: Error) => toast.error(err.message || t.admin.tourStopError),
+  });
+
+  const approveStopMutation = useMutation({
+    mutationFn: async (stopId: number) => {
+      const result = await adminApi.approveTourStop(stopId, lang);
+      if (!result.success) throw new Error(result.error);
+    },
+    onSuccess: () => {
+      toast.success(t.admin.tourStopApproved);
+      invalidateTourDetail();
+    },
+    onError: (err: Error) => toast.error(err.message || t.admin.tourStopError),
+  });
+
+  const rejectStopMutation = useMutation({
+    mutationFn: async ({ stopId, reason }: { stopId: number; reason: string }) => {
+      const result = await adminApi.rejectTourStop(stopId, reason, lang);
+      if (!result.success) throw new Error(result.error);
+    },
+    onSuccess: () => {
+      toast.success(t.admin.tourStopRejected);
+      invalidateTourDetail();
+      setRejectStopId(null);
+      setRejectReason('');
+    },
+    onError: (err: Error) => toast.error(err.message || t.admin.tourStopError),
+  });
+
+  const updateStopMutation = useMutation({
+    mutationFn: async ({ stopId, data }: { stopId: number; data: UpdateTourStopPayload }) => {
+      const result = await adminApi.updateTourStop(stopId, data, lang);
+      if (!result.success) throw new Error(result.error);
+      return result.data;
+    },
+    onSuccess: () => {
+      toast.success(t.admin.tourStopUpdated);
+      invalidateTourDetail();
+      setEditingStopId(null);
+    },
+    onError: (err: Error) => toast.error(err.message || t.admin.tourStopError),
+  });
+
+  const lockChoicesMutation = useMutation({
+    mutationFn: async (stopId: number) => {
+      const result = await adminApi.submitAndApproveChoices(stopId, lang);
+      if (!result.success) throw new Error(result.error);
+    },
+    onSuccess: () => {
+      toast.success(t.tours.choicesLocked);
+      invalidateTourDetail();
+      queryClient.invalidateQueries({ queryKey: ['admin-stop-choices', choicesStopId, lang] });
+      queryClient.invalidateQueries({ queryKey: ['admin-stop-service-summary', choicesStopId, lang] });
+    },
+    onError: (err: Error) => toast.error(err.message || t.tours.choicesLockError),
+  });
+
+  const unlockChoicesMutation = useMutation({
+    mutationFn: async (stopId: number) => {
+      const result = await adminApi.revokeChoicesApproval(stopId, lang);
+      if (!result.success) throw new Error(result.error);
+    },
+    onSuccess: () => {
+      toast.success(t.tours.choicesUnlocked);
+      invalidateTourDetail();
+      queryClient.invalidateQueries({ queryKey: ['admin-stop-choices', choicesStopId, lang] });
+      queryClient.invalidateQueries({ queryKey: ['admin-stop-service-summary', choicesStopId, lang] });
+    },
+    onError: (err: Error) => toast.error(err.message || t.tours.choicesUnlockError),
+  });
+
+  const handleAddStop = () => {
+    if (!tourId || !selectedOrgDetail || !stopStartTime || !stopEndTime) return;
+    const limits: SelectionLimit[] = Object.entries(stopSelectionLimits).map(([id, max]) => ({
+      id: Number(id),
+      type: 'service-category' as const,
+      max,
+    }));
+    addStopMutation.mutate({
+      tourId,
+      organizationId: selectedOrgDetail.id,
+      description: stopDescription || undefined,
+      scheduledStartTime: stopStartTime,
+      scheduledEndTime: stopEndTime,
+      showPriceToCustomer: stopShowPrice,
+      maxSpendLimit: stopMaxSpend ? Number(stopMaxSpend) : null,
+      choiceDeadlineTime: stopChoiceDeadline || undefined,
+      ...(limits.length > 0 ? { selectionLimits: limits } : {}),
+    });
+  };
+
+  // Receipt helpers
+  const choicesArr: AgencyStopChoicesDto[] = stopChoices || [];
+  const selectedStop = stops?.find(s => s.id === choicesStopId);
+  const choicesOrgName = selectedStop?.organization?.name || '';
+  const receiptTourInfo = tourDetail ? {
+    tourName: tourDetail.tourName,
+    agencyName: tourDetail.agency?.name || '',
+    startDate: tourDetail.startDate,
+    stopStartDate: selectedStop?.scheduledStartTime,
+    stopEndDate: selectedStop?.scheduledEndTime,
+  } : { tourName: '', startDate: '' };
+  const filteredChoices = receiptFilter.trim()
+    ? choicesArr.filter((c: AgencyStopChoicesDto) => {
+        const q = receiptFilter.trim().toLowerCase();
+        const name = `${c.client?.firstName || ''} ${c.client?.lastName || ''}`.toLowerCase();
+        const clientId = String(c.clientId);
+        const seatLabel = c.resourceChoice && Array.isArray(c.resourceChoice)
+          ? (c.resourceChoice as ClientResourceChoiceItemDto[]).map((r) => r.resourceName || '').join(' ').toLowerCase()
+          : '';
+        return name.includes(q) || clientId.includes(q) || seatLabel.includes(q);
+      })
+    : choicesArr;
+
+  const handlePrint = useCallback(() => {
+    handleReceiptPrint(printRef, receiptTemplate);
+  }, [receiptTemplate]);
+
+  const handleExportExcel = useCallback(() => {
+    if (!choicesArr.length) return;
+    exportReceiptExcel(receiptTourInfo, choicesArr, serviceSummary ?? null, choicesOrgName, t);
+  }, [choicesArr, serviceSummary, choicesOrgName, t, receiptTourInfo]);
+
+  if (isDetailLoading) {
+    return (
+      <div className="p-6 flex items-center justify-center py-24">
+        <LoadingState />
+      </div>
+    );
+  }
+
+  if (!tourDetail) {
+    return (
+      <div className="p-6">
+        <Button variant="ghost" onClick={() => router.push('/admin/tours')} className="gap-2 mb-4">
+          <ArrowLeft className="h-4 w-4" />
+          {t.admin.tourManagement}
+        </Button>
+        <ErrorState message={t.admin.tourLoadError} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Page Header */}
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" onClick={() => router.push('/admin/tours')} className="gap-2">
+          <ArrowLeft className="h-4 w-4" />
+          {t.admin.tourManagement}
+        </Button>
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-bold text-slate-900">{tourDetail.tourName}</h1>
+          <TourStatusBadge status={tourDetail.status} />
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <Tabs value={dialogTab} onValueChange={setDialogTab} className="flex-1 flex flex-col min-h-0">
+        <div className="shrink-0 overflow-x-auto">
+          <TabsList className="w-max sm:w-full justify-start">
+            <TabsTrigger value="info" className="gap-1.5 text-xs sm:text-sm">
+              <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              {t.admin.detail}
+            </TabsTrigger>
+            <TabsTrigger value="stops" className="gap-1.5 text-xs sm:text-sm">
+              <MapPin className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              {t.admin.tourStops}
+              {tourDetail.stops && tourDetail.stops.length > 0 && (
+                <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">{tourDetail.stops.length}</Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="clients" className="gap-1.5 text-xs sm:text-sm">
+              <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              {t.tours.clients}
+              {tourDetail.participants && tourDetail.participants.length > 0 && (
+                <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">{tourDetail.participants.length}</Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="choices" className="gap-1.5 text-xs sm:text-sm">
+              <ClipboardList className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              {t.tours.customerChoices}
+              {tourDetail.stops && tourDetail.stops.length > 0 && (
+                <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">{tourDetail.stops.length}</Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
+        </div>
+
+        {/* ===== TAB: Tur Bilgileri ===== */}
+        <TabsContent value="info" className="flex-1 overflow-y-auto mt-4 space-y-4">
+          {/* Cover Image */}
+          {resolveImageUrl(tourDetail.coverImageUrl) && (
+            <div className="w-full h-56 rounded-lg overflow-hidden bg-slate-100">
+              <img
+                src={resolveImageUrl(tourDetail.coverImageUrl)!}
+                alt={tourDetail.tourName}
+                className="w-full h-full object-cover"
+              />
+            </div>
+          )}
+
+          {/* Info Grid */}
+          <div className="grid grid-cols-3 lg:grid-cols-6 gap-4 text-sm">
+            <div>
+              <p className="text-slate-500">{t.tours.tourCode}</p>
+              <p className="font-mono font-medium">{tourDetail.tourCode}</p>
+            </div>
+            <div>
+              <p className="text-slate-500">{t.tours.status}</p>
+              <TourStatusBadge status={tourDetail.status} />
+            </div>
+            <div>
+              <p className="text-slate-500">{t.tours.startDate}</p>
+              <p className="font-medium">{formatDate(tourDetail.startDate)}</p>
+            </div>
+            <div>
+              <p className="text-slate-500">{t.tours.endDate}</p>
+              <p className="font-medium">{formatDate(tourDetail.endDate)}</p>
+            </div>
+            <div>
+              <p className="text-slate-500">{t.tours.minParticipants}</p>
+              <p className="font-medium">{tourDetail.minParticipants || '-'}</p>
+            </div>
+            <div>
+              <p className="text-slate-500">{t.tours.maxParticipants}</p>
+              <p className="font-medium">{tourDetail.maxParticipants || '-'}</p>
+            </div>
+          </div>
+
+          {/* Agency */}
+          {tourDetail.agency && (
+            <>
+              <Separator />
+              <div className="flex items-center gap-2 text-sm">
+                <Building2 className="h-4 w-4 text-slate-400" />
+                <span className="text-slate-500">{t.admin.tourAgency}:</span>
+                <span className="font-medium">{tourDetail.agency.name}</span>
+              </div>
+            </>
+          )}
+
+          {/* Description */}
+          {tourDetail.description && (
+            <>
+              <Separator />
+              <div className="text-sm">
+                <p className="text-slate-500">{t.tours.tourDescription}</p>
+                <p className="mt-1">{tourDetail.description}</p>
+              </div>
+            </>
+          )}
+
+          {/* Stops */}
+          {tourDetail.stops && tourDetail.stops.length > 0 && (
+            <>
+              <Separator />
+              <div>
+                <p className="text-sm font-medium text-slate-700 mb-2">
+                  {t.tours.stops} ({tourDetail.stops.length})
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {tourDetail.stops.map((stop, index) => (
+                    <div key={stop.id} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg text-sm">
+                      <div className="flex items-center justify-center w-6 h-6 rounded-full bg-violet-100 text-violet-600 text-xs font-bold shrink-0">
+                        {index + 1}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">
+                          {stop.organization?.name || `${t.tours.organization} #${stop.organizationId}`}
+                        </p>
+                        {stop.organization?.address && (
+                          <p className="text-slate-400 text-xs flex items-center gap-1 mt-0.5">
+                            <MapPin className="h-3 w-3" />
+                            {stop.organization.address}
+                          </p>
+                        )}
+                        <p className="text-slate-400 text-xs flex items-center gap-1 mt-0.5">
+                          <Clock className="h-3 w-3" />
+                          {formatShortDateTime(stop.scheduledStartTime)} - {formatShortDateTime(stop.scheduledEndTime)}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Participants */}
+          {tourDetail.participants && tourDetail.participants.length > 0 && (
+            <>
+              <Separator />
+              <div>
+                <p className="text-sm font-medium text-slate-700 mb-2">
+                  {t.admin.tourParticipants} ({tourDetail.participants.length})
+                </p>
+                <div className="space-y-1">
+                  {tourDetail.participants.map((p) => {
+                    const client = p.client;
+                    const name = client
+                      ? `${client.firstName || ''} ${client.lastName || ''}`.trim() || `#${p.clientId}`
+                      : p.clientName || `#${p.clientId}`;
+                    const isExpanded = expandedParticipantId === p.id;
+                    const phoneDisplay = client?.phone
+                      ? `+${client.phoneCountryCode || '90'} ${client.phone}`
+                      : null;
+                    const genderLabel = client?.gender === 'm' ? t.common.male : client?.gender === 'f' ? t.common.female : null;
+                    return (
+                      <Fragment key={p.id}>
+                        <button
+                          className="w-full flex items-center justify-between p-2.5 bg-slate-50 hover:bg-slate-100 rounded-lg text-sm transition-colors cursor-pointer"
+                          onClick={() => setExpandedParticipantId(isExpanded ? null : p.id)}
+                        >
+                          <div className="flex items-center gap-2.5">
+                            {client?.profilePhoto ? (
+                              <img
+                                src={resolveImageUrl(client.profilePhoto) || ''}
+                                alt={name}
+                                className="h-7 w-7 rounded-full object-cover cursor-zoom-in"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openLightbox([resolveImageUrl(client.profilePhoto)!], 0);
+                                }}
+                              />
+                            ) : (
+                              <div className="h-7 w-7 rounded-full bg-violet-100 text-violet-600 flex items-center justify-center text-xs font-bold">
+                                {name.charAt(0).toUpperCase()}
+                              </div>
+                            )}
+                            <div className="text-left">
+                              <span className="font-medium">{name}</span>
+                              {client?.email && (
+                                <span className="text-xs text-slate-400 ml-2">{client.email}</span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {genderLabel && (
+                              <Badge variant="outline" className="text-[10px] px-1.5">{genderLabel}</Badge>
+                            )}
+                            {p.status && (
+                              <Badge variant="outline" className="text-xs">
+                                {p.status}
+                              </Badge>
+                            )}
+                            <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                          </div>
+                        </button>
+                        {isExpanded && (
+                          <div className="ml-9 p-3 bg-white border border-slate-200 rounded-lg text-xs space-y-1.5">
+                            {phoneDisplay && (
+                              <div className="flex items-center gap-2 text-slate-600">
+                                <Phone className="h-3 w-3 text-slate-400" />
+                                <span className="font-medium text-slate-800">{phoneDisplay}</span>
+                              </div>
+                            )}
+                            {client?.email && (
+                              <div className="flex items-center gap-2 text-slate-600">
+                                <Mail className="h-3 w-3 text-slate-400" />
+                                <span className="font-medium text-slate-800">{client.email}</span>
+                              </div>
+                            )}
+                            {p.pricePaid != null && (
+                              <div className="flex items-center gap-2 text-slate-600">
+                                <DollarSign className="h-3 w-3 text-slate-400" />
+                                <span className="font-medium text-slate-800">{Number(p.pricePaid).toFixed(2)} {getCurrencySymbol()}</span>
+                              </div>
+                            )}
+                            {p.paidAt && (
+                              <div className="flex items-center gap-2 text-slate-600">
+                                <Clock className="h-3 w-3 text-slate-400" />
+                                <span className="font-medium text-slate-800">{formatDate(p.paidAt)}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </Fragment>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Gallery */}
+          {tourDetail.galleryImages && tourDetail.galleryImages.length > 0 && (
+            <>
+              <Separator />
+              <div>
+                <p className="text-sm font-medium text-slate-700 mb-2">{t.tours.gallery} ({tourDetail.galleryImages.length})</p>
+                <div className="grid grid-cols-6 gap-2">
+                  {tourDetail.galleryImages.map((img) => {
+                    const imgSrc = resolveImageUrl(img.imageUrl);
+                    if (!imgSrc) return null;
+                    return (
+                      <div key={img.id} className="h-24 rounded-lg overflow-hidden bg-slate-100">
+                        <img src={imgSrc} alt="" className="w-full h-full object-cover" />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          )}
+        </TabsContent>
+
+        {/* ===== TAB: Misafirler ===== */}
+        <TabsContent value="clients" className="flex-1 overflow-y-auto mt-4 space-y-4">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <p className="text-sm font-medium text-slate-700">
+              {t.tours.clients} ({tourDetail.participants?.length || 0})
+            </p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setPdfShowPhone(!pdfShowPhone)}
+                className={`px-2.5 py-1 text-xs font-medium rounded-md border transition-colors ${pdfShowPhone ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-slate-50 border-slate-200 text-slate-500'}`}
+              >
+                <Phone className="h-3 w-3 inline mr-1" />
+                {t.common.phone || 'Telefon'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setPdfShowStatus(!pdfShowStatus)}
+                className={`px-2.5 py-1 text-xs font-medium rounded-md border transition-colors ${pdfShowStatus ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-slate-50 border-slate-200 text-slate-500'}`}
+              >
+                {t.invitations.columnStatus}
+              </button>
+              {tourDetail.participants && tourDetail.participants.length > 0 && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="gap-1.5">
+                      <Send className="h-4 w-4" />
+                      {t.invitations.sendPdf}
+                      <ChevronDown className="h-3.5 w-3.5 ml-1" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="z-[1002]">
+                    <DropdownMenuItem onClick={handleDownloadParticipantsPdf}>
+                      <Download className="h-4 w-4 mr-2" />
+                      {t.invitations.downloadPdf}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleSendParticipantsWhatsapp}>
+                      <MessageCircle className="h-4 w-4 mr-2" />
+                      {t.invitations.sendViaWhatsapp}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+              <Button size="sm" variant="outline" onClick={() => setBatchImportOpen(true)} className="gap-1.5">
+                <FileSpreadsheet className="h-4 w-4" />
+                {t.invitations.batchImport}
+              </Button>
+            </div>
+          </div>
+          {!tourDetail.participants?.length ? (
+            <EmptyState icon={Users} title={t.tours.clients} description={t.tours.noClients} />
+          ) : (
+            <div className="space-y-1">
+              {tourDetail.participants.map((p) => {
+                const client = p.client;
+                const name = client
+                  ? `${client.firstName || ''} ${client.lastName || ''}`.trim() || `#${p.clientId}`
+                  : p.clientName || `#${p.clientId}`;
+                const isExpanded = expandedParticipantId === p.id;
+                const phoneDisplay = client?.phone
+                  ? `+${client.phoneCountryCode || '90'} ${client.phone}`
+                  : null;
+                const genderLabel = client?.gender === 'm' ? t.common.male : client?.gender === 'f' ? t.common.female : null;
+                return (
+                  <Fragment key={p.id}>
+                    <button
+                      className="w-full flex items-center justify-between p-2.5 bg-slate-50 hover:bg-slate-100 rounded-lg text-sm transition-colors cursor-pointer"
+                      onClick={() => setExpandedParticipantId(isExpanded ? null : p.id)}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        {client?.profilePhoto ? (
+                          <img
+                            src={resolveImageUrl(client.profilePhoto) || ''}
+                            alt={name}
+                            className="h-7 w-7 rounded-full object-cover cursor-zoom-in"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openLightbox([resolveImageUrl(client.profilePhoto)!], 0);
+                            }}
+                          />
+                        ) : (
+                          <div className="h-7 w-7 rounded-full bg-violet-100 text-violet-600 flex items-center justify-center text-xs font-bold">
+                            {name.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <div className="text-left">
+                          <span className="font-medium">{name}</span>
+                          {client?.username && (
+                            <code className="text-[11px] text-slate-400 ml-2 bg-slate-100 px-1.5 py-0.5 rounded">{client.username}</code>
+                          )}
+                          {client?.email && (
+                            <span className="text-xs text-slate-400 ml-2">{client.email}</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {genderLabel && (
+                          <Badge variant="outline" className="text-[10px] px-1.5">{genderLabel}</Badge>
+                        )}
+                        {p.status && (
+                          <Badge variant="outline" className="text-xs">
+                            {p.status}
+                          </Badge>
+                        )}
+                        {client?.username && (
+                          <button
+                            type="button"
+                            className="h-6 w-6 flex items-center justify-center rounded text-green-600 hover:text-green-800 hover:bg-green-50"
+                            onClick={(e) => { e.stopPropagation(); setWhatsappTarget({ client, name }); }}
+                            title={t.invitations.whatsappShare}
+                          >
+                            <Send className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              className="h-6 w-6 flex items-center justify-center rounded text-amber-600 hover:text-amber-800 hover:bg-amber-50"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPasswordTarget({ clientId: p.clientId, name, username: client?.username });
+                                setNewPassword('');
+                                setNewPasswordError('');
+                                setShowNewPassword(false);
+                              }}
+                            >
+                              <KeyRound className="h-3.5 w-3.5" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">{t.invitations.changePassword}</TooltipContent>
+                        </Tooltip>
+                        <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                      </div>
+                    </button>
+                    {isExpanded && (
+                      <div className="ml-9 p-3 bg-white border border-slate-200 rounded-lg text-xs space-y-1.5">
+                        {phoneDisplay && (
+                          <div className="flex items-center gap-2 text-slate-600">
+                            <Phone className="h-3 w-3 text-slate-400" />
+                            <span className="font-medium text-slate-800">{phoneDisplay}</span>
+                          </div>
+                        )}
+                        {client?.email && (
+                          <div className="flex items-center gap-2 text-slate-600">
+                            <Mail className="h-3 w-3 text-slate-400" />
+                            <span className="font-medium text-slate-800">{client.email}</span>
+                          </div>
+                        )}
+                        {p.pricePaid != null && (
+                          <div className="flex items-center gap-2 text-slate-600">
+                            <DollarSign className="h-3 w-3 text-slate-400" />
+                            <span className="font-medium text-slate-800">{Number(p.pricePaid).toFixed(2)} {getCurrencySymbol()}</span>
+                          </div>
+                        )}
+                        {p.paidAt && (
+                          <div className="flex items-center gap-2 text-slate-600">
+                            <Clock className="h-3 w-3 text-slate-400" />
+                            <span className="font-medium text-slate-800">{formatDate(p.paidAt)}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </Fragment>
+                );
+              })}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ===== TAB: Duraklar ===== */}
+        <TabsContent value="stops" className="flex-1 overflow-y-auto mt-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium text-slate-700">
+              {t.admin.tourStops} ({tourDetail.stops?.length || 0})
+            </p>
+            <Button size="sm" onClick={() => setAddStopOpen(true)} className="gap-1.5">
+              <Plus className="h-4 w-4" />
+              {t.admin.addTourStop}
+            </Button>
+          </div>
+
+          {!tourDetail.stops?.length ? (
+            <EmptyState icon={MapPin} title={t.admin.tourStops} description={t.tours.noStops} />
+          ) : (
+            <div className="space-y-2">
+              {tourDetail.stops.map((stop, index) => {
+                const isEditing = editingStopId === stop.id;
+                return (
+                <Card key={stop.id} className="border shadow-sm">
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-violet-100 text-violet-600 text-sm font-bold shrink-0 mt-0.5">
+                        {index + 1}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="font-medium text-sm">
+                            {stop.organization?.name || `${t.tours.organization} #${stop.organizationId}`}
+                          </p>
+                          {stop.preReservationStatus && (
+                            <Badge
+                              variant={stop.preReservationStatus === 'approved' ? 'default' : stop.preReservationStatus === 'rejected' ? 'destructive' : 'secondary'}
+                              className="text-[10px] px-1.5 py-0"
+                            >
+                              {stop.preReservationStatus === 'approved' ? t.tours.stopStatusApproved
+                                : stop.preReservationStatus === 'rejected' ? t.tours.stopStatusRejected
+                                : t.tours.stopStatusPending}
+                            </Badge>
+                          )}
+                          {stop.choicesStatus && (
+                            <Badge
+                              variant={stop.choicesStatus === 'approved' ? 'default' : stop.choicesStatus === 'rejected' ? 'destructive' : 'outline'}
+                              className="text-[10px] px-1.5 py-0"
+                            >
+                              {stop.choicesStatus === 'approved' ? t.tours.choicesStatusApproved
+                                : stop.choicesStatus === 'submitted' ? t.tours.choicesStatusSubmitted
+                                : stop.choicesStatus === 'rejected' ? t.tours.choicesStatusRejected
+                                : stop.choicesStatus === 'revision_requested' ? t.tours.choicesStatusRevisionRequested
+                                : t.tours.choicesStatusInProgress}
+                            </Badge>
+                          )}
+                        </div>
+                        {stop.organization?.address && (
+                          <p className="text-slate-400 text-xs flex items-center gap-1 mb-1">
+                            <MapPin className="h-3 w-3" />
+                            {stop.organization.address}
+                          </p>
+                        )}
+                        <p className="text-slate-500 text-xs flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {formatShortDateTime(stop.scheduledStartTime)} - {formatShortDateTime(stop.scheduledEndTime)}
+                        </p>
+                        {!isEditing && stop.description && (
+                          <p className="text-slate-500 text-xs mt-1">{stop.description}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        {stop.preReservationStatus === 'pending' && (
+                          <>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+                                  onClick={() => approveStopMutation.mutate(stop.id)}
+                                  disabled={approveStopMutation.isPending}
+                                >
+                                  <CheckCircle className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>{t.admin.approvePreReservation}</TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  onClick={() => setRejectStopId(stop.id)}
+                                >
+                                  <XCircle className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>{t.admin.rejectPreReservation}</TooltipContent>
+                            </Tooltip>
+                          </>
+                        )}
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className={`h-8 w-8 p-0 ${isEditing ? 'text-violet-600 bg-violet-50' : 'text-slate-400 hover:text-violet-600 hover:bg-violet-50'}`}
+                              onClick={() => {
+                                if (isEditing) {
+                                  setEditingStopId(null);
+                                } else {
+                                  const toLocalInput = (iso: string) => iso ? iso.replace(/[Zz]$/, '').replace(/[+-]\d{2}:\d{2}$/, '').slice(0, 16) : '';
+                                  setEditingStopId(stop.id);
+                                  setEditStopDescription(stop.description || '');
+                                  setEditStopStartTime(toLocalInput(stop.scheduledStartTime));
+                                  setEditStopEndTime(toLocalInput(stop.scheduledEndTime));
+                                  setEditStopShowPrice(stop.showPriceToCustomer ?? true);
+                                  setEditStopMaxSpend(stop.maxSpendLimit != null ? String(stop.maxSpendLimit) : '');
+                                  setEditStopChoiceDeadline(stop.choiceDeadlineTime ? toLocalInput(stop.choiceDeadlineTime) : '');
+                                  // Populate selectionLimits from stop data
+                                  if (stop.selectionLimits?.length) {
+                                    const limitsMap: Record<number, number> = {};
+                                    for (const sl of stop.selectionLimits) {
+                                      if (sl.type === 'service-category') limitsMap[sl.id] = sl.max;
+                                    }
+                                    setEditStopSelectionLimits(limitsMap);
+                                  } else {
+                                    setEditStopSelectionLimits({});
+                                  }
+                                  setEditMenuPreviewOrgId(stop.organizationId);
+                                  setEditMenuPreviewOrgName(stop.organization?.name || '');
+                                }
+                              }}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>{isEditing ? t.common.cancel : t.common.edit}</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                              onClick={() => setDeleteStopId(stop.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>{t.admin.removeTourStop}</TooltipContent>
+                        </Tooltip>
+                      </div>
+                    </div>
+
+                    {/* Inline edit form */}
+                    {isEditing && (
+                      <div className="mt-3 pt-3 border-t space-y-3">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => setEditMenuPreviewOpen(true)}
+                        >
+                          <Eye className="h-3.5 w-3.5 mr-1.5" />
+                          {t.menu.menuPreview}
+                        </Button>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs">{t.admin.descriptionLabel}</Label>
+                          <Textarea
+                            value={editStopDescription}
+                            onChange={(e) => setEditStopDescription(e.target.value)}
+                            rows={2}
+                            className="text-sm"
+                          />
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="space-y-1.5">
+                            <Label className="text-xs">{t.admin.scheduledStartTime}</Label>
+                            <DateTimeInput
+                              value={editStopStartTime}
+                              min={tourDetail?.startDate ? `${tourDetail.startDate.split('T')[0]}T00:00` : undefined}
+                              max={tourDetail?.endDate ? `${tourDetail.endDate.split('T')[0]}T23:59` : undefined}
+                              onChange={(e) => setEditStopStartTime(e.target.value)}
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs">{t.admin.scheduledEndTime}</Label>
+                            <DateTimeInput
+                              value={editStopEndTime}
+                              min={tourDetail?.startDate ? `${tourDetail.startDate.split('T')[0]}T00:00` : undefined}
+                              max={tourDetail?.endDate ? `${tourDetail.endDate.split('T')[0]}T23:59` : undefined}
+                              onChange={(e) => setEditStopEndTime(e.target.value)}
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs">{t.requests.choiceDeadline}</Label>
+                          <DateTimeInput
+                            value={editStopChoiceDeadline}
+                            onChange={(e) => setEditStopChoiceDeadline(e.target.value)}
+                          />
+                          <p className="text-[11px] text-slate-400">{t.requests.choiceDeadlineDesc}</p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <Switch
+                            checked={editStopShowPrice}
+                            onCheckedChange={setEditStopShowPrice}
+                          />
+                          <Label className="text-xs">{t.tours.showPriceToCustomer}</Label>
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs">{t.tours.maxSpendLimit}</Label>
+                          <Input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            placeholder={t.tours.maxSpendLimitPlaceholder}
+                            value={editStopMaxSpend}
+                            onChange={(e) => setEditStopMaxSpend(e.target.value)}
+                            className="text-sm"
+                          />
+                        </div>
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setEditingStopId(null)}
+                          >
+                            {t.common.cancel}
+                          </Button>
+                          <Button
+                            size="sm"
+                            className="gap-1.5"
+                            disabled={!editStopStartTime || !editStopEndTime || updateStopMutation.isPending}
+                            onClick={() => {
+                              const editLimits: SelectionLimit[] = Object.entries(editStopSelectionLimits).map(([id, max]) => ({
+                                id: Number(id),
+                                type: 'service-category' as const,
+                                max,
+                              }));
+                              const data: UpdateTourStopPayload = {
+                                description: editStopDescription,
+                                scheduledStartTime: editStopStartTime,
+                                scheduledEndTime: editStopEndTime,
+                                showPriceToCustomer: editStopShowPrice,
+                                maxSpendLimit: editStopMaxSpend ? Number(editStopMaxSpend) : null,
+                                choiceDeadlineTime: editStopChoiceDeadline || undefined,
+                                selectionLimits: editLimits.length > 0 ? editLimits : null,
+                              };
+                              updateStopMutation.mutate({ stopId: stop.id, data });
+                            }}
+                          >
+                            {updateStopMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                            {t.common.save}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+                );
+              })}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ===== TAB: Misafir Secimleri ===== */}
+        <TabsContent value="choices" className="flex-1 overflow-y-auto mt-4">
+          {!tourDetail.stops?.length ? (
+            <EmptyState icon={ClipboardList} title={t.tours.customerChoices} description={t.tours.noStops} />
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+              {/* Stop selector - 1 column */}
+              <Card className="lg:col-span-1">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">{t.tours.stops}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-1">
+                    {tourDetail.stops.map((stop, index) => (
+                      <button
+                        key={stop.id}
+                        type="button"
+                        className={`w-full flex items-center gap-2 p-2.5 rounded-lg text-left transition-colors ${
+                          choicesStopId === stop.id
+                            ? 'bg-blue-50 border border-blue-300'
+                            : 'hover:bg-slate-50 border border-transparent'
+                        }`}
+                        onClick={() => {
+                          setChoicesStopId(stop.id);
+                          setExpandedClientId(null);
+                        }}
+                      >
+                        <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
+                          {index + 1}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium truncate">{stop.organization?.name || `#${stop.organizationId}`}</p>
+                            {(() => {
+                              const dotConfig: Record<string, { color: string; label: string }> = {
+                                pending: { color: 'bg-orange-400', label: t.tours.stopStatusPending },
+                                approved: { color: 'bg-green-500', label: t.tours.stopStatusApproved },
+                                rejected: { color: 'bg-red-500', label: t.tours.stopStatusRejected },
+                              };
+                              const status = stop.preReservationStatus;
+                              const cfg = status
+                                ? (dotConfig[status] || { color: 'bg-slate-300', label: status })
+                                : { color: 'bg-slate-300', label: t.tours.stopStatusNoRequest };
+                              return (
+                                <span
+                                  className={`w-2.5 h-2.5 rounded-full shrink-0 ${cfg.color}`}
+                                  title={cfg.label}
+                                />
+                              );
+                            })()}
+                          </div>
+                          <p className="text-xs text-slate-500">
+                            {stop.scheduledStartTime ? formatShortDateTime(stop.scheduledStartTime) : ''}
+                            {stop.scheduledStartTime && stop.scheduledEndTime ? ' - ' : ''}
+                            {stop.scheduledEndTime ? formatShortDateTime(stop.scheduledEndTime) : ''}
+                          </p>
+                          {(() => {
+                            const choicesConfig: Record<string, { variant: 'default' | 'secondary' | 'outline' | 'destructive'; label: string }> = {
+                              in_progress: { variant: 'outline', label: t.tours.choicesStatusInProgress },
+                              submitted: { variant: 'secondary', label: t.tours.choicesStatusSubmitted },
+                              approved: { variant: 'default', label: t.tours.choicesStatusApproved },
+                              rejected: { variant: 'destructive', label: t.tours.choicesStatusRejected },
+                              revision_requested: { variant: 'outline', label: t.tours.choicesStatusRevisionRequested },
+                            };
+                            const cs = stop.choicesStatus;
+                            if (!cs) return null;
+                            const cfg = choicesConfig[cs] || { variant: 'outline' as const, label: cs };
+                            return (
+                              <Badge variant={cfg.variant} className="text-[10px] px-1.5 py-0 mt-0.5">
+                                {cfg.label}
+                              </Badge>
+                            );
+                          })()}
+                          {stop.preReservationStatus === 'approved' && stop.choicesStatus !== 'approved' && (
+                            <ChoiceDeadlineCountdown tourStopId={stop.id} compact choiceDeadlineTime={stop.choiceDeadlineTime} scheduledEndTime={stop.scheduledEndTime} choiceDeadlineHours={stop.choiceDeadline} />
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Choices + Summary - 3 columns */}
+              <div className="lg:col-span-3 space-y-4">
+                {!choicesStopId ? (
+                  <Card>
+                    <CardContent className="py-12">
+                      <EmptyState
+                        icon={ClipboardList}
+                        title={t.tours.customerChoices}
+                        description={t.tours.selectStop}
+                      />
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <>
+                    {/* Service Summary */}
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm flex items-center gap-2">
+                          <DollarSign className="h-4 w-4" />
+                          {t.tours.serviceSummary}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {summaryLoading ? (
+                          <LoadingState message={t.common.loading} />
+                        ) : !serviceSummary?.services?.length ? (
+                          <p className="text-sm text-slate-500 text-center py-4">{t.tours.noChoices}</p>
+                        ) : (() => {
+                          const currSymbol = getCurrencySymbol(serviceSummary.currency || serviceSummary.services[0]?.currency);
+                          return (
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="border-b text-slate-500">
+                                  <th className="text-left py-2 font-medium">{t.tours.service}</th>
+                                  <th className="text-center py-2 font-medium">{t.tours.quantity}</th>
+                                  <th className="text-right py-2 font-medium">{t.tours.unitPrice}</th>
+                                  <th className="text-right py-2 font-medium">{t.tours.totalPrice}</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {serviceSummary.services.map((item, idx) => {
+                                  const svcId = Number(item.serviceId || item.service?.id || 0);
+                                  const notes: { name: string; note: string }[] = [];
+                                  for (const ch of choicesArr) {
+                                    const cName = [ch.client?.firstName, ch.client?.lastName].filter(Boolean).join(' ') || ch.clientName || `#${ch.clientId}`;
+                                    for (const sc of ch.serviceChoices || []) {
+                                      if (Number(sc.serviceId) === svcId && sc.note) {
+                                        notes.push({ name: cName, note: sc.note });
+                                      }
+                                    }
+                                  }
+                                  return (
+                                    <React.Fragment key={svcId || idx}>
+                                      <tr className={notes.length ? '' : 'border-b last:border-b-0'}>
+                                        <td className="py-2">{item.serviceName || item.service?.title}</td>
+                                        <td className="py-2 text-center">{item.totalQuantity}</td>
+                                        <td className="py-2 text-right">{Number(item.unitPrice).toFixed(2)} {currSymbol}</td>
+                                        <td className="py-2 text-right font-medium">{Number(item.totalPrice).toFixed(2)} {currSymbol}</td>
+                                      </tr>
+                                      {notes.length > 0 && (
+                                        <tr className="border-b last:border-b-0">
+                                          <td colSpan={4} className="pb-2 pl-4">
+                                            {notes.map((n, ni) => (
+                                              <span key={ni} className="inline-block text-xs italic bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded mr-1 mb-0.5">
+                                                {n.name}: {n.note}
+                                              </span>
+                                            ))}
+                                          </td>
+                                        </tr>
+                                      )}
+                                    </React.Fragment>
+                                  );
+                                })}
+                              </tbody>
+                              <tfoot>
+                                <tr className="border-t-2">
+                                  <td colSpan={3} className="py-2 font-semibold text-right">{t.tours.grandTotal}</td>
+                                  <td className="py-2 text-right font-bold text-lg">{Number(serviceSummary.grandTotal).toFixed(2)} {currSymbol}</td>
+                                </tr>
+                                {serviceSummary.commissionRate != null && serviceSummary.commissionAmount != null && (
+                                  <tr>
+                                    <td colSpan={3} className="py-1 text-right text-sm font-medium text-orange-600">
+                                      {t.tours.agencyCommission} %{serviceSummary.commissionRate}
+                                    </td>
+                                    <td className="py-1 text-right font-semibold text-orange-600">{Number(serviceSummary.commissionAmount).toFixed(2)} {currSymbol}</td>
+                                  </tr>
+                                )}
+                                {(serviceSummary as Record<string, unknown>).systemCommissionRate != null && (serviceSummary as Record<string, unknown>).systemCommissionAmount != null && (
+                                  <tr>
+                                    <td colSpan={3} className="py-1 text-right text-sm font-medium text-violet-600">
+                                      {t.tours.systemCommission} %{String((serviceSummary as Record<string, unknown>).systemCommissionRate)}
+                                    </td>
+                                    <td className="py-1 text-right font-semibold text-violet-600">{Number((serviceSummary as Record<string, unknown>).systemCommissionAmount).toFixed(2)} {currSymbol}</td>
+                                  </tr>
+                                )}
+                              </tfoot>
+                            </table>
+                          </div>
+                          );
+                        })()}
+                      </CardContent>
+                    </Card>
+
+                    {/* 3D Venue Occupancy */}
+                    {selectedStop && (
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm flex items-center gap-2">
+                            <Building2 className="h-4 w-4" />
+                            {t.venue?.modelView || '3D Model'}
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <AdminStopVenuePreview stopId={selectedStop.id} categoryId={selectedStop.organization?.categoryId} />
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Customer Choices Detail */}
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-sm flex items-center gap-2">
+                            <ClipboardList className="h-4 w-4" />
+                            {t.tours.customerChoices}
+                          </CardTitle>
+                          {selectedStop?.preReservationStatus === 'approved' && selectedStop?.choicesStatus !== 'approved' && (
+                            <ChoiceDeadlineCountdown
+                              tourStopId={choicesStopId}
+                              choiceDeadlineTime={selectedStop.choiceDeadlineTime}
+                              scheduledEndTime={selectedStop.scheduledEndTime}
+                              choiceDeadlineHours={selectedStop.choiceDeadline}
+                            />
+                          )}
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        {choicesLoading ? (
+                          <LoadingState message={t.common.loading} />
+                        ) : (
+                          <div className="space-y-2">
+                            {choicesArr.map((choice: AgencyStopChoicesDto, choiceIdx: number) => {
+                              const clientName = choice.client
+                                ? `${choice.client.firstName || ''} ${choice.client.lastName || ''}`.trim()
+                                : choice.clientName || `#${choice.clientId}`;
+                              const isExpanded = expandedClientId === choice.clientId;
+
+                              return (
+                                <div key={`${choice.clientId}-${choiceIdx}`} className="border rounded-lg overflow-hidden">
+                                  <button
+                                    type="button"
+                                    className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 transition-colors"
+                                    onClick={() => setExpandedClientId(isExpanded ? null : choice.clientId)}
+                                  >
+                                    <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center shrink-0 overflow-hidden">
+                                      {choice.client?.profilePhoto ? (
+                                        <img src={choice.client.profilePhoto} alt="" className="w-full h-full object-cover" />
+                                      ) : (
+                                        <UserIcon className="h-4 w-4 text-slate-400" />
+                                      )}
+                                    </div>
+                                    <div className="flex-1 min-w-0 text-left">
+                                      <p className="text-sm font-medium truncate">{clientName}</p>
+                                      {choice.client?.email && (
+                                        <p className="text-xs text-slate-500">{choice.client.email}</p>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      {choice.resourceChoice && (
+                                        <Badge variant="outline" className="text-xs">{t.tours.resourceSelection}</Badge>
+                                      )}
+                                      {choice.serviceChoices && choice.serviceChoices.length > 0 && (
+                                        <Badge variant="secondary" className="text-xs">
+                                          {choice.serviceChoices.length} {t.tours.service.toLowerCase()}
+                                        </Badge>
+                                      )}
+                                      {isExpanded ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
+                                    </div>
+                                  </button>
+
+                                  {isExpanded && (
+                                    <div className="border-t px-3 py-3 bg-slate-50 space-y-3">
+                                      <div>
+                                        <div className="flex items-center justify-between mb-1">
+                                          <p className="text-xs font-medium text-slate-500">{t.tours.resource}</p>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-6 px-2 text-xs gap-1 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              const cId = choice.clientId ?? choice.client?.id;
+                                              if (!cId) return;
+                                              const cName = choice.client
+                                                ? `${choice.client.firstName || ''} ${choice.client.lastName || ''}`.trim()
+                                                : choice.clientName || `#${cId}`;
+                                              const hasExisting = !!choice.resourceChoice;
+                                              const existingResId = !Array.isArray(choice.resourceChoice) && choice.resourceChoice?.resourceId
+                                                ? choice.resourceChoice.resourceId
+                                                : undefined;
+                                              openLayoutEditDialog(choicesStopId!, cId, cName, hasExisting, existingResId);
+                                            }}
+                                          >
+                                            <Armchair className="h-3 w-3" />
+                                            {choice.resourceChoice ? t.customer.changeTable : t.customer.selectSeat}
+                                          </Button>
+                                        </div>
+                                        {choice.resourceChoice ? (
+                                          <div className="text-sm bg-white rounded p-2 border">
+                                            {Array.isArray(choice.resourceChoice)
+                                              ? choice.resourceChoice.map((item) => `${item.resourceTypeName}: ${item.resourceName}`).join(' · ')
+                                              : (choice.resourceChoice.resource?.name || `#${choice.resourceChoice.resourceId}`)
+                                            }
+                                          </div>
+                                        ) : (
+                                          <p className="text-xs text-slate-400">{t.tours.noChoices}</p>
+                                        )}
+                                      </div>
+                                      <div>
+                                        <div className="flex items-center justify-between mb-1">
+                                          <p className="text-xs font-medium text-slate-500">{t.tours.service}</p>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-6 px-2 text-xs gap-1 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              const cId = choice.clientId ?? choice.client?.id;
+                                              if (!cId) return;
+                                              const cName = choice.client
+                                                ? `${choice.client.firstName || ''} ${choice.client.lastName || ''}`.trim()
+                                                : choice.clientName || `#${cId}`;
+                                              setMenuEditTarget({ stopId: choicesStopId!, clientId: cId, clientName: cName });
+                                            }}
+                                          >
+                                            <UtensilsCrossed className="h-3 w-3" />
+                                            {t.customer.editMenuAction}
+                                          </Button>
+                                        </div>
+                                        {choice.serviceChoices && choice.serviceChoices.length > 0 ? (
+                                          <div className="space-y-1">
+                                            {choice.serviceChoices.map((sc) => (
+                                              <div key={sc.id} className="flex items-center justify-between text-sm bg-white rounded p-2 border">
+                                                <div className="flex-1 min-w-0">
+                                                  <span>{sc.service?.title || `#${sc.serviceId}`}</span>
+                                                  {sc.note && (
+                                                    <span className="ml-2 text-xs italic bg-yellow-100 text-yellow-800 px-1.5 py-0.5 rounded">
+                                                      {sc.note}
+                                                    </span>
+                                                  )}
+                                                </div>
+                                                <div className="flex items-center gap-3 text-slate-600 shrink-0">
+                                                  <span>{sc.quantity}x</span>
+                                                  {sc.service?.basePrice != null && (
+                                                    <span className="font-medium">{(Number(sc.service.basePrice) * sc.quantity).toFixed(2)} {getCurrencySymbol(sc.service?.currency || serviceSummary?.currency || serviceSummary?.services?.[0]?.currency)}</span>
+                                                  )}
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        ) : (
+                                          <p className="text-xs text-slate-400">{t.tours.noChoices}</p>
+                                        )}
+                                      </div>
+                                      {!choice.resourceChoice && (!choice.serviceChoices || choice.serviceChoices.length === 0) && (
+                                        <p className="text-sm text-slate-400 text-center">{t.tours.noChoices}</p>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+
+                            {/* Clients without choices */}
+                            {(() => {
+                              const choiceClientIds = new Set(choicesArr.map((c: AgencyStopChoicesDto) => c.clientId ?? c.client?.id));
+                              const confirmedWithoutChoices = (tourDetail?.participants || []).filter(
+                                (p: any) => p.status === 'confirmed' && !choiceClientIds.has(p.clientId)
+                              );
+                              if (confirmedWithoutChoices.length === 0) return null;
+                              return (
+                                <>
+                                  <div className="flex items-center gap-2 mt-4 mb-1">
+                                    <div className="flex-1 border-t border-dashed border-slate-200" />
+                                    <span className="text-xs text-slate-400 shrink-0">{t.tours.noChoicesClients || 'Seçim yapmamış misafirler'}</span>
+                                    <div className="flex-1 border-t border-dashed border-slate-200" />
+                                  </div>
+                                  {confirmedWithoutChoices.map((p: any) => {
+                                    const cName = `${p.client?.firstName || ''} ${p.client?.lastName || ''}`.trim() || `#${p.clientId}`;
+                                    const isExpanded = expandedClientId === p.clientId;
+                                    return (
+                                      <div key={`no-choice-${p.clientId}`} className="border border-dashed border-slate-200 rounded-lg overflow-hidden">
+                                        <button
+                                          type="button"
+                                          className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 transition-colors"
+                                          onClick={() => setExpandedClientId(isExpanded ? null : p.clientId)}
+                                        >
+                                          <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center shrink-0 overflow-hidden">
+                                            {p.client?.profilePhoto ? (
+                                              <img src={resolveImageUrl(p.client.profilePhoto) || ''} alt="" className="w-full h-full object-cover" />
+                                            ) : (
+                                              <UserIcon className="h-4 w-4 text-slate-400" />
+                                            )}
+                                          </div>
+                                          <div className="flex-1 min-w-0 text-left">
+                                            <p className="text-sm font-medium truncate">{cName}</p>
+                                            {p.client?.email && (
+                                              <p className="text-xs text-slate-500">{p.client.email}</p>
+                                            )}
+                                          </div>
+                                          <Badge variant="outline" className="text-xs text-slate-400 shrink-0">{t.tours.noChoices}</Badge>
+                                          {isExpanded ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
+                                        </button>
+                                        {isExpanded && (
+                                          <div className="border-t px-3 py-3 bg-slate-50 space-y-3">
+                                            <div className="flex items-center justify-between">
+                                              <p className="text-xs font-medium text-slate-500">{t.tours.resource}</p>
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-6 px-2 text-xs gap-1 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  openLayoutEditDialog(choicesStopId!, p.clientId, cName, false);
+                                                }}
+                                              >
+                                                <Armchair className="h-3 w-3" />
+                                                {t.customer.selectSeat}
+                                              </Button>
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                              <p className="text-xs font-medium text-slate-500">{t.tours.service}</p>
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-6 px-2 text-xs gap-1 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setMenuEditTarget({ stopId: choicesStopId!, clientId: p.clientId, clientName: cName });
+                                                }}
+                                              >
+                                                <UtensilsCrossed className="h-3 w-3" />
+                                                {t.customer.selectMenuAction}
+                                              </Button>
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </>
+                              );
+                            })()}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    {/* Choices Status & Print */}
+                    {(() => {
+                      const currentStop = stops?.find(s => s.id === choicesStopId);
+                      const cs = currentStop?.choicesStatus;
+                      const choicesStatusConfig: Record<string, { variant: 'default' | 'secondary' | 'outline' | 'destructive'; label: string }> = {
+                        submitted: { variant: 'secondary', label: t.tours.choicesStatusSubmitted },
+                        approved: { variant: 'default', label: t.tours.choicesStatusApproved },
+                        rejected: { variant: 'destructive', label: t.tours.choicesStatusRejected },
+                        revision_requested: { variant: 'outline', label: t.tours.choicesStatusRevisionRequested },
+                        in_progress: { variant: 'outline', label: t.tours.choicesStatusInProgress },
+                      };
+                      return (
+                        <div className="flex items-center justify-between">
+                          {cs && choicesStatusConfig[cs] ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-slate-500">{t.tours.choicesStatus}:</span>
+                              <Badge variant={choicesStatusConfig[cs].variant}>
+                                {choicesStatusConfig[cs].label}
+                              </Badge>
+                            </div>
+                          ) : <div />}
+                          <div className="flex items-center gap-2">
+                            {currentStop?.preReservationStatus === 'approved' && cs === 'in_progress' && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => choicesStopId && lockChoicesMutation.mutate(choicesStopId)}
+                                disabled={lockChoicesMutation.isPending}
+                                className="gap-2"
+                              >
+                                {lockChoicesMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
+                                {t.tours.lockChoices}
+                              </Button>
+                            )}
+                            {(cs === 'approved' || cs === 'submitted') && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => choicesStopId && unlockChoicesMutation.mutate(choicesStopId)}
+                                disabled={unlockChoicesMutation.isPending}
+                                className="gap-2"
+                              >
+                                {unlockChoicesMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Unlock className="h-4 w-4" />}
+                                {t.tours.unlockChoices}
+                              </Button>
+                            )}
+                            {choicesArr.length > 0 && (
+                              <Button variant="outline" size="sm" onClick={() => setReceiptOpen(true)} className="gap-2">
+                                <Printer className="h-4 w-4" />
+                                {t.guests.printReceipt}
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
+
+      {/* Receipt Dialog */}
+      <Dialog open={receiptOpen} onOpenChange={setReceiptOpen}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{t.guests.printReceipt}</DialogTitle>
+            <DialogDescription>{t.guests.receiptTemplate}</DialogDescription>
+          </DialogHeader>
+
+          {/* Filter and price toggle */}
+          <div className="flex items-center gap-2 mb-2">
+            <input
+              type="text"
+              value={receiptFilter}
+              onChange={(e) => setReceiptFilter(e.target.value)}
+              placeholder={t.common.search || 'Ara...'}
+              className="flex-1 px-3 py-1.5 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-slate-400"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPrices(!showPrices)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors whitespace-nowrap ${
+                showPrices
+                  ? 'bg-green-50 border-green-300 text-green-700'
+                  : 'bg-slate-50 border-slate-300 text-slate-600'
+              }`}
+            >
+              {showPrices ? t.guests.showPrices : t.guests.hidePrices}
+            </button>
+          </div>
+
+          <div className="flex gap-2 mb-4 flex-wrap">
+            {([
+              { key: 'compact' as ReceiptTemplate, label: t.guests.compactReceipt, desc: t.guests.compactReceiptDesc },
+              { key: 'detailed' as ReceiptTemplate, label: t.guests.detailedList, desc: t.guests.detailedListDesc },
+              { key: 'table-based' as ReceiptTemplate, label: t.guests.tableBasedList, desc: t.guests.tableBasedListDesc },
+              { key: 'kitchen' as ReceiptTemplate, label: t.guests.kitchenSummary, desc: t.guests.kitchenSummaryDesc },
+              { key: 'service-summary' as ReceiptTemplate, label: t.guests.serviceSummaryReceipt, desc: t.guests.serviceSummaryReceiptDesc },
+            ]).map((tmpl) => (
+              <button
+                key={tmpl.key}
+                type="button"
+                onClick={() => setReceiptTemplate(tmpl.key)}
+                className={`flex-1 p-3 rounded-lg border text-left transition-colors min-w-[140px] ${
+                  receiptTemplate === tmpl.key
+                    ? 'bg-slate-100 border-slate-400 ring-1 ring-slate-400'
+                    : 'bg-white border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <p className="text-sm font-medium">{tmpl.label}</p>
+                <p className="text-xs text-slate-500">{tmpl.desc}</p>
+              </button>
+            ))}
+          </div>
+
+          <div ref={printRef} className="border rounded-lg p-4 bg-white overflow-x-auto">
+            {receiptTemplate === 'compact' && (
+              <CompactReceipt tourInfo={receiptTourInfo} choices={filteredChoices} orgName={choicesOrgName} t={t} showPrices={showPrices} />
+            )}
+            {receiptTemplate === 'detailed' && (
+              <DetailedListReceipt tourInfo={receiptTourInfo} choices={filteredChoices} orgName={choicesOrgName} t={t} showPrices={showPrices} />
+            )}
+            {receiptTemplate === 'table-based' && (
+              <TableBasedListReceipt tourInfo={receiptTourInfo} choices={filteredChoices} orgName={choicesOrgName} t={t} showPrices={showPrices} />
+            )}
+            {receiptTemplate === 'kitchen' && (
+              <KitchenSummaryReceipt tourInfo={receiptTourInfo} choices={filteredChoices} orgName={choicesOrgName} t={t} showPrices={showPrices} />
+            )}
+            {receiptTemplate === 'service-summary' && (
+              <ServiceSummaryReceipt tourInfo={receiptTourInfo} serviceSummary={serviceSummary} orgName={choicesOrgName} t={t} showPrices={showPrices} />
+            )}
+            {receiptTemplate !== 'service-summary' && (
+              <>
+                <ReceiptTableServices choices={filteredChoices} t={t} showPrices={showPrices} />
+                <ReceiptServiceSummary serviceSummary={serviceSummary} t={t} showPrices={showPrices} />
+              </>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => setReceiptOpen(false)}>
+              {t.common.cancel}
+            </Button>
+            <Button variant="outline" onClick={handleExportExcel} className="gap-2">
+              <FileSpreadsheet className="h-4 w-4" />
+              Excel
+            </Button>
+            <Button onClick={handlePrint} className="gap-2">
+              <Printer className="h-4 w-4" />
+              {t.guests.printReceipt}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Tour Stop Dialog */}
+      <Dialog open={addStopOpen} onOpenChange={(open) => {
+        if (!open) {
+          setAddStopOpen(false);
+          setSelectedOrgDetail(null);
+          setStopDescription('');
+          setStopStartTime('');
+          setStopEndTime('');
+          setStopShowPrice(true);
+          setStopMaxSpend('');
+          setStopChoiceDeadline('');
+          setStopSelectionLimits({});
+          setAddStopOrgSearch('');
+        }
+      }}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+          <DialogHeader>
+            <DialogTitle>{t.admin.addTourStop}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {/* Organization Search */}
+            <div className="space-y-2">
+              <Label>{t.tours.organization} *</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Input
+                  placeholder={t.admin.searchOrganization}
+                  value={addStopOrgSearch}
+                  onChange={(e) => {
+                    setAddStopOrgSearch(e.target.value);
+                    if (selectedOrgDetail) {
+                      setSelectedOrgDetail(null);
+                      setStopSelectionLimits({});
+                    }
+                  }}
+                  className="pl-9"
+                />
+                {orgSearchLoading && (
+                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-slate-400" />
+                )}
+              </div>
+
+              {/* Search results dropdown */}
+              {!selectedOrgDetail && searchedOrgs.length > 0 && (
+                <div className="border rounded-lg max-h-48 overflow-y-auto bg-white shadow-sm">
+                  {searchedOrgs.map((org) => (
+                    <button
+                      key={org.id}
+                      type="button"
+                      className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 text-left transition-colors border-b last:border-b-0"
+                      onClick={() => {
+                        setSelectedOrgDetail({ id: org.id, name: org.name, address: org.address, email: org.email, phone: org.phone, phoneCountryCode: org.phoneCountryCode });
+                        setAddStopOrgSearch(org.name);
+                      }}
+                    >
+                      <Building2 className="h-4 w-4 text-slate-400 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{org.name}</p>
+                        {org.address && (
+                          <p className="text-xs text-slate-500 truncate max-w-[320px]" title={org.address}>{org.address}</p>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {!selectedOrgDetail && !orgSearchLoading && searchedOrgs.length === 0 && (
+                <p className="text-sm text-slate-500 text-center py-2">{t.admin.noOrganizationsFound}</p>
+              )}
+
+              {/* Selected organization detail card */}
+              {selectedOrgDetail && (
+                <Card className="border-green-200 bg-green-50/50">
+                  <CardContent className="p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <CheckCircle className="h-4 w-4 text-green-600 shrink-0" />
+                        <span className="font-medium text-sm truncate">{selectedOrgDetail.name}</span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 shrink-0"
+                        onClick={() => {
+                          setSelectedOrgDetail(null);
+                          setAddStopOrgSearch('');
+                          setStopSelectionLimits({});
+                        }}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-600 mt-2">
+                      {selectedOrgDetail.address && (
+                        <div className="col-span-2 flex items-start gap-1">
+                          <MapPin className="h-3 w-3 mt-0.5 shrink-0 text-slate-400" />
+                          <span>{selectedOrgDetail.address}</span>
+                        </div>
+                      )}
+                      {selectedOrgDetail.email && (
+                        <div className="flex items-center gap-1">
+                          <Mail className="h-3 w-3 text-slate-400" />
+                          <span>{selectedOrgDetail.email}</span>
+                        </div>
+                      )}
+                      {selectedOrgDetail.phone && (
+                        <div className="flex items-center gap-1">
+                          <Phone className="h-3 w-3 text-slate-400" />
+                          <span>{selectedOrgDetail.phoneCountryCode ? `+${selectedOrgDetail.phoneCountryCode} ` : ''}{selectedOrgDetail.phone}</span>
+                        </div>
+                      )}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full mt-2"
+                      onClick={() => setMenuPreviewOpen(true)}
+                    >
+                      <Eye className="h-3.5 w-3.5 mr-1.5" />
+                      {t.menu.menuPreview}
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+
+            {/* Time fields */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>{t.admin.scheduledStartTime}</Label>
+                <DateTimeInput
+                  value={stopStartTime}
+                  min={tourDetail?.startDate ? `${tourDetail.startDate.split('T')[0]}T00:00` : undefined}
+                  max={tourDetail?.endDate ? `${tourDetail.endDate.split('T')[0]}T23:59` : undefined}
+                  onChange={(e) => setStopStartTime(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{t.admin.scheduledEndTime}</Label>
+                <DateTimeInput
+                  value={stopEndTime}
+                  min={tourDetail?.startDate ? `${tourDetail.startDate.split('T')[0]}T00:00` : undefined}
+                  max={tourDetail?.endDate ? `${tourDetail.endDate.split('T')[0]}T23:59` : undefined}
+                  onChange={(e) => setStopEndTime(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Description */}
+            <div className="space-y-2">
+              <Label>{t.tours.tourDescription}</Label>
+              <Textarea
+                value={stopDescription}
+                onChange={(e) => setStopDescription(e.target.value)}
+                placeholder="Misafirlerinizin göreceği durak açıklaması"
+                rows={2}
+              />
+            </div>
+
+            {/* Show price toggle */}
+            <div className="flex items-center gap-3">
+              <Switch
+                checked={stopShowPrice}
+                onCheckedChange={setStopShowPrice}
+              />
+              <Label>{t.tours.showPriceToCustomer}</Label>
+            </div>
+
+            {/* Max spend limit */}
+            <div className="space-y-2">
+              <Label>{t.tours.maxSpendLimit}</Label>
+              <Input
+                type="number"
+                min={0}
+                step="0.01"
+                placeholder={t.tours.maxSpendLimitPlaceholder}
+                value={stopMaxSpend}
+                onChange={(e) => setStopMaxSpend(e.target.value)}
+              />
+            </div>
+
+            {/* Choice deadline */}
+            <div className="space-y-2">
+              <Label>{t.requests.choiceDeadline}</Label>
+              <DateTimeInput
+                value={stopChoiceDeadline}
+                onChange={(e) => setStopChoiceDeadline(e.target.value)}
+              />
+              <p className="text-xs text-slate-500">{t.requests.choiceDeadlineDesc}</p>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setAddStopOpen(false)}>
+              {t.common.cancel}
+            </Button>
+            <Button
+              onClick={handleAddStop}
+              disabled={!selectedOrgDetail || !stopStartTime || !stopEndTime || addStopMutation.isPending}
+            >
+              {addStopMutation.isPending ? t.common.loading : t.admin.addTourStop}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Stop Confirm */}
+      <ConfirmDialog
+        open={!!deleteStopId}
+        onOpenChange={(open) => { if (!open) setDeleteStopId(null); }}
+        title={t.admin.removeTourStop}
+        description={t.admin.removeTourStopConfirm}
+        onConfirm={() => { if (deleteStopId) deleteStopMutation.mutate(deleteStopId); }}
+        variant="destructive"
+      />
+
+      {/* Reject Stop Dialog */}
+      <Dialog open={!!rejectStopId} onOpenChange={(open) => { if (!open) { setRejectStopId(null); setRejectReason(''); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t.admin.rejectPreReservation}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label className="text-sm font-medium mb-1.5 block">{t.admin.rejectReason}</Label>
+              <Input
+                placeholder={t.admin.rejectReasonPlaceholder}
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => { setRejectStopId(null); setRejectReason(''); }}>
+                {t.common.cancel}
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => { if (rejectStopId) rejectStopMutation.mutate({ stopId: rejectStopId, reason: rejectReason }); }}
+                disabled={!rejectReason.trim() || rejectStopMutation.isPending}
+              >
+                {rejectStopMutation.isPending ? t.common.loading : t.admin.rejectPreReservation}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Menu Preview (Add Stop) */}
+      <OrgMenuPreviewDialog
+        open={menuPreviewOpen}
+        onOpenChange={setMenuPreviewOpen}
+        organizationId={selectedOrgDetail?.id}
+        organizationName={selectedOrgDetail?.name}
+        selectionLimits={stopSelectionLimits}
+        onSelectionLimitChange={(catId, val) => {
+          setStopSelectionLimits((prev) => {
+            if (val === undefined) {
+              const next = { ...prev };
+              delete next[catId];
+              return next;
+            }
+            return { ...prev, [catId]: val };
+          });
+        }}
+      />
+
+      {/* Menu Preview (Edit Stop) */}
+      <OrgMenuPreviewDialog
+        open={editMenuPreviewOpen}
+        onOpenChange={setEditMenuPreviewOpen}
+        organizationId={editMenuPreviewOrgId}
+        organizationName={editMenuPreviewOrgName}
+        stopId={editingStopId}
+        selectionLimits={editStopSelectionLimits}
+        onSelectionLimitChange={(catId, val) => {
+          setEditStopSelectionLimits((prev) => {
+            if (val === undefined) {
+              const next = { ...prev };
+              delete next[catId];
+              return next;
+            }
+            return { ...prev, [catId]: val };
+          });
+        }}
+      />
+
+      {/* WhatsApp Share Dialog */}
+      <Dialog open={!!whatsappTarget} onOpenChange={(open) => { if (!open) { setWhatsappTarget(null); setWhatsappLang('tr'); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageCircle className="h-5 w-5 text-green-600" />
+              {t.invitations.whatsappShare}
+            </DialogTitle>
+            <DialogDescription className="sr-only">{t.invitations.whatsappShare}</DialogDescription>
+          </DialogHeader>
+          {whatsappTarget && (() => {
+            const fullName = whatsappTarget.name || `${whatsappTarget.client?.firstName || ''} ${whatsappTarget.client?.lastName || ''}`.trim();
+            const username = whatsappTarget.client?.username || '';
+            const wpT = locales[whatsappLang];
+            const message = wpT.invitations.whatsappMessage
+              .replace('{fullName}', fullName)
+              .replace('{username}', username);
+            return (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  {(['tr', 'en', 'de'] as Locale[]).map((l) => (
+                    <button
+                      key={l}
+                      type="button"
+                      onClick={() => setWhatsappLang(l)}
+                      className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                        whatsappLang === l
+                          ? 'bg-green-600 text-white shadow-sm'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      {l === 'tr' ? 'Türkçe' : l === 'en' ? 'English' : 'Deutsch'}
+                    </button>
+                  ))}
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-slate-500 mb-2">{t.invitations.whatsappPreview}</p>
+                  <div className="bg-slate-50 rounded-lg p-3 text-sm whitespace-pre-line text-slate-700 border max-h-60 overflow-y-auto">
+                    {message}
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => { setWhatsappTarget(null); setWhatsappLang('tr'); }}>
+                    {t.common.cancel}
+                  </Button>
+                  <Button
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                    onClick={() => {
+                      const encoded = encodeURIComponent(message);
+                      window.open(`https://web.whatsapp.com/send?text=${encoded}`, '_blank');
+                      setWhatsappTarget(null);
+                      setWhatsappLang('tr');
+                    }}
+                  >
+                    <MessageCircle className="h-4 w-4 mr-2" />
+                    {t.invitations.whatsappSend}
+                  </Button>
+                </DialogFooter>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* Batch Import Dialog */}
+      <Dialog open={batchImportOpen} onOpenChange={(open) => !open && closeBatchImport()}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{t.invitations.batchImportTitle}</DialogTitle>
+            <DialogDescription className="sr-only">{t.invitations.batchImportTitle}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {/* File Select */}
+            <div className="space-y-2">
+              <Label>{t.invitations.selectExcelFile}</Label>
+              <div
+                className="border-2 border-dashed rounded-lg p-4 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition-colors"
+                onClick={() => batchFileRef.current?.click()}
+              >
+                {batchFile ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <FileSpreadsheet className="h-5 w-5 text-green-600" />
+                    <span className="text-sm font-medium">{batchFile.name}</span>
+                    <button
+                      type="button"
+                      className="text-slate-400 hover:text-red-500"
+                      onClick={(e) => { e.stopPropagation(); setBatchFile(null); setBatchPreview([]); }}
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-1">
+                    <Upload className="h-6 w-6 text-slate-400" />
+                    <p className="text-sm text-slate-500">{t.invitations.selectExcelFile}</p>
+                  </div>
+                )}
+              </div>
+              <input
+                ref={batchFileRef}
+                type="file"
+                className="hidden"
+                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    setBatchFile(file);
+                    const XLSX = require('xlsx-js-style');
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                      try {
+                        const wb = XLSX.read(ev.target?.result, { type: 'array' });
+                        const ws = wb.Sheets[wb.SheetNames[0]];
+                        const rows: string[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+                        setBatchPreview(rows);
+                      } catch { setBatchPreview([]); }
+                    };
+                    reader.readAsArrayBuffer(file);
+                  }
+                  e.target.value = '';
+                }}
+              />
+            </div>
+
+            {batchPreview.length > 0 ? (() => {
+              const headerIdx = batchPreview.findIndex(row => row.some(c => String(c).toUpperCase().includes('SOYADI')));
+              const titleText = headerIdx > 0 ? batchPreview.slice(0, headerIdx).map(r => r.filter(c => String(c).trim()).join(' ')).filter(Boolean).join(' ') : null;
+              const headerRow = headerIdx >= 0 ? batchPreview[headerIdx] : batchPreview[0];
+              const dataRows = batchPreview.slice((headerIdx >= 0 ? headerIdx : 0) + 1);
+              const colCount = headerRow?.length || 4;
+              return (
+              /* File Preview */
+              <div className="space-y-2">
+                <Label>{t.invitations.excelPreview} ({dataRows.length} {t.tours.clients.toLowerCase()})</Label>
+                <div className="border rounded-lg overflow-hidden max-h-52 overflow-y-auto">
+                  <table className="w-full text-xs">
+                    <thead className="sticky top-0">
+                      {titleText && (
+                        <tr className="bg-blue-50 border-b">
+                          <th colSpan={colCount} className="px-3 py-1.5 text-left font-semibold text-blue-700 italic">{titleText}</th>
+                        </tr>
+                      )}
+                      <tr className="bg-green-50 border-b">
+                        {headerRow?.map((cell, i) => (
+                          <th key={i} className="px-3 py-1.5 text-left font-semibold text-green-800">{String(cell)}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {dataRows.map((row, ri) => (
+                        <tr key={ri} className={ri % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                          {row.map((cell, ci) => (
+                            <td key={ci} className="px-3 py-1">{String(cell)}</td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              ); })() : (
+              /* Excel Template */
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>{t.invitations.excelTemplate}</Label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const XLSX = require('xlsx-js-style');
+                      const data = [
+                        [t.invitations.excelRowNo, t.invitations.excelLastName, t.invitations.excelFirstName, t.invitations.excelGender],
+                        [1, 'HILLEBRAND', 'INGE', 'MRS'],
+                        [2, 'SUPPAN-DANIA', 'BETTINA', 'MRS'],
+                        [3, 'SCHNEIDER', 'KARIN', 'MR'],
+                      ];
+                      const ws = XLSX.utils.aoa_to_sheet(data);
+                      ws['!cols'] = [{ wch: 8 }, { wch: 20 }, { wch: 20 }, { wch: 12 }];
+                      const wb = XLSX.utils.book_new();
+                      XLSX.utils.book_append_sheet(wb, ws, 'Misafirler');
+                      XLSX.writeFile(wb, 'misafir_sablonu.xlsx');
+                    }}
+                    className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    {t.invitations.downloadTemplate}
+                  </button>
+                </div>
+                <div className="border rounded-lg overflow-hidden">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-slate-100 border-b">
+                        <th className="px-3 py-1.5 text-left font-semibold text-slate-700">{t.invitations.excelRowNo}</th>
+                        <th className="px-3 py-1.5 text-left font-semibold text-slate-700">{t.invitations.excelLastName}</th>
+                        <th className="px-3 py-1.5 text-left font-semibold text-slate-700">{t.invitations.excelFirstName}</th>
+                        <th className="px-3 py-1.5 text-left font-semibold text-slate-700">{t.invitations.excelGender}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      <tr><td className="px-3 py-1 text-slate-500">1</td><td className="px-3 py-1">HILLEBRAND</td><td className="px-3 py-1">INGE</td><td className="px-3 py-1">MRS</td></tr>
+                      <tr><td className="px-3 py-1 text-slate-500">2</td><td className="px-3 py-1">SUPPAN-DANIA</td><td className="px-3 py-1">BETTINA</td><td className="px-3 py-1">MRS</td></tr>
+                      <tr><td className="px-3 py-1 text-slate-500">3</td><td className="px-3 py-1">SCHNEIDER</td><td className="px-3 py-1">KARIN</td><td className="px-3 py-1">MR</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p className="text-[11px] text-amber-600 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-1.5">
+                  ⚠ {t.invitations.excelTemplateDesc}
+                </p>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="outline" onClick={closeBatchImport}>
+                {t.common.cancel}
+              </Button>
+              <Button
+                disabled={!batchFile || batchImportMutation.isPending}
+                onClick={() => {
+                  if (batchFile) {
+                    batchImportMutation.mutate({ file: batchFile });
+                  }
+                }}
+              >
+                {batchImportMutation.isPending ? (
+                  <><Loader2 className="h-4 w-4 animate-spin mr-1" />{t.common.loading}</>
+                ) : (
+                  <><Upload className="h-4 w-4 mr-1" />{t.invitations.batchImport}</>
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Menu Edit Dialog */}
+      <Dialog open={!!menuEditTarget} onOpenChange={(open) => { if (!open) closeMenuEditDialog(); }}>
+        <DialogContent className="sm:max-w-lg max-h-[95vh] sm:max-h-[85vh] min-h-[60vh] sm:min-h-[50vh] w-[95vw] sm:w-auto flex flex-col" onPointerDownOutside={(e) => e.stopPropagation()} onInteractOutside={(e) => e.stopPropagation()}>
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle className="flex items-center gap-2">
+              <UtensilsCrossed className="h-5 w-5 text-orange-500" />
+              {menuEditTarget?.clientName} — {t.customer.editMenuAction}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto pr-1">
+            {menuEditLoading ? (
+              <LoadingState message={t.common.loading} />
+            ) : !menuEditCategories || menuEditCategories.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-slate-500">{t.customer.noMenu}</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {menuEditCategories.map((cat) => (
+                  <InteractiveMenuCategory
+                    key={cat.id}
+                    category={cat}
+                    t={t}
+                    showPrice
+                    stopId={menuEditTarget!.stopId}
+                    getItemQty={menuEditGetItemQty}
+                    setItemQty={menuEditSetItemQty}
+                    getItemNote={menuEditGetItemNote}
+                    setItemNote={menuEditSetItemNote}
+                    getInitialQty={menuEditGetInitialQty}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+          {menuEditTarget && menuEditCategories && menuEditCategories.length > 0 && (
+            <MenuBottomBar
+              stopId={menuEditTarget.stopId}
+              categories={menuEditCategories}
+              showPrice
+              maxSpendLimit={stops?.find(s => s.id === menuEditTarget.stopId)?.maxSpendLimit}
+              getMenuTotal={menuEditGetMenuTotal}
+              menuTotalItemCount={menuEditTotalItemCount}
+              t={t}
+              onSave={() => {
+                toast.success(t.customer.selectionSaved);
+                queryClient.invalidateQueries({ queryKey: ['admin-stop-choices', choicesStopId, lang] });
+                queryClient.invalidateQueries({ queryKey: ['admin-stop-service-summary', choicesStopId, lang] });
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Layout (Resource Choice) Edit Dialog */}
+      <Dialog open={!!layoutEditTarget} onOpenChange={(open) => { if (!open) closeLayoutEditDialog(); }}>
+        <DialogContent className="sm:max-w-4xl max-h-[95vh] sm:max-h-[90vh] w-[95vw] sm:w-auto flex flex-col" onPointerDownOutside={(e) => e.stopPropagation()} onInteractOutside={(e) => e.stopPropagation()}>
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle className="flex items-center gap-2">
+              <Armchair className="h-5 w-5 text-orange-500" />
+              {layoutEditTarget?.clientName} — {layoutEditTarget?.hasExisting ? t.customer.changeTable : t.customer.selectSeat}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto pr-1">
+            {layoutEditLoading ? (
+              <LoadingState message={t.common.loading} />
+            ) : layoutEditError ? (
+              <div className="text-center py-8">
+                <p className="text-red-500">{(layoutEditError as Error).message}</p>
+              </div>
+            ) : layoutFloors.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-slate-500">{t.customer.noLayout}</p>
+              </div>
+            ) : (
+              <>
+                <StopVenuePreview
+                  stopId={layoutEditTarget!.stopId}
+                  floors={layoutFloors}
+                  childrenCache={layoutChildrenCache}
+                  categoryId={stops?.find((s: any) => s.id === layoutEditTarget!.stopId)?.organization?.categoryId}
+                  onTableSelect={(tableResourceId) => {
+                    setLayoutNavigateToTableId(tableResourceId);
+                    setTimeout(() => {
+                      document.getElementById('admin-venue-selector')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }, 200);
+                  }}
+                />
+                <div id="admin-venue-selector" />
+                <CustomerVenueSelector
+                  floors={layoutFloors}
+                  childrenCache={layoutChildrenCache}
+                  loadingChildren={layoutLoadingChildren}
+                  fetchChildren={layoutFetchChildren}
+                  onSelectChair={handleLayoutSelectChair}
+                  savingTable={layoutSaving}
+                  existingResourceId={layoutExistingResourceId}
+                  pendingChairId={layoutPendingChair?.id}
+                  currentClientId={layoutEditTarget?.clientId}
+                  navigateToTableId={layoutNavigateToTableId}
+                  categoryId={stops?.find((s: any) => s.id === layoutEditTarget!.stopId)?.organization?.categoryId}
+                />
+              </>
+            )}
+          </div>
+
+          {layoutPendingChair && (
+            <div className="flex-shrink-0 border-t bg-amber-50 rounded-b-lg -mx-6 -mb-6 px-6 py-4">
+              <p className="text-sm font-semibold text-amber-800 mb-1">{t.customer.seatChangeTitle}</p>
+              <p className="text-sm text-amber-700 mb-3">{t.customer.confirmSeatChange}</p>
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" size="sm" onClick={() => setLayoutPendingChair(null)}>
+                  {t.common.cancel}
+                </Button>
+                <Button size="sm" className="bg-orange-500 hover:bg-orange-600" onClick={() => {
+                  if (layoutPendingChair) {
+                    const chair = layoutPendingChair;
+                    setLayoutPendingChair(null);
+                    handleLayoutSelectChair(chair, true);
+                  }
+                }}>
+                  {t.common.confirm}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Change Password Dialog */}
+      <Dialog open={!!passwordTarget} onOpenChange={(open) => { if (!open) { setPasswordTarget(null); setNewPassword(''); setNewPasswordError(''); setShowNewPassword(false); } }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <KeyRound className="h-5 w-5 text-amber-600" />
+              {t.invitations.changePassword}
+            </DialogTitle>
+          </DialogHeader>
+          {passwordTarget && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 p-2.5 bg-slate-50 rounded-lg">
+                <div className="h-8 w-8 rounded-full bg-violet-100 text-violet-600 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                  {passwordTarget.name.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <p className="font-medium text-sm">{passwordTarget.name}</p>
+                  {passwordTarget.username && <p className="text-xs text-slate-500">{passwordTarget.username}</p>}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>{t.invitations.newPassword}</Label>
+                <div className="relative">
+                  <Input
+                    type={showNewPassword ? 'text' : 'password'}
+                    value={newPassword}
+                    onChange={(e) => { setNewPassword(e.target.value); setNewPasswordError(''); }}
+                    placeholder={t.invitations.newPasswordPlaceholder}
+                    className={`pr-10 ${newPasswordError ? 'border-red-500' : ''}`}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (newPassword.length < 6) {
+                          setNewPasswordError(t.invitations.passwordMinLength);
+                          return;
+                        }
+                        changePasswordMutation.mutate({ clientId: passwordTarget.clientId, newPassword });
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                  >
+                    {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                {newPasswordError && <p className="text-xs text-red-500">{newPasswordError}</p>}
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => { setPasswordTarget(null); setNewPassword(''); setNewPasswordError(''); setShowNewPassword(false); }}>
+                  {t.common.cancel}
+                </Button>
+                <Button
+                  disabled={changePasswordMutation.isPending}
+                  onClick={() => {
+                    if (newPassword.length < 6) {
+                      setNewPasswordError(t.invitations.passwordMinLength);
+                      return;
+                    }
+                    changePasswordMutation.mutate({ clientId: passwordTarget.clientId, newPassword });
+                  }}
+                >
+                  {changePasswordMutation.isPending ? (
+                    <>
+                      <span className="animate-spin mr-2">&#9696;</span>
+                      {t.invitations.changing}
+                    </>
+                  ) : (
+                    <>
+                      <KeyRound className="h-4 w-4 mr-2" />
+                      {t.invitations.changePassword}
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Lightbox */}
+      {lightboxImages.length > 0 && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80"
+          onClick={closeLightbox}
+        >
+          <button
+            type="button"
+            className="absolute top-4 right-4 text-white/70 hover:text-white z-10"
+            onClick={closeLightbox}
+          >
+            <X className="h-6 w-6" />
+          </button>
+          <img
+            src={lightboxImages[lightboxIndex]}
+            alt=""
+            className="max-h-[85vh] max-w-[90vw] object-contain rounded-lg"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+}

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2, User, Search, Users, Eye, EyeOff, Navigation, Calendar, Hash, UserPlus, FileSpreadsheet, Upload, X, MessageCircle, Download, FileText, Send, ChevronDown, KeyRound } from 'lucide-react';
+import { Plus, Trash2, User, Search, Users, Eye, EyeOff, Navigation, Calendar, Hash, UserPlus, FileSpreadsheet, Upload, X, MessageCircle, Download, FileText, Send, ChevronDown, KeyRound, Phone } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { agencyApi, tourApi, type AgencyClientDto, type CreateAgencyClientDto } from '@/lib/api';
@@ -54,6 +54,8 @@ export default function AgencyClientsPage() {
   const [filterTourDropdownOpen, setFilterTourDropdownOpen] = useState(false);
   const [filterTourName, setFilterTourName] = useState('');
   const filterTourRef = useRef<HTMLDivElement>(null);
+  const [pdfShowPhone, setPdfShowPhone] = useState(false);
+  const [pdfShowStatus, setPdfShowStatus] = useState(false);
   const [whatsappTarget, setWhatsappTarget] = useState<AgencyClientDto | null>(null);
   const [whatsappLang, setWhatsappLang] = useState<Locale>('tr');
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -348,13 +350,15 @@ export default function AgencyClientsPage() {
       const tours = clientTourMap.get(client.clientId);
       const tourStr = tours?.join(', ') || '-';
       const status = client.active ? t.agency.clientActive : t.agency.clientInactive;
+      const phone = client.client?.phone ? `+${client.client.phoneCountryCode || '90'} ${client.client.phone}` : '-';
       const date = new Date(client.createdAt).toLocaleDateString(locale === 'tr' ? 'tr-TR' : locale === 'de' ? 'de-DE' : 'en-US');
       return `<tr>
         <td style="padding:6px 10px;border:1px solid #e2e8f0;text-align:center">${i + 1}</td>
         <td style="padding:6px 10px;border:1px solid #e2e8f0">${client.client?.firstName || ''} ${client.client?.lastName || ''}</td>
         <td style="padding:6px 10px;border:1px solid #e2e8f0">${client.client?.email || '-'}</td>
         <td style="padding:6px 10px;border:1px solid #e2e8f0">${client.client?.username || '-'}</td>
-        <td style="padding:6px 10px;border:1px solid #e2e8f0;text-align:center">${status}</td>
+        ${pdfShowPhone ? `<td style="padding:6px 10px;border:1px solid #e2e8f0">${phone}</td>` : ''}
+        ${pdfShowStatus ? `<td style="padding:6px 10px;border:1px solid #e2e8f0;text-align:center">${status}</td>` : ''}
         <td style="padding:6px 10px;border:1px solid #e2e8f0">${tourStr}</td>
         <td style="padding:6px 10px;border:1px solid #e2e8f0;text-align:center">${date}</td>
       </tr>`;
@@ -379,7 +383,8 @@ export default function AgencyClientsPage() {
           <th>${t.invitations.columnClient}</th>
           <th>${t.invitations.columnEmail}</th>
           <th>${t.invitations.columnUsername}</th>
-          <th style="text-align:center">${t.invitations.columnStatus}</th>
+          ${pdfShowPhone ? `<th>${t.common.phone || 'Telefon'}</th>` : ''}
+          ${pdfShowStatus ? `<th style="text-align:center">${t.invitations.columnStatus}</th>` : ''}
           <th>${t.invitations.columnTour}</th>
           <th style="text-align:center">${t.invitations.columnDate}</th>
         </tr></thead>
@@ -448,6 +453,21 @@ export default function AgencyClientsPage() {
               </div>
               {/* Action buttons - wrap on mobile */}
               <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPdfShowPhone(!pdfShowPhone)}
+                  className={`px-2.5 py-1 text-xs font-medium rounded-md border transition-colors ${pdfShowPhone ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-slate-50 border-slate-200 text-slate-500'}`}
+                >
+                  <Phone className="h-3 w-3 inline mr-1" />
+                  {t.common.phone || 'Telefon'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPdfShowStatus(!pdfShowStatus)}
+                  className={`px-2.5 py-1 text-xs font-medium rounded-md border transition-colors ${pdfShowStatus ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-slate-50 border-slate-200 text-slate-500'}`}
+                >
+                  {t.invitations.columnStatus}
+                </button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="sm" disabled={clients.length === 0}>
