@@ -64,7 +64,7 @@ function DialogContent({
         aria-describedby={undefined}
         data-slot="dialog-content"
         className={cn(
-          "bg-background fixed top-[50%] left-[50%] z-[1001] grid w-full max-w-[calc(100%-2rem)] max-h-[calc(100vh-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg outline-none overflow-y-auto",
+          "bg-background fixed top-[50%] left-[50%] z-[1001] grid w-full max-w-[calc(100%-2rem)] max-h-[calc(100dvh-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg outline-none overflow-y-auto",
           !className?.includes("max-w-") && "sm:max-w-lg",
           className
         )}

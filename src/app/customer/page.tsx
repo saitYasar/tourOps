@@ -411,7 +411,7 @@ export default function CustomerDashboard() {
       {selectedNotif && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center">
           <div className="absolute inset-0 bg-black/50" onClick={() => setSelectedNotif(null)} />
-          <div className="relative bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 max-h-[80vh] overflow-y-auto">
+          <div className="relative bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 max-h-[80dvh] overflow-y-auto">
             <div className="flex items-center justify-between p-4 border-b">
               <h3 className="font-semibold text-slate-900">
                 {t.notifications.detail}

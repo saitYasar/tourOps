@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Dialog Mobile Test</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #f1f5f9; padding: 20px; }
+h1 { font-size: 18px; margin-bottom: 16px; color: #1e293b; }
+.btn { display: block; width: 100%; padding: 14px; margin-bottom: 12px; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer; }
+.btn-seat { background: #22c55e; color: white; }
+.btn-menu { background: #f97316; color: white; }
+
+/* Dialog overlay */
+.overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; }
+.overlay.open { display: flex; align-items: center; justify-content: center; }
+
+/* Dialog - using dvh */
+.dialog {
+  background: white;
+  border-radius: 12px;
+  width: 95vw;
+  max-height: 95dvh;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  position: relative;
+}
+.dialog-header { flex-shrink: 0; padding-bottom: 12px; border-bottom: 1px solid #e2e8f0; }
+.dialog-header h2 { font-size: 16px; }
+.dialog-body { flex: 1; overflow-y: auto; padding: 12px 0; }
+.dialog-footer { flex-shrink: 0; border-top: 1px solid #e2e8f0; padding-top: 12px; display: flex; gap: 8px; justify-content: flex-end; }
+.dialog-footer button { padding: 10px 20px; border-radius: 8px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; }
+.btn-cancel { background: #f1f5f9; color: #64748b; }
+.btn-save { background: #f97316; color: white; }
+.close-x { position: absolute; top: 12px; right: 12px; background: none; border: none; font-size: 20px; cursor: pointer; color: #94a3b8; }
+
+/* Fake seat grid */
+.seat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 8px; }
+.seat { aspect-ratio: 1; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; }
+.seat-empty { background: #f8fafc; border: 1px solid #e2e8f0; color: #64748b; }
+.seat-male { background: #dbeafe; border: 1px solid #93c5fd; color: #1d4ed8; }
+.seat-female { background: #fce7f3; border: 1px solid #f9a8d4; color: #be185d; }
+.seat-mine { background: #dcfce7; border: 2px solid #22c55e; color: #166534; }
+
+/* Fake menu items */
+.menu-item { padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+.menu-item-name { font-weight: 500; color: #334155; }
+.menu-item-price { color: #f97316; font-weight: 600; }
+
+/* Info banner */
+.info { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 12px; margin-bottom: 16px; font-size: 13px; color: #1e40af; }
+.status { margin-top: 16px; padding: 10px; background: #dcfce7; border-radius: 8px; font-size: 13px; color: #166534; text-align: center; }
+</style>
+</head>
+<body>
+
+<h1>Dialog Mobile Test (dvh)</h1>
+<div class="info">
+  Bu sayfa auth gerektirmez. Dialog'ların mobilde kaydet/kapat butonlarının görünüp görünmediğini test eder.<br><br>
+  <strong>max-height: 95dvh</strong> kullanılıyor (tarayıcı toolbar'ını hesaba katar).
+</div>
+
+<button class="btn btn-seat" onclick="openDialog('seat')">Koltuk Seçim Dialog'u Aç</button>
+<button class="btn btn-menu" onclick="openDialog('menu')">Menü Seçim Dialog'u Aç</button>
+
+<div class="status">
+  Viewport: <span id="vh-info"></span><br>
+  dvh desteği: <span id="dvh-support"></span>
+</div>
+
+<!-- Seat Dialog -->
+<div class="overlay" id="seat-dialog">
+  <div class="dialog">
+    <button class="close-x" onclick="closeDialog('seat')">&times;</button>
+    <div class="dialog-header">
+      <h2>🪑 Yer Seç</h2>
+    </div>
+    <div class="dialog-body">
+      <div class="seat-grid">
+        <div class="seat seat-mine">1</div>
+        <div class="seat seat-empty"></div>
+        <div class="seat seat-empty">3</div>
+        <div class="seat seat-empty"></div>
+        <div class="seat seat-empty">5</div>
+        <div class="seat seat-female">6</div>
+        <div class="seat seat-male">7</div>
+        <div class="seat seat-female">8</div>
+        <div class="seat seat-empty">9</div>
+        <div class="seat seat-empty">10</div>
+        <div class="seat seat-female">11</div>
+        <div class="seat seat-empty">12</div>
+        <div class="seat seat-empty">13</div>
+        <div class="seat seat-empty">14</div>
+        <div class="seat seat-empty">15</div>
+        <div class="seat seat-empty">16</div>
+        <div class="seat seat-empty">17</div>
+        <div class="seat seat-empty">18</div>
+        <div class="seat seat-empty">19</div>
+        <div class="seat seat-empty">20</div>
+        <div class="seat seat-empty">21</div>
+        <div class="seat seat-empty">22</div>
+        <div class="seat seat-empty"></div>
+        <div class="seat seat-empty"></div>
+        <div class="seat seat-empty">25</div>
+        <div class="seat seat-empty">26</div>
+        <div class="seat seat-empty">23</div>
+        <div class="seat seat-empty">24</div>
+        <div class="seat seat-empty">29</div>
+        <div class="seat seat-empty">30</div>
+        <div class="seat seat-empty">27</div>
+        <div class="seat seat-empty">28</div>
+        <div class="seat seat-empty">33</div>
+        <div class="seat seat-empty">34</div>
+        <div class="seat seat-empty">31</div>
+        <div class="seat seat-empty">32</div>
+        <div class="seat seat-empty">37</div>
+        <div class="seat seat-empty">38</div>
+        <div class="seat seat-empty">35</div>
+        <div class="seat seat-empty">36</div>
+        <div class="seat seat-empty">41</div>
+        <div class="seat seat-empty">42</div>
+        <div class="seat seat-empty">39</div>
+        <div class="seat seat-empty">40</div>
+      </div>
+    </div>
+    <div class="dialog-footer">
+      <button class="btn-cancel" onclick="closeDialog('seat')">İptal</button>
+      <button class="btn-save" onclick="closeDialog('seat')">✓ Onayla</button>
+    </div>
+  </div>
+</div>
+
+<!-- Menu Dialog -->
+<div class="overlay" id="menu-dialog">
+  <div class="dialog" style="min-height: 60dvh;">
+    <button class="close-x" onclick="closeDialog('menu')">&times;</button>
+    <div class="dialog-header">
+      <h2>🍽️ Menü Seç</h2>
+    </div>
+    <div class="dialog-body">
+      <div class="menu-item"><span class="menu-item-name">Izgara Köfte</span><span class="menu-item-price">€12.50</span></div>
+      <div class="menu-item"><span class="menu-item-name">Adana Kebap</span><span class="menu-item-price">€15.00</span></div>
+      <div class="menu-item"><span class="menu-item-name">Karışık Izgara</span><span class="menu-item-price">€18.00</span></div>
+      <div class="menu-item"><span class="menu-item-name">Kuzu Pirzola</span><span class="menu-item-price">€22.00</span></div>
+      <div class="menu-item"><span class="menu-item-name">Tavuk Şiş</span><span class="menu-item-price">€11.00</span></div>
+      <div class="menu-item"><span class="menu-item-name">Lahmacun</span><span class="menu-item-price">€8.00</span></div>
+      <div class="menu-item"><span class="menu-item-name">Pide (Kaşarlı)</span><span class="menu-item-price">€9.50</span></div>
+      <div class="menu-item"><span class="menu-item-name">İskender</span><span class="menu-item-price">€16.00</span></div>
+      <div class="menu-item"><span class="menu-item-name">Mercimek Çorbası</span><span class="menu-item-price">€5.00</span></div>
+      <div class="menu-item"><span class="menu-item-name">Künefe</span><span class="menu-item-price">€7.00</span></div>
+      <div class="menu-item"><span class="menu-item-name">Baklava</span><span class="menu-item-price">€6.50</span></div>
+      <div class="menu-item"><span class="menu-item-name">Ayran</span><span class="menu-item-price">€2.00</span></div>
+    </div>
+    <div class="dialog-footer">
+      <div style="flex:1">
+        <div style="font-size:13px;color:#64748b;">3 ürün</div>
+        <div style="font-size:18px;font-weight:700;color:#f97316;">Toplam: €45.50</div>
+      </div>
+      <button class="btn-save" onclick="closeDialog('menu')">✓ Seçimi Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function openDialog(type) {
+  document.getElementById(type + '-dialog').classList.add('open');
+}
+function closeDialog(type) {
+  document.getElementById(type + '-dialog').classList.remove('open');
+}
+
+// Show viewport info
+function updateInfo() {
+  document.getElementById('vh-info').textContent =
+    window.innerHeight + 'px (innerHeight) / ' + document.documentElement.clientHeight + 'px (clientHeight)';
+}
+updateInfo();
+window.addEventListener('resize', updateInfo);
+
+// Check dvh support
+const div = document.createElement('div');
+div.style.height = '100dvh';
+document.body.appendChild(div);
+const supported = div.offsetHeight > 0 && div.offsetHeight !== window.innerHeight * 0;
+document.getElementById('dvh-support').textContent = CSS.supports('height', '100dvh') ? '✅ Destekleniyor' : '❌ Desteklenmiyor';
+document.body.removeChild(div);
+</script>
+
+</body>
+</html>
