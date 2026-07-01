@@ -654,7 +654,7 @@ function DashboardView({
                   )}
                   <CardContent className="p-3 sm:p-4 flex-1 flex flex-col min-w-0">
                     <div className="flex items-start justify-between gap-2 mb-1.5 sm:mb-2">
-                      <h4 className="font-bold text-slate-800 text-xs sm:text-base min-w-0 line-clamp-2">{tour.tourName}</h4>
+                      <h4 className="font-bold text-slate-800 text-[11px] sm:text-base min-w-0">{tour.tourName}</h4>
                       <span
                         className={`text-[10px] sm:text-xs font-medium px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full whitespace-nowrap shrink-0 ${statusCfg.color} ${!isConfirmed ? 'cursor-help' : ''}`}
                         title={!isConfirmed ? t.customer.participantNotConfirmedTooltip : ''}
