@@ -73,7 +73,7 @@ export default function AdminLoginPage() {
 
   // Verify OTP
   const onVerifyOtp = async () => {
-    if (otp.length !== 6) {
+    if (otp.length !== 4) {
       setError(t.auth.otpInvalid);
       return;
     }
@@ -233,11 +233,11 @@ export default function AdminLoginPage() {
                     <Input
                       id="otp"
                       type="text"
-                      placeholder="000000"
-                      maxLength={6}
+                      placeholder="0000"
+                      maxLength={4}
                       value={otp}
                       onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                      onKeyDown={(e) => { if (e.key === 'Enter' && otp.length === 6 && !isSubmitting) onVerifyOtp(); }}
+                      onKeyDown={(e) => { if (e.key === 'Enter' && otp.length === 4 && !isSubmitting) onVerifyOtp(); }}
                       className="h-14 text-center text-2xl tracking-[0.5em] font-mono rounded-xl"
                       autoFocus
                     />
@@ -246,7 +246,7 @@ export default function AdminLoginPage() {
                   <Button
                     onClick={onVerifyOtp}
                     className="w-full h-11 rounded-xl bg-slate-800 hover:bg-slate-900 text-white"
-                    disabled={isSubmitting || otp.length !== 6}
+                    disabled={isSubmitting || otp.length !== 4}
                   >
                     {isSubmitting ? (
                       <span className="flex items-center">
