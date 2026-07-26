@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   Compass,
@@ -172,7 +172,7 @@ function CustomerLoginContent() {
 
   // Verify OTP
   const handleVerifyOtp = async () => {
-    if (otp.length !== 6) return;
+    if (otp.length !== 4) return;
     setError('');
     setIsLoading(true);
 
@@ -323,9 +323,9 @@ function CustomerLoginContent() {
               </div>
             </div>
 
-            <div className="space-y-5">
-              {/* OTP Verification Step */}
-              {otpStep === 'otp' ? (
+            <div>
+              {/* OTP Verification Step - always in DOM */}
+              <div className={otpStep === 'otp' ? '' : 'hidden'}>
                 <OtpVerifySection
                   email={email}
                   otp={otp}
@@ -337,10 +337,13 @@ function CustomerLoginContent() {
                   onBack={() => { setOtpStep('form'); setOtp(''); setError(''); }}
                   t={t}
                   buttonLabel={mode === 'register' ? t.auth.clientRegister : t.auth.login}
+                  isVisible={otpStep === 'otp'}
                 />
-              ) : mode === 'login' ? (
-                /* ===== GİRİŞ ===== */
-                <>
+              </div>
+
+              {/* ===== GİRİŞ ===== */}
+              <div className={otpStep !== 'otp' && mode === 'login' ? '' : 'hidden'}>
+                <div className="space-y-5">
                   <div className="text-center">
                     <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-gradient-to-r from-rose-100 to-amber-100 mb-3">
                       <LogIn className="h-7 w-7 text-red-500" />
@@ -375,13 +378,14 @@ function CustomerLoginContent() {
                     </button>
                   </div>
 
-                  {error && (
+                  {/* Login Error - always in DOM */}
+                  <div className={error && otpStep !== 'otp' && mode === 'login' ? '' : 'hidden'}>
                     <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm text-center">
-                      {error}
+                      {error || ' '}
                     </div>
-                  )}
+                  </div>
 
-                  {loginMethod === 'username' ? (
+                  <div className={loginMethod === 'username' ? '' : 'hidden'}>
                     <form onSubmit={handleUsernameLogin} className="space-y-4">
                       <div className="space-y-1.5">
                         <Label htmlFor="username" className="text-sm font-medium text-slate-700">
@@ -434,20 +438,16 @@ function CustomerLoginContent() {
                         className="w-full h-11 rounded-xl text-sm font-medium bg-gradient-to-r from-rose-500 via-red-500 to-amber-500 hover:from-rose-600 hover:via-red-600 hover:to-amber-600 text-white shadow-lg shadow-red-500/25"
                         disabled={isLoading || !username.trim() || !password.trim()}
                       >
-                        {isLoading ? (
-                          <>
-                            <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                            {t.auth.loggingIn}
-                          </>
-                        ) : (
-                          <>
-                            <LogIn className="h-4 w-4 mr-2" />
-                            {t.auth.loginAsClient}
-                          </>
-                        )}
+                        <span className="flex items-center">
+                          <Loader2 className={`h-4 w-4 mr-2 animate-spin ${isLoading ? '' : 'hidden'}`} />
+                          <LogIn className={`h-4 w-4 mr-2 ${isLoading ? 'hidden' : ''}`} />
+                          <span>{isLoading ? t.auth.loggingIn : t.auth.loginAsClient}</span>
+                        </span>
                       </Button>
                     </form>
-                  ) : (
+                  </div>
+
+                  <div className={loginMethod === 'email' ? '' : 'hidden'}>
                     <form onSubmit={handleEmailLogin} className="space-y-4">
                       <div className="space-y-1.5">
                         <Label htmlFor="login-email" className="text-sm font-medium text-slate-700">
@@ -473,24 +473,20 @@ function CustomerLoginContent() {
                         className="w-full h-11 rounded-xl text-sm font-medium bg-gradient-to-r from-rose-500 via-red-500 to-amber-500 hover:from-rose-600 hover:via-red-600 hover:to-amber-600 text-white shadow-lg shadow-red-500/25"
                         disabled={isLoading || !email.trim()}
                       >
-                        {isLoading ? (
-                          <>
-                            <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                            {t.auth.sending}
-                          </>
-                        ) : (
-                          <>
-                            <Mail className="h-4 w-4 mr-2" />
-                            {t.auth.sendOtp}
-                          </>
-                        )}
+                        <span className="flex items-center">
+                          <Loader2 className={`h-4 w-4 mr-2 animate-spin ${isLoading ? '' : 'hidden'}`} />
+                          <Mail className={`h-4 w-4 mr-2 ${isLoading ? 'hidden' : ''}`} />
+                          <span>{isLoading ? t.auth.sending : t.auth.sendOtp}</span>
+                        </span>
                       </Button>
                     </form>
-                  )}
-                </>
-              ) : (
-                /* ===== KAYIT ===== */
-                <>
+                  </div>
+                </div>
+              </div>
+
+              {/* ===== KAYIT ===== */}
+              <div className={otpStep !== 'otp' && mode === 'register' ? '' : 'hidden'}>
+                <div className="space-y-5">
                   <div className="text-center">
                     <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-gradient-to-r from-rose-100 to-amber-100 mb-3">
                       <UserPlus className="h-7 w-7 text-red-500" />
@@ -499,11 +495,12 @@ function CustomerLoginContent() {
                     <p className="text-slate-500 text-sm">{t.auth.clientRegisterSubtitle}</p>
                   </div>
 
-                  {error && (
+                  {/* Register Error - always in DOM */}
+                  <div className={error && otpStep !== 'otp' && mode === 'register' ? '' : 'hidden'}>
                     <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm text-center">
-                      {error}
+                      {error || ' '}
                     </div>
-                  )}
+                  </div>
 
                   <form onSubmit={handleRegister} className="space-y-4">
                     <div className="grid grid-cols-2 gap-3">
@@ -561,21 +558,15 @@ function CustomerLoginContent() {
                       className="w-full h-11 rounded-xl text-sm font-medium bg-gradient-to-r from-rose-500 via-red-500 to-amber-500 hover:from-rose-600 hover:via-red-600 hover:to-amber-600 text-white shadow-lg shadow-red-500/25"
                       disabled={isLoading || !email.trim() || !firstName.trim() || !lastName.trim()}
                     >
-                      {isLoading ? (
-                        <>
-                          <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                          {t.auth.registering}
-                        </>
-                      ) : (
-                        <>
-                          <UserPlus className="h-4 w-4 mr-2" />
-                          {t.auth.clientRegister}
-                        </>
-                      )}
+                      <span className="flex items-center">
+                        <Loader2 className={`h-4 w-4 mr-2 animate-spin ${isLoading ? '' : 'hidden'}`} />
+                        <UserPlus className={`h-4 w-4 mr-2 ${isLoading ? 'hidden' : ''}`} />
+                        <span>{isLoading ? t.auth.registering : t.auth.clientRegister}</span>
+                      </span>
                     </Button>
                   </form>
-                </>
-              )}
+                </div>
+              </div>
 
               {/* Info Box */}
               <div className="p-4 rounded-xl bg-gradient-to-r from-rose-100 to-red-100 border border-red-200">
@@ -612,6 +603,7 @@ function OtpVerifySection({
   onBack,
   t,
   buttonLabel,
+  isVisible,
 }: {
   email: string;
   otp: string;
@@ -624,7 +616,15 @@ function OtpVerifySection({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   t: any;
   buttonLabel: string;
+  isVisible: boolean;
 }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Node stays mounted, so autoFocus never fires — focus when the step becomes visible
+  useEffect(() => {
+    if (isVisible) inputRef.current?.focus();
+  }, [isVisible]);
+
   return (
     <div className="space-y-5">
       <button
@@ -646,44 +646,39 @@ function OtpVerifySection({
         </p>
       </div>
 
-      {error && (
+      {/* OTP Error - always in DOM */}
+      <div className={error ? '' : 'hidden'}>
         <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm text-center">
-          {error}
+          {error || ' '}
         </div>
-      )}
+      </div>
 
       <div className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="otp" className="text-slate-700 text-sm">{t.auth.otpLabel}</Label>
           <Input
+            ref={inputRef}
             id="otp"
             type="text"
-            placeholder="000000"
-            maxLength={6}
+            placeholder="0000"
+            maxLength={4}
             value={otp}
             onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-            onKeyDown={(e) => { if (e.key === 'Enter' && otp.length === 6 && !isLoading) onVerify(); }}
+            onKeyDown={(e) => { if (e.key === 'Enter' && otp.length === 4 && !isLoading) onVerify(); }}
             className="h-14 text-center text-2xl tracking-[0.5em] font-mono rounded-xl border-slate-200 focus:border-red-400 focus:ring-red-400"
-            autoFocus
           />
         </div>
 
         <Button
           onClick={onVerify}
           className="w-full h-11 rounded-xl text-sm font-medium bg-gradient-to-r from-rose-500 via-red-500 to-amber-500 hover:from-rose-600 hover:via-red-600 hover:to-amber-600 text-white shadow-lg shadow-red-500/25"
-          disabled={isLoading || otp.length !== 6}
+          disabled={isLoading || otp.length !== 4}
         >
-          {isLoading ? (
-            <>
-              <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-              {t.auth.verifying}
-            </>
-          ) : (
-            <>
-              <CheckCircle2 className="h-4 w-4 mr-2" />
-              {buttonLabel}
-            </>
-          )}
+          <span className="flex items-center">
+            <Loader2 className={`h-4 w-4 mr-2 animate-spin ${isLoading ? '' : 'hidden'}`} />
+            <CheckCircle2 className={`h-4 w-4 mr-2 ${isLoading ? 'hidden' : ''}`} />
+            <span>{isLoading ? t.auth.verifying : buttonLabel}</span>
+          </span>
         </Button>
 
         <p className="text-xs text-slate-500 text-center">
