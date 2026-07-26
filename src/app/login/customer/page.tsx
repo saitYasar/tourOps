@@ -323,7 +323,7 @@ function CustomerLoginContent() {
               </div>
             </div>
 
-            <div>
+            <div className="space-y-5">
               {/* OTP Verification Step - always in DOM */}
               <div className={otpStep === 'otp' ? '' : 'hidden'}>
                 <OtpVerifySection
