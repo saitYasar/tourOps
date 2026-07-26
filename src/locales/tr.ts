@@ -71,8 +71,8 @@ export const tr = {
     // OTP related
     otpTitle: 'Doğrulama Kodu',
     otpLabel: 'Doğrulama Kodu',
-    otpSentTo: 'adresine gönderilen 6 haneli kodu giriniz',
-    otpInvalid: 'Lütfen 6 haneli doğrulama kodunu giriniz',
+    otpSentTo: 'adresine gönderilen 4 haneli kodu giriniz',
+    otpInvalid: 'Lütfen 4 haneli doğrulama kodunu giriniz',
     otpError: 'Doğrulama kodu hatalı veya süresi dolmuş. Lütfen tekrar deneyin.',
     otpWrongCode: 'Doğrulama kodu hatalı',
     verifying: 'Doğrulanıyor...',
@@ -84,7 +84,7 @@ export const tr = {
     sendOtp: 'Doğrulama Kodu Gönder',
     sending: 'Gönderiliyor...',
     enterEmail: 'E-posta adresinizi girin',
-    otpInfo: 'E-posta adresinize 6 haneli doğrulama kodu gönderilecektir.',
+    otpInfo: 'E-posta adresinize 4 haneli doğrulama kodu gönderilecektir.',
     // Error states
     accountNotFound: 'Hesap Bulunamadı',
     accountNotFoundMsg: 'Bu e-posta ile kayıtlı bir hesap bulunamadı. Lütfen önce kayıt oluşturun.',
@@ -108,7 +108,7 @@ export const tr = {
     adminLogin: 'Admin Girişi',
     adminPanel: 'Yönetim Paneli',
     adminEmailPlaceholder: 'Yönetici e-posta adresinizi girin',
-    adminOnlyInfo: 'Yalnızca sistem yöneticileri giriş yapabilir. E-posta adresinize 6 haneli doğrulama kodu gönderilecektir.',
+    adminOnlyInfo: 'Yalnızca sistem yöneticileri giriş yapabilir. E-posta adresinize 4 haneli doğrulama kodu gönderilecektir.',
     otpSendFailed: 'OTP gönderilemedi',
     generalError: 'Bir hata oluştu',
     businessApproval: 'İşletme onay yönetimi',
@@ -1743,7 +1743,7 @@ export const tr = {
     formSubmitting: 'İşlem devam ediyor...',
     fillRequired: 'Gerekli alanları doldurun',
     nameRequired: 'İsim alanı boş olamaz',
-    otpRequired: 'OTP kodu 6 haneli olmalı',
+    otpRequired: 'OTP kodu 4 haneli olmalı',
     // Menu
     noCategoriesYet: 'Henüz kategori oluşturulmamış',
     // Layout editor

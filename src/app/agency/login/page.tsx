@@ -201,7 +201,7 @@ function AgencyClientLoginContent() {
 
   // Verify OTP (works for both email login and register)
   const handleVerifyOtp = async () => {
-    if (otp.length !== 6) return;
+    if (otp.length !== 4) return;
     setError('');
     setIsLoading(true);
 
@@ -751,11 +751,11 @@ function OtpVerifySection({
           <Input
             id="otp"
             type="text"
-            placeholder="000000"
-            maxLength={6}
+            placeholder="0000"
+            maxLength={4}
             value={otp}
             onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-            onKeyDown={(e) => { if (e.key === 'Enter' && otp.length === 6 && !isLoading) onVerify(); }}
+            onKeyDown={(e) => { if (e.key === 'Enter' && otp.length === 4 && !isLoading) onVerify(); }}
             className="h-14 text-center text-2xl tracking-[0.5em] font-mono rounded-xl border-slate-200 focus:border-red-400 focus:ring-red-400"
             autoFocus
           />
@@ -764,7 +764,7 @@ function OtpVerifySection({
         <Button
           onClick={onVerify}
           className="w-full h-11 rounded-xl text-sm font-medium bg-gradient-to-r from-rose-500 via-red-500 to-amber-500 hover:from-rose-600 hover:via-red-600 hover:to-amber-600 text-white shadow-lg shadow-red-500/25"
-          disabled={isLoading || otp.length !== 6}
+          disabled={isLoading || otp.length !== 4}
         >
           {isLoading ? (
             <>

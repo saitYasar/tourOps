@@ -148,7 +148,7 @@ export default function LoginPage() {
   };
 
   const onVerifyOtp = async () => {
-    if (otp.length !== 6) {
+    if (otp.length !== 4) {
       setError({ type: 'invalid_otp', message: t.auth.otpInvalid });
       return;
     }
@@ -323,11 +323,11 @@ export default function LoginPage() {
                     <Input
                       id="otp"
                       type="text"
-                      placeholder="000000"
-                      maxLength={6}
+                      placeholder="0000"
+                      maxLength={4}
                       value={otp}
                       onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                      onKeyDown={(e) => { if (e.key === 'Enter' && otp.length === 6 && !isSubmitting) onVerifyOtp(); }}
+                      onKeyDown={(e) => { if (e.key === 'Enter' && otp.length === 4 && !isSubmitting) onVerifyOtp(); }}
                       className="h-14 text-center text-2xl tracking-[0.5em] font-mono rounded-xl border-slate-200 focus:border-blue-400 focus:ring-blue-400"
                     />
                   </div>
@@ -335,7 +335,7 @@ export default function LoginPage() {
                   <Button
                     onClick={onVerifyOtp}
                     className={`w-full h-11 rounded-xl text-sm font-medium ${theme.primary} text-white`}
-                    disabled={isSubmitting || otp.length !== 6}
+                    disabled={isSubmitting || otp.length !== 4}
                   >
                     <span className="flex items-center">
                       <Loader2 className={`h-4 w-4 mr-2 animate-spin ${isSubmitting ? '' : 'hidden'}`} />
