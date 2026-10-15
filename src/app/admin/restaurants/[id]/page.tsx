@@ -1778,7 +1778,8 @@ function MenuTab({ orgId }: { orgId: number }) {
         id: editingService.id,
         data: {
           title: serviceForm.title,
-          description: serviceForm.description || undefined,
+          // Send empty string (not undefined) so a cleared description is actually removed
+          description: serviceForm.description,
           basePrice: serviceForm.basePrice,
           priceType: serviceForm.priceType,
           serviceCategoryId: serviceForm.serviceCategoryId,
